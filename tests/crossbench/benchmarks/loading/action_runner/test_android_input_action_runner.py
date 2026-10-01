@@ -157,8 +157,8 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
         "-l",
         result=("List of attached devices\n"
                 "1.1.1.1 device product:mock model:mock"))
-    self.platform = AndroidAdbMockPlatform(
-        self.host_platform, adb=MockAdb(self.host_platform))
+    self.adb = MockAdb(self.host_platform)
+    self.platform = AndroidAdbMockPlatform(self.host_platform, adb=self.adb)
     self.uinput_proc = mock.MagicMock()
     self.uinput_proc.poll.return_value = None
     self.uinput_proc.stdin = mock.MagicMock()
@@ -267,6 +267,35 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
       self.assertEqual(device_name, "custom_kb")
       self.assertTrue(events)
 
+  def test_text_input_legacy_sdk_zero_duration(self) -> None:
+    self.adb.mock_sdk_version = 36
+    self.platform.expect_sh("input", "keyboard", "text", "Some%ssample%stext")
+    text_input_action = TextInputAction.create(
+        InputSource.KEYBOARD, text="Some sample text", duration=dt.timedelta())
+    self.run_action(text_input_action)
+
+  def test_text_input_legacy_sdk_non_zero_duration(self) -> None:
+    self.adb.mock_sdk_version = 36
+    for _ in range(3):
+      self.platform.expect_sh("input", "keyboard", "text", "a")
+    text_input_action = TextInputAction.create(
+        InputSource.KEYBOARD, text="aaa", duration=dt.timedelta(seconds=1))
+    self.run_action(text_input_action)
+
+  def test_text_input_legacy_sdk_keyevent_w3c(self) -> None:
+    self.adb.mock_sdk_version = 36
+    self.platform.expect_sh("input", "keyevent", "KEYCODE_ENTER")
+    text_input_action = TextInputAction(
+        InputSource.KEYBOARD, keyevent="Enter", duration=dt.timedelta())
+    self.run_action(text_input_action)
+
+  def test_text_input_legacy_sdk_keyevent_android(self) -> None:
+    self.adb.mock_sdk_version = 36
+    self.platform.expect_sh("input", "keyevent", "KEYCODE_BACK")
+    text_input_action = TextInputAction(
+        InputSource.KEYBOARD, keyevent="KEYCODE_BACK", duration=dt.timedelta())
+    self.run_action(text_input_action)
+
   def test_click_touch_coordinates(self) -> None:
     click_action = ClickAction.create(
         InputSource.TOUCH,
@@ -282,6 +311,26 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
           WaitEvent(dt.timedelta(milliseconds=50)),
           TouchEvent(Point(100, 200), is_down=False),
       ])
+
+  def test_click_touch_legacy_sdk_coordinates(self) -> None:
+    self.adb.mock_sdk_version = 36
+    click_action = ClickAction.create(
+        InputSource.TOUCH,
+        position=PositionConfig.from_coordinates(x=100, y=200))
+    self.platform.expect_sh("input", "tap", "100", "200")
+    self.run_action(click_action)
+
+  def test_click_touch_legacy_sdk_selector_success(self) -> None:
+    self.adb.mock_sdk_version = 36
+    click_action = ClickAction.create(
+        InputSource.TOUCH,
+        position=PositionConfig.from_selector(selector="div[]", required=True))
+    self.expect_action_setup(
+        found_element=True,
+        app_bounds=DisplayRectangle(Point(0, 0), 100, 100),
+        element_bounds=DisplayRectangle(Point(20, 40), 10, 10))
+    self.platform.expect_sh("input", "tap", "25", "45")
+    self.run_action(click_action)
 
   def test_click_mouse_coordinates(self) -> None:
     click_action = ClickAction.create(
@@ -299,6 +348,26 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
           WaitEvent(dt.timedelta(milliseconds=50)),
           MouseButtonEvent(ButtonClick.LEFT, is_down=False),
       ])
+
+  def test_click_mouse_legacy_sdk_coordinates(self) -> None:
+    self.adb.mock_sdk_version = 36
+    click_action = ClickAction.create(
+        InputSource.MOUSE,
+        position=PositionConfig.from_coordinates(x=100, y=200))
+    self.platform.expect_sh("input", "mouse", "tap", "100", "200")
+    self.run_action(click_action)
+
+  def test_click_mouse_legacy_sdk_selector_success(self) -> None:
+    self.adb.mock_sdk_version = 36
+    click_action = ClickAction.create(
+        InputSource.MOUSE,
+        position=PositionConfig.from_selector(selector="div[]", required=True))
+    self.expect_action_setup(
+        found_element=True,
+        app_bounds=DisplayRectangle(Point(0, 0), 100, 100),
+        element_bounds=DisplayRectangle(Point(20, 40), 10, 10))
+    self.platform.expect_sh("input", "mouse", "tap", "25", "45")
+    self.run_action(click_action)
 
   def test_click_mouse_non_zero_duration(self) -> None:
     click_action = ClickAction.create(
