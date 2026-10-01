@@ -22,6 +22,7 @@ from crossbench.probes.probe import Probe
 from crossbench.probes.probe_context import ProbeContext
 from crossbench.probes.results import LocalProbeResult, ProbeResult
 from crossbench.runner.actions import Actions
+from crossbench.runner.pause_controller import ResumeMode
 from crossbench.runner.result_origin import ResultOrigin
 from crossbench.runner.timing import Timing
 from tests.crossbench.mock_helper import MockBenchmark, MockStory
@@ -88,6 +89,7 @@ class MockRun(ResultOrigin):
     self.did_run = False
     self.did_teardown = False
     self.did_teardown_browser = False
+    self.is_skipped = False
     self.is_dry_run: bool | None = None
 
   @property
@@ -173,6 +175,9 @@ class MockRun(ResultOrigin):
   def max_end_datetime(self) -> dt.datetime:
     return dt.datetime.max
 
+  def mark_skipped(self) -> None:
+    self.is_skipped = True
+
   def run(self, is_dry_run: bool) -> None:
     assert self.is_dry_run is is_dry_run
     assert not self.did_run
@@ -255,6 +260,10 @@ class MockRunner:
     self.env = RunnerEnv(self.platform, self.out_dir, self.browsers,
                          self.probes, self.repetitions)
     self.mock_waits: list[MockWait] = []
+
+  def check_pause(self, run: Run) -> ResumeMode:
+    del run
+    return ResumeMode.CONTINUE
 
   def wait(self, time: AnyTimeUnit, absolute_time: bool = False) -> None:
     self.mock_waits.append(MockWait(time, absolute_time))

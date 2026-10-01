@@ -121,6 +121,12 @@ class RunTestCase(BaseRunGroupTestCase):
         self._run_actions_and_get_new_marks(performance_mark="custom-marker"),
         ["crossbench-custom-marker-start", "crossbench-custom-marker-stop"])
 
+  def test_mark_skipped(self) -> None:
+    run = self._create_run()
+    self.assertFalse(run.is_skipped)
+    run.mark_skipped()
+    self.assertTrue(run.is_skipped)
+
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)

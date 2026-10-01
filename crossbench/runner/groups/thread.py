@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Iterable
 from ordered_set import OrderedSet
 
 from crossbench import exception
+from crossbench.runner.pause_controller import ResumeMode
 
 if TYPE_CHECKING:
   from crossbench.browsers.browser import Browser
@@ -96,26 +97,41 @@ class RunThreadGroup(threading.Thread):
 
   def run(self) -> None:
     for browser_session in self._browser_sessions:
-      self._run_browser_session(browser_session)
+      resume_mode = self._run_browser_session(browser_session)
       if not browser_session.is_success:
         self._exceptions.extend(browser_session.exceptions)
+      if resume_mode == ResumeMode.STOP:
+        break
     self.runner.exceptions.extend(self._exceptions)
 
-  def _run_browser_session(self,
-                           browser_session: BrowserSessionRunGroup) -> None:
+  def _run_browser_session(
+      self,
+      browser_session: BrowserSessionRunGroup,
+  ) -> ResumeMode:
     if browser_session.is_single_run:
       self._log_run(browser_session.first_run)
     else:
       logging.info("=" * 80)
     with browser_session.open(self.is_dry_run) as is_success:
       if not is_success:
+        logging.warning(
+            "Browser failed to start for %s, continuing with the next run.",
+            browser_session,
+        )
         browser_session.handle_startup_failure()
-      else:
-        for run in browser_session.runs:
-          self._run_browser_session_run(browser_session, run)
+        return ResumeMode.CONTINUE
+      for run in browser_session.runs:
+        action = self._run_browser_session_run(browser_session, run)
+        if action == ResumeMode.STOP:
+          self._mark_remaining_runs_skipped(run)
+          return action
+    return ResumeMode.CONTINUE
 
-  def _run_browser_session_run(self, browser_session: BrowserSessionRunGroup,
-                               run: Run) -> None:
+  def _run_browser_session_run(
+      self,
+      browser_session: BrowserSessionRunGroup,
+      run: Run,
+  ) -> ResumeMode:
     if not browser_session.is_single_run:
       self._log_run(run)
     if not run.is_success:
@@ -130,6 +146,13 @@ class RunThreadGroup(threading.Thread):
     else:
       browser_session.exceptions.extend(run.exceptions)
       run.log_failure()
+
+    return self.runner.check_pause(run)
+
+  def _mark_remaining_runs_skipped(self, last_run: Run) -> None:
+    for remaining_run in self._runs:
+      if remaining_run.index > last_run.index:
+        remaining_run.mark_skipped()
 
 
 class RunMainGroup(RunThreadGroup):

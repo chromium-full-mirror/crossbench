@@ -97,6 +97,7 @@ class Run(ResultOrigin):
     self._probe_context_manager = ProbeRunContextManager(
         self, self._probe_results)
     self._annotations: set[RunAnnotation] = set()
+    self._is_skipped: bool = False
 
   def __str__(self) -> str:
     return f"Run({self.name}, state={self._state}, {self.browser})"
@@ -281,6 +282,13 @@ class Run(ResultOrigin):
   @property
   def is_success(self) -> bool:
     return self._exceptions.is_success
+
+  @property
+  def is_skipped(self) -> bool:
+    return self._is_skipped
+
+  def mark_skipped(self) -> None:
+    self._is_skipped = True
 
   @property
   def session(self) -> BrowserSessionRunGroup:

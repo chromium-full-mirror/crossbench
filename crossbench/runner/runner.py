@@ -35,6 +35,7 @@ from crossbench.runner.groups.repetitions import RepetitionsRunGroup
 from crossbench.runner.groups.session import BrowserSessionRunGroup
 from crossbench.runner.groups.stories import StoriesRunGroup
 from crossbench.runner.groups.thread import RunMainGroup, RunThreadGroup
+from crossbench.runner.pause_controller import PauseController, ResumeMode
 from crossbench.runner.run import Run
 from crossbench.runner.runner_state import RunnerState, RunnerStateMachine
 from crossbench.runner.timing import Timing
@@ -154,16 +155,23 @@ class Runner:
               "without closing the browser in between.\n"
               f"Enabled temperatures:\n{CacheTemperature.help_text(indent=2)}"))
     run_group.add_argument(
+        "--step-by-step-mode",
+        action="store_true",
+        help="Wait for user input before executing each action.")
+    # Pausing prompts the user from the thread that finished a run, so it is
+    # only supported when all runs are executed on a single thread.
+    thread_or_pause_group = run_group.add_mutually_exclusive_group()
+    thread_or_pause_group.add_argument(
         "--thread-mode",
         "--parallel",
         default=ThreadMode.NONE,
         type=ThreadMode,  # type: ignore
         help=("Change how Runs are executed.\n" +
               ThreadMode.help_text(indent=2)))
-    run_group.add_argument(
-        "--step-by-step-mode",
+    thread_or_pause_group.add_argument(
+        "--pause-on-error",
         action="store_true",
-        help="Wait for user input before executing each action.")
+        help="Pause and ask how to proceed when a run fails.")
 
   @classmethod
   def _add_output_arguments(cls, benchmark_cls: type[Benchmark],
@@ -236,6 +244,7 @@ class Runner:
         "ignore_partial_failures": args.ignore_partial_failures,
         "disabled_probes": args.no_probe,
         "required_device_config_mode": args.required_device_config_mode,
+        "pause_on_error": args.pause_on_error,
     }
 
   def __init__(
@@ -262,6 +271,7 @@ class Runner:
       disabled_probes: Iterable[str] = (),
       required_device_config_mode: RequiredDeviceConfigMode = (
           RequiredDeviceConfigMode.SET),
+      pause_on_error: bool = False,
   ) -> None:
     self.out_dir = out_dir.absolute()
     self._disabled_probes: frozenset[str] = frozenset(disabled_probes)
@@ -307,6 +317,11 @@ class Runner:
     self._create_symlinks: bool = create_symlinks
     self._step_by_step_mode: bool = step_by_step_mode
     self._ignore_partial_failures: bool = ignore_partial_failures
+    self._pause_controller = PauseController(pause_on_error=pause_on_error)
+
+  def check_pause(self, run: Run) -> ResumeMode:
+    """Pauses and prompts for a ResumeMode if requested or if a run failed."""
+    return self._pause_controller.check_pause(run.is_success)
 
   def _prepare_benchmark(self) -> None:
     benchmark_validator.validate_cls(type(self._benchmark))
@@ -808,7 +823,8 @@ class Runner:
 
     group_count = len(thread_groups)
     if group_count == 1:
-      self._run_single_threaded(thread_groups[0])
+      with self._pause_controller:
+        self._run_single_threaded(thread_groups[0])
       return
 
     with self._exceptions.annotate(f"Starting {group_count} thread groups."):
@@ -826,6 +842,9 @@ class Runner:
 
   def _teardown(self) -> None:
     self._state.transition(RunnerState.RUNNING, to=RunnerState.TEARDOWN)
+    self._measured_runs = [
+        run for run in self._measured_runs if not run.is_skipped
+    ]
     logging.info("=" * 80)
     if self.is_success:
       logging.info("✅ %s RUNS COMPLETED SUCCESSFULLY", len(self.runs))
@@ -836,6 +855,8 @@ class Runner:
     self._teardown_merge_probe_data()
 
   def _teardown_merge_probe_data(self) -> None:
+    if not self._measured_runs:
+      return
     throw = self._exceptions.throw
     self._cache_temperatures_groups = CacheTemperaturesRunGroup.groups(
         self._measured_runs, throw)

@@ -98,7 +98,9 @@ class BaseRunnerTestCase(
       probes: Iterable[Probe] | None = None,
       throw: bool = True,
       create_symlinks: bool = True,
-      disabled_probes: Iterable[str] = ()) -> Runner:
+      disabled_probes: Iterable[str] = (),
+      pause_on_error: bool = False,
+  ) -> Runner:
     return Runner(
         self.out_dir,
         browsers=browsers or self.browsers,
@@ -108,7 +110,8 @@ class BaseRunnerTestCase(
         create_symlinks=create_symlinks,
         throw=throw,
         in_memory_result_db=True,
-        disabled_probes=disabled_probes)
+        disabled_probes=disabled_probes,
+        pause_on_error=pause_on_error)
 
   def single_story_runner(self,
                           browser: Browser | None = None,

@@ -20,6 +20,7 @@ from crossbench.device_config import DeviceConfig, DeviceConfigValueError, \
     RequiredDeviceConfigMode
 from crossbench.exception import MultiException
 from crossbench.flags.base import Flags
+from crossbench.helper import input_helper
 from crossbench.helper.state import UnexpectedStateError
 from crossbench.network.live import LiveNetwork
 from crossbench.probes import all as all_probes
@@ -29,6 +30,7 @@ from crossbench.probes.trace_processor.trace_processor import \
     TraceProcessorProbe
 from crossbench.runner.groups.session import BrowserSessionRunGroup
 from crossbench.runner.groups.thread import RunThreadGroup
+from crossbench.runner.pause_controller import ResumeMode
 from crossbench.runner.runner import CacheTemperature, Runner, ThreadMode
 from tests import test_helper
 from tests.crossbench.mock_browser import MockChromeDev
@@ -947,6 +949,29 @@ class RunThreadGroupTestCase(BaseRunnerTestCase):
         return_value={"canonical_parent_hash": "abcdef123"}), mock.patch.object(
             runner.platform, "sh", side_effect=OSError("Git failed")):
       runner._setup()
+
+  def test_pause_on_error_flag_disabled_by_default(self):
+    runner = self.default_runner(pause_on_error=False)
+    mock_run = mock.MagicMock(is_success=False)
+    self.assertEqual(runner.check_pause(mock_run), ResumeMode.CONTINUE)
+
+  def test_pause_on_error_flag_enabled(self):
+    runner = self.default_runner(pause_on_error=True)
+    mock_run = mock.MagicMock(is_success=True)
+    self.assertEqual(runner.check_pause(mock_run), ResumeMode.CONTINUE)
+    mock_run.is_success = False
+    with mock.patch.object(input_helper, "prompt", return_value="s"):
+      self.assertEqual(runner.check_pause(mock_run), ResumeMode.STOP)
+
+  def test_stop_early_filters_skipped_runs(self):
+    runner = self.default_runner()
+    with mock.patch.object(
+        runner._pause_controller, "check_pause", return_value=ResumeMode.STOP):
+      runner.run()
+    self.assertEqual(len(runner.runs), 1)
+    self.assertFalse(runner.all_runs[0].is_skipped)
+    for skipped_run in runner.all_runs[1:]:
+      self.assertTrue(skipped_run.is_skipped)
 
 
 class DeviceConfigRunnerTestCase(BaseRunnerTestCase):
