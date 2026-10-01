@@ -812,7 +812,7 @@ class BenchmarkSubcommand(CrossbenchSubcommand):
     if not args.create_symlinks or args.out_dir:
       return
     results_root = runner.out_dir.parent
-    latest_link = results_root / "latest"
+    latest_link = pth.LATEST_RESULT_DIR
     if latest_link.is_symlink():
       latest_link.unlink()
     if not latest_link.exists():

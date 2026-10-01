@@ -27,6 +27,10 @@ class PlatformHelperTestCase(unittest.TestCase):
       pth.safe_filename(test_str, strict_len=True)
     self.assertEqual(len(pth.safe_filename(test_str)), pth.MAX_PART_LEN)
 
+  def test_results_dirs(self) -> None:
+    self.assertEqual(pth.RESULTS_DIR, pth.ROOT_DIR / "results")
+    self.assertEqual(pth.LATEST_RESULT_DIR, pth.RESULTS_DIR / "latest")
+
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)

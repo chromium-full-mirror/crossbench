@@ -21,10 +21,8 @@ from crossbench.parse import PathParser
 from crossbench.probes.trace_processor.trace_processor import MODULES_DIR, \
     QUERIES_DIR, TraceProcessorProbe
 
-ROOT_DIR: Final = pth.LocalPath(__file__).parents[2]
-DEFAULT_RESULT_DIR: Final = ROOT_DIR / "results" / "latest"
-DEFAULT_CONFIG_PATH: Final = (
-    ROOT_DIR / "config" / "benchmark" / "loadline" / "probe_config.hjson")
+DEFAULT_CONFIG_PATH: Final[pth.LocalPath] = (
+    pth.ROOT_DIR / "config" / "benchmark" / "loadline" / "probe_config.hjson")
 
 
 class MergedTraceUriResolver(TraceUriResolver):
@@ -62,7 +60,7 @@ class BTPUtil:
     self.parser.add_argument(
         "--result-dir",
         type=PathParser.existing_path,
-        default=DEFAULT_RESULT_DIR,
+        default=pth.LATEST_RESULT_DIR,
         help="Path to the benchmark result directory.")
     self.parser.add_argument(
         "--probe-config",
@@ -72,7 +70,7 @@ class BTPUtil:
     self.parser.add_argument(
         "--output-dir",
         type=PathParser.path,
-        default=ROOT_DIR,
+        default=pth.ROOT_DIR,
         help="Path to the directory where output files will be placed.")
     self.parser.add_argument(
         "--extra-query",

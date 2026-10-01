@@ -28,6 +28,8 @@ LocalPosixPath: TypeAlias = pathlib.PosixPath
 LocalPathLike: TypeAlias = str | LocalPath
 
 ROOT_DIR: Final[LocalPath] = LocalPath(__file__).parents[1]
+RESULTS_DIR: Final[LocalPath] = ROOT_DIR / "results"
+LATEST_RESULT_DIR: Final[LocalPath] = RESULTS_DIR / "latest"
 
 MAX_PART_LEN: Final[int] = 255
 

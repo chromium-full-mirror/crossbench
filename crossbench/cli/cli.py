@@ -32,6 +32,7 @@ from crossbench.cli.subcommand.help import HelpSubcommand
 from crossbench.cli.subcommand.mcp import McpSubcommand
 from crossbench.cli.subcommand.perfetto import PerfettoCrossbenchSubcommand
 from crossbench.cli.subcommand.pinpoint import PinpointSubcommand
+from crossbench.cli.subcommand.reprocess import ReprocessSubcommand
 from crossbench.cli.subcommand.setup_cross_platform_mode import \
     SetupCrossPlatformModeSubcommand
 from crossbench.cli.subcommand.upload_results import UploadResultsSubcommand
@@ -229,6 +230,7 @@ class CrossBenchCLI:
     self._add_subcommand(McpSubcommand)
     self._add_subcommand(PerfettoCrossbenchSubcommand)
     self._add_subcommand(PinpointSubcommand)
+    self._add_subcommand(ReprocessSubcommand)
     self._add_subcommand(SetupCrossPlatformModeSubcommand)
     self._add_subcommand(UploadResultsSubcommand)
 

@@ -55,7 +55,6 @@ xlsxwriter = "3.2.5"
 crossbench = 'crossbench.scripts:crossbench'
 cb = 'crossbench.scripts:crossbench'
 cb_btp = 'crossbench.scripts:cb_btp'
-cb_reprocess = 'crossbench.scripts:cb_reprocess'
 cb_validate_hjson = 'crossbench.scripts:cb_validate_hjson'
 
 [tool.poetry.group.dev.dependencies]

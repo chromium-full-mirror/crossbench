@@ -6,51 +6,66 @@ from __future__ import annotations
 
 import argparse
 import json
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any, Protocol
 
 import pandas as pd
 from tabulate import tabulate
+from typing_extensions import override
 
+from crossbench import path as pth
 from crossbench.benchmarks.web_power.probe import WebPowerProbe
-from crossbench.cli.btp import DEFAULT_RESULT_DIR
-from crossbench.cli.parser import CBArgumentParser
+from crossbench.cli.subcommand.base import CrossbenchSubcommand
 from crossbench.parse import ObjectParser, PathParser
 
 if TYPE_CHECKING:
-  from crossbench import path as pth
-  from crossbench.probes.probe import Probe
+  from crossbench.cli.parser import CBArgumentParser, CBNamespace
+  from crossbench.cli.types import Subparsers
 
 
-class ReprocessUtil:
-  """Utility class for reprocessing existing Crossbench benchmark data offline.
+class ReprocessableProbe(Protocol):
 
-  This is used by the `cb_reprocess` CLI tool to re-evaluate probe scores
-  (e.g., parsing power rails) from previously collected CSV files without
-  needing to re-run the entire benchmark.
-  """
+  @classmethod
+  def process_result_dir(cls,
+                         result_dir: pth.LocalPath,
+                         base_df: pd.DataFrame,
+                         reprocess: bool = False) -> pd.DataFrame:
+    ...
 
-  SUPPORTED_PROBES: dict[str, type[Probe]] = {
+
+class ReprocessSubcommand(CrossbenchSubcommand):
+  """A subcommand for reprocessing existing benchmark results offline."""
+
+  NAME = "reprocess"
+  SUPPORTED_PROBES: dict[str, type[ReprocessableProbe]] = {
       "web_power": WebPowerProbe,
   }
 
-  def __init__(self) -> None:
-    self.parser: CBArgumentParser = CBArgumentParser(
-        description=(
-            "Reprocesses benchmark results "
-            "from existing CSV files without re-running the benchmark."),
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    self.parser.add_argument(
-        "path",
+  @override
+  def register_subcommand(self,
+                          subparsers: Subparsers) -> argparse.ArgumentParser:
+    self._parser = subparsers.add_parser(
+        "reprocess",
+        help="Reprocesses benchmark results from existing CSV/trace files "
+        "without re-running the benchmark.")
+    self._parser.set_defaults(crossbench_subcommand=self)
+    return self.parser
+
+  @override
+  def add_cli_arguments(self, parser: CBArgumentParser) -> CBArgumentParser:
+    parser.add_argument(
+        "result_dir",
         type=PathParser.dir_path,
         nargs="?",
-        default=DEFAULT_RESULT_DIR,
+        default=pth.LATEST_RESULT_DIR,
         help="Path to the benchmark result directory.")
-    self.parser.add_argument(
+    parser.add_argument(
         "--probe",
         "--probes",
         type=self._parse_probes,
         default=list(self.SUPPORTED_PROBES.keys()),
         help="Comma-separated list of probes to reprocess.")
+    self.cli.add_debugging_arguments(parser)
+    return parser
 
   def _parse_probes(self, value: str) -> list[str]:
     probes = ObjectParser.str_list(value, "probes")
@@ -59,10 +74,9 @@ class ReprocessUtil:
         raise argparse.ArgumentTypeError(f"Unsupported probe: '{probe}'")
     return probes
 
-  def run(self, argv: Sequence[str]) -> None:
-    args: argparse.Namespace = self.parser.parse_args(argv)
-
-    result_dir: pth.LocalPath = args.path
+  @override
+  def run(self, args: CBNamespace) -> None:
+    result_dir: pth.LocalPath = args.result_dir
     probe_names: list[str] = args.probe
 
     base_df: pd.DataFrame = self._get_base_df(result_dir)
@@ -71,10 +85,9 @@ class ReprocessUtil:
 
   def _process_probe(self, probe_name: str, result_dir: pth.LocalPath,
                      base_df: pd.DataFrame) -> None:
-    probe_cls: type[Probe] = self.SUPPORTED_PROBES[probe_name]
+    probe_cls = self.SUPPORTED_PROBES[probe_name]
     # TODO: Upstream this to the base Probe interface or find an alternative to
     # unify offline reprocessing across all probes.
-    assert hasattr(probe_cls, "process_result_dir")
     new_scores: pd.DataFrame = probe_cls.process_result_dir(
         result_dir, base_df, reprocess=True)
     print(

@@ -12,7 +12,6 @@ import hjson
 
 from crossbench.cli.btp import BTPUtil
 from crossbench.cli.cli import CrossBenchCLI
-from crossbench.cli.reprocess import ReprocessUtil
 
 
 def crossbench(argv: list[str] | None = None) -> None:
@@ -27,13 +26,6 @@ def cb_btp(argv: list[str] | None = None) -> None:
     argv = sys.argv
   btp = BTPUtil()
   btp.run(argv[1:])
-
-
-def cb_reprocess(argv: list[str] | None = None) -> None:
-  if not argv:
-    argv = sys.argv
-  reprocessor = ReprocessUtil()
-  reprocessor.run(argv[1:])
 
 
 def cb_validate_hjson(argv: list[str] | None = None) -> None:
