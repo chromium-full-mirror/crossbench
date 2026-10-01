@@ -6,15 +6,16 @@ from __future__ import annotations
 
 import datetime as dt
 import functools
-from typing import TYPE_CHECKING, Final, NamedTuple
+from typing import TYPE_CHECKING, Callable, Final, NamedTuple, Sequence
 
 import crossbench.path as pth
+from crossbench.action_runner.action.enums import ButtonClick
 from crossbench.action_runner.base import ActionRunner
 from crossbench.action_runner.display_rectangle import DisplayRectangle
 from crossbench.action_runner.element_not_found_error import \
     ElementNotFoundError
 from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
-    TouchEvent, WaitEvent
+    MouseButtonEvent, MouseMoveEvent, TouchEvent, WaitEvent
 from crossbench.action_runner.keyboard_layout import US_KEYBOARD_LAYOUT
 from crossbench.action_runner.screenshot_annotation import \
     ScreenshotPointAnnotation, ScreenshotRectAnnotation
@@ -90,19 +91,40 @@ class UnifiedInputActionRunner(ActionRunner):
             self.browser_platform.get_default_device(input_source) or "")
 
   def click_touch(self, action: i_action.ClickAction) -> None:
+    self._inject_click(action, self._get_touch_click_events)
+
+  def click_mouse(self, action: i_action.ClickAction) -> None:
+    self._inject_click(action, self._get_mouse_click_events)
+
+  def _get_touch_click_events(self, click_location: Point,
+                              duration: dt.timedelta) -> tuple[InputEvent, ...]:
+    return (
+        TouchEvent(position=click_location, is_down=True),
+        WaitEvent(duration=duration),
+        TouchEvent(position=click_location, is_down=False),
+    )
+
+  def _get_mouse_click_events(self, click_location: Point,
+                              duration: dt.timedelta) -> tuple[InputEvent, ...]:
+    return (
+        MouseMoveEvent(position=click_location),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=True),
+        WaitEvent(duration=duration),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=False),
+    )
+
+  def _inject_click(
+      self, action: i_action.ClickAction,
+      events_fn: Callable[[Point, dt.timedelta], Sequence[InputEvent]]) -> None:
     with self.actions("ClickAction", measure=False) as actions:
       click_location = self._get_click_location(actions, action)
       if not click_location:
         return
 
       duration = action.duration or self.DEFAULT_CLICK_DURATION
-      events: tuple[InputEvent, ...] = (
-          TouchEvent(position=click_location, is_down=True),
-          WaitEvent(duration=duration),
-          TouchEvent(position=click_location, is_down=False),
-      )
+      events = events_fn(click_location, duration)
 
-      device_name = self.action_device_name(action, InputSource.TOUCH)
+      device_name = self.action_device_name(action, action.input_source)
       self.browser_platform.inject_input_events(device_name, events)
 
       if action.verify:
@@ -184,10 +206,6 @@ class UnifiedInputActionRunner(ActionRunner):
         window_offset_x=pos.screen_x,
         window_offset_y=pos.screen_y,
         element_rect=element_rect)
-
-  def click_mouse(self, action: i_action.ClickAction) -> None:
-    # TODO(b/553272919): implement
-    del action
 
   def scroll_touch(self, action: i_action.ScrollAction) -> None:
     # TODO(b/553272919): implement

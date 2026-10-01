@@ -10,12 +10,13 @@ import unittest
 from unittest import mock
 
 from crossbench.action_runner.action.click import ClickAction
+from crossbench.action_runner.action.enums import ButtonClick
 from crossbench.action_runner.action.position import PositionConfig
 from crossbench.action_runner.action.text_input import TextInputAction
 from crossbench.action_runner.element_not_found_error import \
     ElementNotFoundError
 from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
-    TouchEvent, WaitEvent
+    MouseButtonEvent, MouseMoveEvent, TouchEvent, WaitEvent
 from crossbench.action_runner.unified_input_action_runner import SCRIPTS_DIR, \
     UnifiedInputActionRunner
 from crossbench.benchmarks.loading.input_source import InputSource
@@ -51,6 +52,25 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
       0,  # element top
       0,  # element width
       0,  # element height
+  ])
+
+  _FOUND_ELEMENT_JS_RESULT: JsInvocation = JsInvocation(result=[
+      True,  # Found element
+      1,  # pixel ratio
+      1920,  # window outer width
+      1080,  # window outer height
+      1920,  # window inner width
+      1080,  # window inner height
+      1920,  # screen width
+      1080,  # screen height
+      1920,  # screen avail width
+      1080,  # screen avail height
+      0,  # screenX
+      0,  # screenY
+      100,  # element left
+      200,  # element top
+      50,  # element width
+      40,  # element height
   ])
 
   def setUp(self) -> None:
@@ -229,25 +249,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
         InputSource.TOUCH,
         position=PositionConfig.from_selector(
             selector="div#submit", required=True))
-    self.browser.expect_js(
-        expected_js=JsInvocation(result=[
-            True,  # Found element
-            1,  # pixel ratio
-            1920,  # window outer width
-            1080,  # window outer height
-            1920,  # window inner width
-            1080,  # window inner height
-            1920,  # screen width
-            1080,  # screen height
-            1920,  # screen avail width
-            1080,  # screen avail height
-            0,  # screenX
-            0,  # screenY
-            100,  # element left
-            200,  # element top
-            50,  # element width
-            40,  # element height
-        ]))
+    self.browser.expect_js(expected_js=self._FOUND_ELEMENT_JS_RESULT)
     self.run_action(click_action)
 
     self.assert_input_events_injected([
@@ -262,25 +264,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
         position=PositionConfig.from_selector(
             selector="div#submit", required=True, wait=True))
     self.browser.expect_js(expected_js=JsInvocation(result=1))
-    self.browser.expect_js(
-        expected_js=JsInvocation(result=[
-            True,  # Found element
-            1,  # pixel ratio
-            1920,  # window outer width
-            1080,  # window outer height
-            1920,  # window inner width
-            1080,  # window inner height
-            1920,  # screen width
-            1080,  # screen height
-            1920,  # screen avail width
-            1080,  # screen avail height
-            0,  # screenX
-            0,  # screenY
-            100,  # element left
-            200,  # element top
-            50,  # element width
-            40,  # element height
-        ]))
+    self.browser.expect_js(expected_js=self._FOUND_ELEMENT_JS_RESULT)
     self.run_action(click_action)
 
     self.assert_input_events_injected([
@@ -323,6 +307,115 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
         TouchEvent(Point(10, 20), is_down=True),
         WaitEvent(duration=UnifiedInputActionRunner.DEFAULT_CLICK_DURATION),
         TouchEvent(Point(10, 20), is_down=False),
+    ])
+
+  def test_click_mouse_coordinates_default_duration(self) -> None:
+    click_action = ClickAction(
+        InputSource.MOUSE, position=PositionConfig.from_coordinates(x=50, y=60))
+    self.run_action(click_action)
+
+    self.assert_input_events_injected([
+        MouseMoveEvent(Point(50, 60)),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=True),
+        WaitEvent(duration=UnifiedInputActionRunner.DEFAULT_CLICK_DURATION),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=False),
+    ])
+
+  def test_click_mouse_coordinates_with_duration(self) -> None:
+    click_action = ClickAction(
+        InputSource.MOUSE,
+        position=PositionConfig.from_coordinates(x=50, y=60),
+        duration=dt.timedelta(milliseconds=150))
+    self.run_action(click_action)
+
+    self.assert_input_events_injected([
+        MouseMoveEvent(Point(50, 60)),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=True),
+        WaitEvent(duration=dt.timedelta(milliseconds=150)),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=False),
+    ])
+
+  def test_click_mouse_coordinates_with_source_device(self) -> None:
+    click_action = ClickAction(
+        InputSource.MOUSE,
+        position=PositionConfig.from_coordinates(x=50, y=60),
+        source_device="my_mouse_device")
+    self.run_action(click_action)
+
+    self.assert_input_events_injected([
+        MouseMoveEvent(Point(50, 60)),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=True),
+        WaitEvent(duration=UnifiedInputActionRunner.DEFAULT_CLICK_DURATION),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=False),
+    ],
+                                      expected_device_name="my_mouse_device")
+
+  def test_click_mouse_selector_success(self) -> None:
+    click_action = ClickAction(
+        InputSource.MOUSE,
+        position=PositionConfig.from_selector(
+            selector="div#submit", required=True))
+    self.browser.expect_js(expected_js=self._FOUND_ELEMENT_JS_RESULT)
+    self.run_action(click_action)
+
+    self.assert_input_events_injected([
+        MouseMoveEvent(Point(125, 220)),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=True),
+        WaitEvent(duration=UnifiedInputActionRunner.DEFAULT_CLICK_DURATION),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=False),
+    ])
+
+  def test_click_mouse_selector_with_wait(self) -> None:
+    click_action = ClickAction(
+        InputSource.MOUSE,
+        position=PositionConfig.from_selector(
+            selector="div#submit", required=True, wait=True))
+    self.browser.expect_js(expected_js=JsInvocation(result=1))
+    self.browser.expect_js(expected_js=self._FOUND_ELEMENT_JS_RESULT)
+    self.run_action(click_action)
+
+    self.assert_input_events_injected([
+        MouseMoveEvent(Point(125, 220)),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=True),
+        WaitEvent(duration=UnifiedInputActionRunner.DEFAULT_CLICK_DURATION),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=False),
+    ])
+
+  def test_click_mouse_selector_non_existent_required_raises(self) -> None:
+    click_action = ClickAction(
+        InputSource.MOUSE,
+        position=PositionConfig.from_selector(
+            selector="div#missing", required=True))
+    self.browser.expect_js(expected_js=self._NO_ELEMENT_JS_RESULT)
+
+    with self.assertRaisesRegex(ElementNotFoundError, "div#missing"):
+      self.run_action(click_action)
+
+    self.inject_events_mock.assert_not_called()
+
+  def test_click_mouse_selector_non_required_success(self) -> None:
+    click_action = ClickAction(
+        InputSource.MOUSE,
+        position=PositionConfig.from_selector(
+            selector="div#missing", required=False))
+    self.browser.expect_js(expected_js=self._NO_ELEMENT_JS_RESULT)
+    self.run_action(click_action)
+
+    self.inject_events_mock.assert_not_called()
+
+  def test_click_mouse_with_verify(self) -> None:
+    click_action = ClickAction(
+        InputSource.MOUSE,
+        position=PositionConfig.from_coordinates(x=10, y=20),
+        verify="#success")
+    self.browser.expect_js(expected_js=JsInvocation(result=1))
+    self.run_action(click_action)
+
+    self.assert_input_events_injected([
+        MouseMoveEvent(Point(10, 20)),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=True),
+        WaitEvent(duration=UnifiedInputActionRunner.DEFAULT_CLICK_DURATION),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=False),
     ])
 
 

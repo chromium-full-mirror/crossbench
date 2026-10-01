@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
   import datetime as dt
 
+  from crossbench.action_runner.action.enums import ButtonClick
   from crossbench.benchmarks.loading.point import Point
 
 
@@ -38,3 +39,14 @@ class TouchEvent(InputEvent):
   # The 'slot' of a touch event is the tracking channel of this
   # touch event during a multi-touch interaction.
   slot: int = 0
+
+
+@dataclasses.dataclass(frozen=True)
+class MouseButtonEvent(InputEvent):
+  button: ButtonClick
+  is_down: bool
+
+
+@dataclasses.dataclass(frozen=True)
+class MouseMoveEvent(InputEvent):
+  position: Point
