@@ -135,9 +135,10 @@ describe('getCrossbenchVirtualFiles', () => {
      async () => {
        const {getCrossbenchVirtualFiles} = await import('../src/main');
        const files = getCrossbenchVirtualFiles();
-       expect(files['/protoc/__init__.py']).toBeDefined();
-       expect(files['/protoc/gen/protos/perfetto/config/trace_config_pb2.py'])
-           .toBeDefined();
+       expect(files['/third_party/__init__.py']).toBeDefined();
+       expect(files['/third_party/protoc/__init__.py']).toBeDefined();
+       expect(files['/tools/__init__.py']).toBeDefined();
+       expect(files['/tools/protoc/sys_path.py']).toBeDefined();
        expect(files['/config/probe/perfetto/trace_config/default.txtpb'])
            .toBeDefined();
        expect(files['/crossbench/cli/cli.py']).toBeDefined();

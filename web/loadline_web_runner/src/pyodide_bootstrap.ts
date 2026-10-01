@@ -74,7 +74,7 @@ import js
 import pandas as pd
 
 sys.path.insert(0, "/")
-sys.path.insert(0, "/protoc/gen")
+sys.path.insert(0, "/third_party/protoc/gen")
 
 try:
     from google.protobuf import runtime_version

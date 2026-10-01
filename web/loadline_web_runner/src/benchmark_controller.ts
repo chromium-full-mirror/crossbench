@@ -18,9 +18,12 @@ const crossbenchPyFiles = import.meta.glob(
                               [
                                 '../../../crossbench/**/*',
                                 '../../../config/**/*',
-                                '../../../protoc/**/*',
+                                '../../../third_party/__init__.py',
+                                '../../../third_party/protoc/**/*',
                                 '../../../third_party/webpagereplay/*',
                                 '../../../third_party/webpagereplay/scripts/*',
+                                '../../../tools/__init__.py',
+                                '../../../tools/protoc/**/*',
                               ],
                               {
                                 query: '?raw',
@@ -32,7 +35,7 @@ export function getCrossbenchVirtualFiles(): Record<string, string> {
   const files: Record<string, string> = {};
   for (const [relativePath, content] of Object.entries(crossbenchPyFiles)) {
     const match = relativePath.match(
-        /^(?:\.\.[/\\])*((?:crossbench|config|protoc|third_party)[/\\].*)$/);
+        /^(?:\.\.[/\\])*((?:crossbench|config|tools|third_party)[/\\].*)$/);
     if (match) {
       files['/' + match[1].replace(/\\/g, '/')] = content;
     }

@@ -33,7 +33,8 @@ function getCrossbenchFilesFromDisk(): Record<string, string> {
 
   scanDir(path.join(repoRoot, 'crossbench'), 'crossbench');
   scanDir(path.join(repoRoot, 'config'), 'config');
-  scanDir(path.join(repoRoot, 'protoc'), 'protoc');
+  scanDir(path.join(repoRoot, 'third_party/protoc'), 'third_party/protoc');
+  scanDir(path.join(repoRoot, 'tools/protoc'), 'tools/protoc');
   return files;
 }
 
