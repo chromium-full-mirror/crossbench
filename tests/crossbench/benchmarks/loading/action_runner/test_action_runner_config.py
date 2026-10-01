@@ -89,7 +89,7 @@ class ActionRunnerConfigTest(unittest.TestCase):
     action_runner_config = ActionRunnerConfig()
     self.assertEqual(action_runner_config.virtual_devices,
                      DEFAULT_VIRTUAL_DEVICES)
-    self.assertEqual(len(action_runner_config.virtual_devices), 2)
+    self.assertEqual(len(action_runner_config.virtual_devices), 3)
     self.assertEqual(
         action_runner_config.virtual_devices[0],
         KeyboardVirtualDeviceConfig(name="default_keyboard"),
@@ -97,6 +97,10 @@ class ActionRunnerConfigTest(unittest.TestCase):
     self.assertEqual(
         action_runner_config.virtual_devices[1],
         TouchscreenVirtualDeviceConfig(name="default_touchscreen"),
+    )
+    self.assertEqual(
+        action_runner_config.virtual_devices[2],
+        MouseVirtualDeviceConfig(name="default_mouse"),
     )
 
   def test_default_virtual_devices_unique_names(self) -> None:

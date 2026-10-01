@@ -23,6 +23,8 @@ from crossbench import path as pth
 from crossbench.action_runner.display_rectangle import DisplayRectangle
 from crossbench.action_runner.virtual_device.keyboard import \
     KeyboardVirtualDeviceConfig
+from crossbench.action_runner.virtual_device.mouse import \
+    MouseVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.touchscreen import \
     TouchscreenVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.virtual_device_config import \
@@ -399,6 +401,35 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
         self.assertIn("N: touch1", written_header)
         self.assertIn("A: 35 0 1440 0 0 12", written_header)
         self.assertIn("A: 36 0 3120 0 0 12", written_header)
+
+  def test_setup_virtual_devices_mouse(self) -> None:
+    with self._patch_uinput_setup() as (mock_popen, mock_proc):
+      self.platform.setup_virtual_devices(
+          (MouseVirtualDeviceConfig(name="mouse1", width=1920, height=1080),))
+      mock_popen.assert_called_once_with("uinput", "-", stdin=mock.ANY)
+      self.assertIn("mouse1", self.platform._virtual_devices)
+      self.assertIs(self.platform._virtual_devices["mouse1"].proc, mock_proc)
+      mock_proc.stdin.write.assert_called_once()
+      written_header = mock_proc.stdin.write.call_args[0][0].decode("utf-8")
+      self.assertIn("N: mouse1", written_header)
+      self.assertIn("A: 35 0 1920 0 0 0", written_header)
+      self.assertIn("A: 36 0 1080 0 0 0", written_header)
+      mock_proc.stdin.flush.assert_called_once()
+
+  def test_setup_virtual_devices_mouse_fallback_resolution(self) -> None:
+    with self._patch_uinput_setup() as (mock_popen, mock_proc):
+      with mock.patch.object(
+          self.platform, "display_resolution",
+          return_value=(1440, 3120)) as mock_res:
+        self.platform.setup_virtual_devices(
+            (MouseVirtualDeviceConfig(name="mouse1"),))
+        mock_res.assert_called_once()
+        mock_popen.assert_called_once_with("uinput", "-", stdin=mock.ANY)
+        self.assertIn("mouse1", self.platform._virtual_devices)
+        written_header = mock_proc.stdin.write.call_args[0][0].decode("utf-8")
+        self.assertIn("N: mouse1", written_header)
+        self.assertIn("A: 35 0 1440 0 0 0", written_header)
+        self.assertIn("A: 36 0 3120 0 0 0", written_header)
 
   def test_setup_virtual_devices_unsupported(self):
     unsupported_config = mock.MagicMock(spec=VirtualDeviceConfig)

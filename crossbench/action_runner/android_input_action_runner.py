@@ -175,11 +175,8 @@ return [
             timeout=action.timeout,
             check_element_rect=True)
 
-  def click_mouse(self, action: i_action.ClickAction) -> None:
-    self._click_impl(action, True)
-
   def click_driver(self, action: i_action.ClickAction) -> None:
-    self._click_impl(action, False)
+    self._click_driver_impl(action)
 
   def swipe(self, action: i_action.SwipeAction) -> None:
     with self.actions("SwipeAction", measure=False):
@@ -187,7 +184,7 @@ return [
                        action.end_y, action.duration)
 
 
-  def _click_impl(self, action: i_action.ClickAction, use_mouse: bool) -> None:
+  def _click_driver_impl(self, action: i_action.ClickAction) -> None:
     if action.duration > dt.timedelta():
       raise InputSourceNotImplementedError(self, action, action.input_source,
                                            "Non-zero duration not implemented")
@@ -197,10 +194,6 @@ return [
       if coordinates_config := action.position.coordinates:
         coordinates = coordinates_config.point()
       elif ui_selector := action.position.ui_selector:
-        if use_mouse:
-          raise InputSourceNotImplementedError(
-              self, action, action.input_source,
-              "Mouse actions not implemented for UiSelectorConfig")
         self._click_ui_selector(ui_selector, action.timeout)
       elif selector_config := action.position.selector:
         if selector_config.wait:
@@ -231,16 +224,11 @@ return [
         coordinates = Point(rect.mid_x, rect.mid_y)
 
       if not action.position.ui_selector:
-        cmd: list[str] = ["input"]
-
-        if use_mouse:
-          cmd.append("mouse")
         assert coordinates, "missing coordinates"
         self.add_failure_screenshot_annotation(
             ScreenshotPointAnnotation(label="click", point=coordinates))
-        cmd.extend(["tap", str(coordinates.x), str(coordinates.y)])
-
-        self.browser_platform.sh(*cmd)
+        self.browser_platform.sh("input", "tap", str(coordinates.x),
+                                 str(coordinates.y))
 
       if action.verify:
         self.wait_for_element_impl(

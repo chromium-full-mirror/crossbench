@@ -15,6 +15,8 @@ from crossbench.action_runner.chromeos_input_action_runner import \
 from crossbench.action_runner.virtual_device.all import VIRTUAL_DEVICES_TUPLE
 from crossbench.action_runner.virtual_device.keyboard import \
     KeyboardVirtualDeviceConfig
+from crossbench.action_runner.virtual_device.mouse import \
+    MouseVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.touchscreen import \
     TouchscreenVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.virtual_device_config import \
@@ -36,6 +38,7 @@ __all__ = [
 DEFAULT_VIRTUAL_DEVICES: Final[tuple[VirtualDeviceConfig, ...]] = (
     KeyboardVirtualDeviceConfig(name="default_keyboard"),
     TouchscreenVirtualDeviceConfig(name="default_touchscreen"),
+    MouseVirtualDeviceConfig(name="default_mouse"),
 )
 
 if TYPE_CHECKING:
