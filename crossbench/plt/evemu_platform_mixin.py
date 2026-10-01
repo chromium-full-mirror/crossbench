@@ -10,21 +10,23 @@ import datetime as dt
 import logging
 import subprocess
 import time
-from typing import TYPE_CHECKING, Final, Iterable, cast
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Final, Iterable, \
+    cast
 
 from immutabledict import immutabledict
 from typing_extensions import override
 
+from crossbench.action_runner.action.enums import ButtonClick
 from crossbench.action_runner.config import VirtualDeviceType
 from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
-    TouchEvent, WaitEvent
+    MouseButtonEvent, MouseMoveEvent, TouchEvent, WaitEvent
 from crossbench.benchmarks.loading.input_source import InputSource
 from crossbench.plt.base import Platform
 
 if TYPE_CHECKING:
   from crossbench.action_runner.config import VirtualDeviceConfig
-  from crossbench.action_runner.virtual_device.touchscreen import \
-      TouchscreenVirtualDeviceConfig
+  from crossbench.action_runner.virtual_device.pointing import \
+      PointingVirtualDeviceConfig
   from crossbench.plt.types import TupleCmdArgs
 
 # Simplified mapping for common W3C to Linux EV_KEY codes
@@ -98,6 +100,17 @@ EV_ABS: Final[int] = 0x0003
 
 SYN_REPORT: Final[int] = 0x0000
 BTN_TOUCH: Final[int] = 0x014a
+BTN_TOOL_MOUSE: Final[int] = 0x0146
+BTN_LEFT: Final[int] = 0x0110
+BTN_RIGHT: Final[int] = 0x0111
+BTN_MIDDLE: Final[int] = 0x0112
+
+BUTTON_CLICK_TO_LINUX: Final[immutabledict[ButtonClick, int]] = (
+    immutabledict({
+        ButtonClick.LEFT: BTN_LEFT,
+        ButtonClick.RIGHT: BTN_RIGHT,
+        ButtonClick.MIDDLE: BTN_MIDDLE,
+    }))
 
 ABS_X: Final[int] = 0x0000
 ABS_Y: Final[int] = 0x0001
@@ -163,6 +176,7 @@ INPUT_SOURCE_TO_VIRTUAL_DEVICE_TYPE: Final[immutabledict[
     InputSource, VirtualDeviceType]] = immutabledict({
         InputSource.KEYBOARD: VirtualDeviceType.KEYBOARD,
         InputSource.TOUCH: VirtualDeviceType.TOUCHSCREEN,
+        InputSource.MOUSE: VirtualDeviceType.MOUSE,
     })
 
 
@@ -215,6 +229,25 @@ A: 3a 0 255 0 0 0
 E: 0.000000 0000 0000 0000
 """
 
+_EVEMU_MOUSE_HEADER: Final[str] = """# EVEMU 1.2
+N: {name}
+I: 0003 18d1 0003 0100
+P: 00 00 00 00 00 00 00 00
+B: 00 0b 00 00 00 00 00 00 00
+B: 01 00 00 00 00 00 00 00 00
+B: 01 00 00 00 00 00 00 00 00
+B: 01 00 00 00 00 00 00 00 00
+B: 01 00 00 00 00 00 00 00 00
+B: 01 00 00 07 00 00 00 00 00
+B: 01 40 04 00 00 00 00 00 00
+B: 03 00 00 00 00 00 80 60 02
+A: 2f 0 9 0 0 0
+A: 35 0 {max_x} 0 0 0
+A: 36 0 {max_y} 0 0 0
+A: 39 0 9 0 0 0
+E: 0.000000 0000 0000 0000
+"""
+
 
 class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
   """
@@ -248,8 +281,13 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
       if device_config.device_type == VirtualDeviceType.KEYBOARD:
         self._init_virtual_keyboard(device_config.name)
       elif device_config.device_type == VirtualDeviceType.TOUCHSCREEN:
-        self._init_virtual_touchscreen(
-            cast("TouchscreenVirtualDeviceConfig", device_config))
+        self._init_pointing_virtual_device(
+            cast("PointingVirtualDeviceConfig", device_config),
+            _EVEMU_TOUCHSCREEN_HEADER)
+      elif device_config.device_type == VirtualDeviceType.MOUSE:
+        self._init_pointing_virtual_device(
+            cast("PointingVirtualDeviceConfig", device_config),
+            _EVEMU_MOUSE_HEADER)
       else:
         raise ValueError(
             f"Unsupported virtual device type: {device_config.device_type}")
@@ -306,19 +344,19 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
     self._start_virtual_device(device_name, VirtualDeviceType.KEYBOARD,
                                _EVEMU_KEYBOARD_HEADER)
 
-  def _init_virtual_touchscreen(
-      self, device_config: TouchscreenVirtualDeviceConfig) -> None:
+  def _init_pointing_virtual_device(self,
+                                    device_config: PointingVirtualDeviceConfig,
+                                    header_template: str) -> None:
     device_name = device_config.name
     if self._is_device_running(device_name):
       return
     width, height = self._resolve_dimensions(device_config.width,
                                              device_config.height)
-    header = _EVEMU_TOUCHSCREEN_HEADER.format(
+    header = header_template.format(
         name=device_name, max_x=width, max_y=height).encode("utf-8")
-    logging.debug("Initializing virtual touchscreen '%s' (%dx%d)", device_name,
-                  width, height)
-    self._start_virtual_device(device_name, VirtualDeviceType.TOUCHSCREEN,
-                               header)
+    logging.debug("Initializing virtual %s '%s' (%dx%d)",
+                  device_config.device_type.value, device_name, width, height)
+    self._start_virtual_device(device_name, device_config.device_type, header)
 
   def _execute_evemu_script(self, device_name: str, script: str) -> None:
     state = self._virtual_devices.get(device_name)
@@ -386,12 +424,11 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
     for event in events:
       if isinstance(event, WaitEvent):
         current_time += event.duration
-      elif isinstance(event, KeyEvent):
-        self._generate_key_event(lines, event, current_time)
-      elif isinstance(event, TouchEvent):
-        self._generate_touch_event(lines, event, current_time)
-      else:
+        continue
+      generator = self._EVENT_GENERATORS.get(type(event))
+      if generator is None:
         raise ValueError(f"Unsupported event type: {type(event).__name__}")
+      generator(self, lines, event, current_time)
 
     return ("\n".join(lines) + "\n" if lines else ""), current_time
 
@@ -438,3 +475,36 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
       self._add_line(lines, current_time, EV_ABS, ABS_MT_TRACKING_ID, -1)
       self._add_line(lines, current_time, EV_KEY, BTN_TOUCH, 0)
       self._add_line(lines, current_time, EV_SYN, SYN_REPORT, 0)
+
+  def _generate_mouse_button_event(self, lines: list[str],
+                                   event: MouseButtonEvent,
+                                   current_time: dt.timedelta) -> None:
+    linux_code = BUTTON_CLICK_TO_LINUX.get(event.button)
+    if linux_code is None:
+      raise ValueError(f"Button click '{event.button}' is not supported.")
+
+    value = 1 if event.is_down else 0
+    self._add_line(lines, current_time, EV_KEY, linux_code, value)
+    self._add_line(lines, current_time, EV_SYN, SYN_REPORT, 0)
+
+  def _generate_mouse_move_event(self, lines: list[str], event: MouseMoveEvent,
+                                 current_time: dt.timedelta) -> None:
+    self._add_line(lines, current_time, EV_KEY, BTN_TOOL_MOUSE, 1)
+    self._add_line(lines, current_time, EV_KEY, BTN_TOUCH, 1)
+    self._add_line(lines, current_time, EV_ABS, ABS_MT_SLOT, 0)
+    self._add_line(lines, current_time, EV_ABS, ABS_MT_TRACKING_ID, 0)
+    self._add_line(lines, current_time, EV_ABS, ABS_MT_POSITION_X,
+                   event.position.x)
+    self._add_line(lines, current_time, EV_ABS, ABS_MT_POSITION_Y,
+                   event.position.y)
+    self._add_line(lines, current_time, EV_SYN, SYN_REPORT, 0)
+
+  _EVENT_GENERATORS: ClassVar[immutabledict[
+      type[InputEvent],
+      Callable[[Any, list[str], Any, dt.timedelta], None],
+  ]] = immutabledict({
+      KeyEvent: _generate_key_event,
+      TouchEvent: _generate_touch_event,
+      MouseButtonEvent: _generate_mouse_button_event,
+      MouseMoveEvent: _generate_mouse_move_event,
+  })

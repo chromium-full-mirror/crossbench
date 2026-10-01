@@ -44,8 +44,8 @@ from crossbench.stories.story import Story
 if TYPE_CHECKING:
   import datetime as dt
 
-  from crossbench.action_runner.virtual_device.touchscreen import \
-      TouchscreenVirtualDeviceConfig
+  from crossbench.action_runner.virtual_device.pointing import \
+      PointingVirtualDeviceConfig
   from crossbench.device_config import DeviceConfigKeyPath
   from crossbench.plt.signals import Signals
   from crossbench.plt.types import CmdArg, ListCmdArgs, ProcessIo, \
@@ -683,10 +683,12 @@ class AndroidAdbMockPlatform(MockPlatformMixin, AndroidAdbPlatform):
     self._init_mock_virtual_device(device_name, VirtualDeviceType.KEYBOARD)
 
   @override
-  def _init_virtual_touchscreen(
-      self, device_config: TouchscreenVirtualDeviceConfig) -> None:
+  def _init_pointing_virtual_device(self,
+                                    device_config: PointingVirtualDeviceConfig,
+                                    header_template: str) -> None:
+    assert header_template, "No evemu header template provided"
     self._init_mock_virtual_device(device_config.name,
-                                   VirtualDeviceType.TOUCHSCREEN)
+                                   device_config.device_type)
 
 
 class GenericMockPlatform(MockPlatformMixin, Platform):

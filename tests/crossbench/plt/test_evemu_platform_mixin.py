@@ -10,10 +10,13 @@ import unittest
 from typing import TYPE_CHECKING
 from unittest import mock
 
+from crossbench.action_runner.action.enums import ButtonClick
 from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
-    TouchEvent, WaitEvent
+    MouseButtonEvent, MouseMoveEvent, TouchEvent, WaitEvent
 from crossbench.action_runner.virtual_device.keyboard import \
     KeyboardVirtualDeviceConfig
+from crossbench.action_runner.virtual_device.mouse import \
+    MouseVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.touchscreen import \
     TouchscreenVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.virtual_device_config import \
@@ -67,6 +70,7 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
           KeyboardVirtualDeviceConfig(name="test_kb"),
           TouchscreenVirtualDeviceConfig(
               name="test_touch", width=1080, height=2400),
+          MouseVirtualDeviceConfig(name="test_mouse", width=1920, height=1080),
       ))
     self.platform.sleep_calls.clear()
 
@@ -85,11 +89,14 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
   def test_teardown_virtual_devices(self) -> None:
     self.assertIn("test_kb", self.platform._virtual_devices)
     self.assertIn("test_touch", self.platform._virtual_devices)
+    self.assertIn("test_mouse", self.platform._virtual_devices)
     self.platform.teardown_virtual_devices()
     self.assertEqual(self.platform._virtual_devices, {})
-    self.assertEqual(self.platform.mock_proc.stdin.close.call_count, 2)
+    self.assertEqual(self.platform.mock_proc.stdin.close.call_count, 3)
     self.platform.mock_proc.wait.assert_has_calls(
-        [mock.call(timeout=2), mock.call(timeout=2)])
+        [mock.call(timeout=2),
+         mock.call(timeout=2),
+         mock.call(timeout=2)])
 
   def test_setup_virtual_devices_touchscreen(self) -> None:
     platform = MockEvemuPlatform()
@@ -123,6 +130,36 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
       self.assertIn("A: 35 0 1440 0 0 12", written_header)
       self.assertIn("A: 36 0 3120 0 0 12", written_header)
 
+  def test_setup_virtual_devices_mouse(self) -> None:
+    platform = MockEvemuPlatform()
+    platform.setup_virtual_devices(
+        (MouseVirtualDeviceConfig(name="mouse1", width=1920, height=1080),))
+    self.assertEqual(len(platform.popen_calls), 1)
+    args, kwargs = platform.popen_calls[0]
+    self.assertEqual(args, ("mock-evemu", "-"))
+    self.assertEqual(kwargs, {"stdin": subprocess.PIPE})
+    self.assertIn("mouse1", platform._virtual_devices)
+    self.assertIs(platform._virtual_devices["mouse1"].proc, platform.mock_proc)
+    written_header = platform.mock_proc.stdin.write.call_args[0][0].decode(
+        "utf-8")
+    self.assertIn("N: mouse1", written_header)
+    self.assertIn("A: 35 0 1920 0 0 0", written_header)
+    self.assertIn("A: 36 0 1080 0 0 0", written_header)
+    platform.mock_proc.stdin.flush.assert_called_once()
+
+  def test_setup_virtual_devices_mouse_fallback_resolution(self) -> None:
+    platform = MockEvemuPlatform()
+    with mock.patch.object(
+        platform, "display_resolution", return_value=(1440, 3120)) as mock_res:
+      platform.setup_virtual_devices((MouseVirtualDeviceConfig(name="mouse1"),))
+      mock_res.assert_called_once()
+      self.assertIn("mouse1", platform._virtual_devices)
+      written_header = platform.mock_proc.stdin.write.call_args[0][0].decode(
+          "utf-8")
+      self.assertIn("N: mouse1", written_header)
+      self.assertIn("A: 35 0 1440 0 0 0", written_header)
+      self.assertIn("A: 36 0 3120 0 0 0", written_header)
+
   def test_setup_virtual_devices_unsupported(self) -> None:
     platform = MockEvemuPlatform()
     unsupported_config = mock.MagicMock(spec=VirtualDeviceConfig)
@@ -136,12 +173,15 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
     platform = MockEvemuPlatform()
     self.assertIsNone(platform.get_default_device(InputSource.KEYBOARD))
     self.assertIsNone(platform.get_default_device(InputSource.TOUCH))
+    self.assertIsNone(platform.get_default_device(InputSource.MOUSE))
     platform.setup_virtual_devices((
         KeyboardVirtualDeviceConfig(name="kb1"),
         TouchscreenVirtualDeviceConfig(name="touch1", width=1080, height=2400),
+        MouseVirtualDeviceConfig(name="mouse1", width=1080, height=2400),
     ))
     self.assertEqual(platform.get_default_device(InputSource.KEYBOARD), "kb1")
     self.assertEqual(platform.get_default_device(InputSource.TOUCH), "touch1")
+    self.assertEqual(platform.get_default_device(InputSource.MOUSE), "mouse1")
 
   def test_execute_evemu_script(self) -> None:
     self.platform._execute_evemu_script("test_kb",
@@ -304,11 +344,86 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
         b"E: 0.700000 0000 0000 0000\n")
     self.platform.mock_proc.stdin.flush.assert_called()
 
+  @mock.patch("time.monotonic", return_value=100.5)
+  def test_mouse_move(self, mock_monotonic) -> None:
+    del mock_monotonic
+    self.platform.inject_input_events("test_mouse", [
+        MouseMoveEvent(Point(100, 200)),
+    ])
+    self.platform.mock_proc.stdin.write.assert_called_with(
+        b"E: 0.200000 0001 0146 0001\n"
+        b"E: 0.200000 0001 014a 0001\n"
+        b"E: 0.200000 0003 002f 0000\n"
+        b"E: 0.200000 0003 0039 0000\n"
+        b"E: 0.200000 0003 0035 0100\n"
+        b"E: 0.200000 0003 0036 0200\n"
+        b"E: 0.200000 0000 0000 0000\n")
+    self.platform.mock_proc.stdin.flush.assert_called()
+
+  @mock.patch("time.monotonic", return_value=100.5)
+  def test_mouse_button_down_and_up(self, mock_monotonic) -> None:
+    del mock_monotonic
+    self.platform.inject_input_events("test_mouse", [
+        MouseButtonEvent(ButtonClick.LEFT, is_down=True),
+        MouseButtonEvent(ButtonClick.LEFT, is_down=False),
+    ])
+    self.platform.mock_proc.stdin.write.assert_called_with(
+        b"E: 0.200000 0001 0110 0001\n"
+        b"E: 0.200000 0000 0000 0000\n"
+        b"E: 0.200000 0001 0110 0000\n"
+        b"E: 0.200000 0000 0000 0000\n")
+    self.platform.mock_proc.stdin.flush.assert_called()
+
+  @mock.patch("time.monotonic", return_value=100.5)
+  def test_mouse_other_buttons(self, mock_monotonic) -> None:
+    del mock_monotonic
+    self.platform.inject_input_events("test_mouse", [
+        MouseButtonEvent(ButtonClick.RIGHT, is_down=True),
+        MouseButtonEvent(ButtonClick.MIDDLE, is_down=True),
+    ])
+    self.platform.mock_proc.stdin.write.assert_called_with(
+        b"E: 0.200000 0001 0111 0001\n"
+        b"E: 0.200000 0000 0000 0000\n"
+        b"E: 0.200000 0001 0112 0001\n"
+        b"E: 0.200000 0000 0000 0000\n")
+    self.platform.mock_proc.stdin.flush.assert_called()
+
+  @mock.patch("time.monotonic", return_value=100.5)
+  def test_mouse_with_wait(self, mock_monotonic) -> None:
+    del mock_monotonic
+    self.platform.inject_input_events("test_mouse", [
+        MouseMoveEvent(Point(50, 60)),
+        MouseButtonEvent(ButtonClick.LEFT, is_down=True),
+        WaitEvent(dt.timedelta(milliseconds=500)),
+        MouseButtonEvent(ButtonClick.LEFT, is_down=False),
+    ])
+    self.platform.mock_proc.stdin.write.assert_called_with(
+        b"E: 0.200000 0001 0146 0001\n"
+        b"E: 0.200000 0001 014a 0001\n"
+        b"E: 0.200000 0003 002f 0000\n"
+        b"E: 0.200000 0003 0039 0000\n"
+        b"E: 0.200000 0003 0035 0050\n"
+        b"E: 0.200000 0003 0036 0060\n"
+        b"E: 0.200000 0000 0000 0000\n"
+        b"E: 0.200000 0001 0110 0001\n"
+        b"E: 0.200000 0000 0000 0000\n"
+        b"E: 0.700000 0001 0110 0000\n"
+        b"E: 0.700000 0000 0000 0000\n")
+    self.platform.mock_proc.stdin.flush.assert_called()
+
   def test_unsupported_key(self) -> None:
     with self.assertRaises(ValueError):
       self.platform.inject_input_events("test_kb", [
           KeyEvent("UnsupportedKey", is_down=True),
       ])
+
+  def test_unsupported_mouse_button(self) -> None:
+    with self.assertRaises(ValueError):
+      self.platform.inject_input_events(
+          "test_mouse",
+          [
+              MouseButtonEvent("unsupported", is_down=True),  # type: ignore
+          ])
 
   def test_unsupported_event_type(self) -> None:
     with self.assertRaisesRegex(ValueError,
