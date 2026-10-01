@@ -15,6 +15,7 @@ from typing_extensions import override
 
 from crossbench import config
 from crossbench.action_runner.action.enums import WindowTarget
+from crossbench.action_runner.config import ActionRunnerConfig
 from crossbench.benchmarks.base import StoryFilter, SubStoryBenchmark
 from crossbench.benchmarks.web_power.probe import WebPowerProbe
 from crossbench.benchmarks.web_power.wpr_helpers import WprBannerDismisser
@@ -32,7 +33,6 @@ if TYPE_CHECKING:
   import argparse
 
   from crossbench import path as pth
-  from crossbench.action_runner.config import ActionRunnerConfig
   from crossbench.browsers.attributes import BrowserAttributes
   from crossbench.cli.parser import CBArgumentParser
   from crossbench.flags.base import Flags
@@ -389,6 +389,15 @@ class WebPowerBenchmarkBase(SubStoryBenchmark):
       bits_probe: BitsProbe | None = None,
   ) -> None:
     self._bits_probe = bits_probe
+    if action_runner_config is None:
+      # Passing None to super().__init__() falls back to ActionRunnerConfig(),
+      # which connects DEFAULT_VIRTUAL_DEVICES via uinput on Android. Override
+      # it with an empty virtual_devices tuple so no virtual devices are
+      # connected by default.
+      #
+      # TODO: Only initialize virtual devices in benchmarks that require them,
+      # and remove this workaround.
+      action_runner_config = ActionRunnerConfig(virtual_devices=())
     super().__init__(stories, action_runner_config)
 
   @property

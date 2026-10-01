@@ -17,6 +17,7 @@ from typing_extensions import override
 from crossbench import config
 from crossbench import path as pth
 from crossbench import plt
+from crossbench.action_runner.config import ActionRunnerConfig
 from crossbench.benchmarks.web_power import wpr_helpers
 from crossbench.benchmarks.web_power.base import VERSION_STRING, \
     WebPowerBenchmarkBase, WebPowerSiteConfig, WebPowerStory, \
@@ -285,6 +286,24 @@ class WebPowerBenchmarkBaseTestCase(BaseWebPowerBenchmarkTestCase):
   def test_default_cool_down(self) -> None:
     self.assertEqual(MockWebPowerBenchmark.DEFAULT_COOL_DOWN,
                      dt.timedelta(minutes=2))
+
+  def test_default_action_runner_config_no_virtual_devices(self) -> None:
+    args = self.parse_args("--site", "cnn")
+    benchmark = MockWebPowerBenchmark.from_cli_args(args)
+    self.assertEqual(benchmark.action_runner_config.virtual_devices, ())
+
+    run = self.mock_run()
+    with mock.patch.object(self.platform,
+                           "setup_virtual_devices") as mock_setup_devices:
+      benchmark.new_action_runner(self.platform, run)
+      mock_setup_devices.assert_called_once_with(())
+
+  def test_custom_action_runner_config(self) -> None:
+    story = MockWebPowerStory.from_site("cnn")
+    custom_config = ActionRunnerConfig()
+    benchmark = MockWebPowerBenchmark(
+        stories=[story], action_runner_config=custom_config)
+    self.assertEqual(benchmark.action_runner_config, custom_config)
 
   def test_kwargs_from_cli_site(self) -> None:
     args = self.parse_args("--site", "cnn")
