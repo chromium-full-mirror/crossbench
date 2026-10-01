@@ -122,6 +122,47 @@ class ListBuildsTest(MockHttpRequestsMixin):
     self.assertEqual(builds[0].commit, "c4")
     self.assertEqual(builds[0].number, 4)
 
+  def test_fetch_builds_empty_bot(self):
+    with self.assertRaises(ValueError) as cm:
+      fetch_builds("")
+    self.assertIn("Bot is required. Run 'cb pp bots'", str(cm.exception))
+
+  def test_fetch_builds_unknown_bot_suggestion(self):
+    mock_response = mock.Mock()
+    mock_response.status_code = 400
+    mock_response.json.return_value = {
+        "error": 'Bot configuration not found: "test-bott"',
+    }
+    error = requests.exceptions.HTTPError(response=mock_response)
+    self.mock_get.side_effect = error
+    with mock.patch(
+        "crossbench.pinpoint.list_builds.fetch_bots",
+        return_value=["test-bot"]):
+      with self.assertRaises(MultiException) as cm:
+        fetch_builds("test-bott")
+      self.assertIn("Invalid bot: 'test-bott'. Did you mean 'test-bot'?",
+                    str(cm.exception))
+      self.assertIn("Run 'cb pp bots' to list all available bots.",
+                    str(cm.exception))
+
+  def test_fetch_builds_unknown_bot_no_match(self):
+    mock_response = mock.Mock()
+    mock_response.status_code = 400
+    mock_response.json.return_value = {
+        "error": 'Bot configuration not found: "xyz"',
+    }
+    error = requests.exceptions.HTTPError(response=mock_response)
+    self.mock_get.side_effect = error
+    with mock.patch(
+        "crossbench.pinpoint.list_builds.fetch_bots",
+        return_value=["test-bot"]):
+      with self.assertRaises(MultiException) as cm:
+        fetch_builds("xyz")
+      self.assertIn("Invalid bot: 'xyz'. Choices are test-bot",
+                    str(cm.exception))
+      self.assertIn("Run 'cb pp bots' to list all available bots.",
+                    str(cm.exception))
+
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)

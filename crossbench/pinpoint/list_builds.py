@@ -9,12 +9,15 @@ import datetime
 import logging
 from typing import Any
 
+import requests
 from tabulate import tabulate
 
+from crossbench.helper.collection_helper import close_matches_message
 from crossbench.pinpoint import http_requests
 from crossbench.pinpoint.api import PINPOINT_BUILDS_API_URL_TEMPLATE
 from crossbench.pinpoint.format_time import DATETIME_FORMAT, format_time
 from crossbench.pinpoint.helper import annotate
+from crossbench.pinpoint.list_bots import fetch_bots
 
 
 @dataclasses.dataclass(frozen=True)
@@ -38,12 +41,23 @@ def list_builds(bot: str, limit: int) -> None:
 
 
 def fetch_builds(bot: str) -> list[Build]:
+  if not bot:
+    raise ValueError(
+        "Bot is required. Run 'cb pp bots' to list all available bots.")
   url = PINPOINT_BUILDS_API_URL_TEMPLATE.format(bot=bot)
 
   with annotate(f"Fetching recent builds for '{bot}'"):
-    response = http_requests.get(url)
-    response.raise_for_status()
-    return _convert_json_to_builds(response.json())
+    try:
+      response = http_requests.get(url)
+      response.raise_for_status()
+      return _convert_json_to_builds(response.json())
+    except requests.exceptions.HTTPError as e:
+      if e.response is not None and e.response.status_code == 400:
+        available_bots = fetch_bots()
+        msg, _ = close_matches_message(bot, available_bots, "bot")
+        raise ValueError(
+            f"{msg}\nRun 'cb pp bots' to list all available bots.") from e
+      raise
 
 
 def _convert_json_to_builds(builds_json: dict[str, Any]) -> list[Build]:

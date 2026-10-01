@@ -337,11 +337,13 @@ class PinpointTryJobConfigTest(MockHttpRequestsMixin):
     )
 
   def test_parse_and_override_missing_bot(self):
-    with self.assertRaises(ValueError):
+    with self.assertRaises(ValueError) as cm:
       PinpointTryJobConfig.parse_and_override(
           config="{benchmark: 'test_benchmark'}")
-    with self.assertRaises(ValueError):
+    self.assertIn("Bot is required. Run 'cb pp bots'", str(cm.exception))
+    with self.assertRaises(ValueError) as cm:
       PinpointTryJobConfig.parse_and_override(benchmark="test_benchmark")
+    self.assertIn("Bot is required. Run 'cb pp bots'", str(cm.exception))
 
   def test_parse_and_override_missing_story_and_tags(self):
     self.mock_fetch_stories.return_value = []
@@ -536,7 +538,19 @@ class PinpointTryJobConfigTest(MockHttpRequestsMixin):
     self.mock_fetch_bots.return_value = ["other_bot"]
     PinpointTryJobConfig.parse_and_override(
         benchmark="test_benchmark", bot="test_bot", story="test_story")
-    self.mock_show_warnings.assert_called_once_with(["Unknown bot: test_bot"])
+    self.mock_show_warnings.assert_called_once_with([
+        "Invalid bot: 'test_bot'. Did you mean 'other_bot'?\n"
+        "Run 'cb pp bots' to list all available bots.",
+    ])
+
+  def test_parse_and_override_unknown_bot_no_match_show_warning(self):
+    self.mock_fetch_bots.return_value = ["something_else"]
+    PinpointTryJobConfig.parse_and_override(
+        benchmark="test_benchmark", bot="x", story="test_story")
+    self.mock_show_warnings.assert_called_once_with([
+        "Invalid bot: 'x'. Choices are something_else\n"
+        "Run 'cb pp bots' to list all available bots.",
+    ])
 
   def test_parse_and_override_unknown_story_show_warning(self):
     self.mock_fetch_stories.return_value = ["other_story"]

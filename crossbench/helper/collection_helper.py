@@ -110,11 +110,14 @@ def _group_by(
 
 def close_matches_message(choice: str,
                           choices: Iterable[str],
-                          name: str = "") -> tuple[str, str | None]:
+                          name: str = "",
+                          limit: int = 10) -> tuple[str, str | None]:
   choices = tuple(choices)
   if not choices:
     raise ValueError("Expected non-empty choices.")
   similar_choices = difflib.get_close_matches(choice, choices)
+  if not similar_choices and len(choice) > 1:
+    similar_choices = [c for c in choices if choice.lower() in c.lower()][:3]
   error_message: str = ""
   if name:
     error_message = f"Invalid {name}: {choice!r}."
@@ -124,6 +127,9 @@ def close_matches_message(choice: str,
   elif len(similar_choices) == 1:
     alternative = similar_choices[0]
     error_message += f" Did you mean {alternative!r}?"
-  else:
+  elif len(choices) <= limit:
     error_message += f" Choices are {','.join(choices)}"
+  else:
+    error_message += (
+        f" Choices are {','.join(choices[:limit])}... ({len(choices)} total)")
   return error_message, alternative

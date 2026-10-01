@@ -194,9 +194,12 @@ class PinpointJobConfigMixin:
   @classmethod
   def resolve_bot(cls, bot: str) -> str | None:
     if not bot:
-      raise ValueError("Bot is required.")
-    if bot not in fetch_bots():
-      return f"Unknown bot: {bot}"
+      raise ValueError(
+          "Bot is required. Run 'cb pp bots' to list all available bots.")
+    available_bots = fetch_bots()
+    if bot not in available_bots:
+      msg, _ = close_matches_message(bot, available_bots, "bot")
+      return f"{msg}\nRun 'cb pp bots' to list all available bots."
     return None
 
   @classmethod
