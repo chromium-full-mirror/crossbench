@@ -581,6 +581,29 @@ class ObjectParser:
         f"Expected bool {name} but got {type_str(value)}: {value!r}")
 
   @classmethod
+  def optional_datetime(cls,
+                        value: Any,
+                        name: str = "datetime") -> dt.datetime | None:
+    if value is None or value == "":
+      return None
+    return cls.datetime(value, name)
+
+  @classmethod
+  def datetime(cls, value: Any, name: str = "datetime") -> dt.datetime:
+    if isinstance(value, dt.datetime):
+      return value
+    if isinstance(value, dt.date):
+      return dt.datetime.combine(value, dt.time())
+    if not isinstance(value, str):
+      raise argparse.ArgumentTypeError(
+          f"Expected datetime {name}, but got {type_str(value)}: {value!r}")
+    try:
+      return dt.datetime.fromisoformat(value.strip())
+    except (ValueError, TypeError) as e:
+      raise argparse.ArgumentTypeError(
+          f"Invalid datetime {name}: {value!r}") from e
+
+  @classmethod
   def not_none(cls, value: NotNoneT | None, name: str = "value") -> NotNoneT:
     if value is None:
       raise argparse.ArgumentTypeError(f"Expected {name} to be not None.")
@@ -753,6 +776,15 @@ class NumberParser:
     except ValueError as e:
       raise argparse.ArgumentTypeError(
           f"Invalid integer {name}: {value!r}") from e
+
+  @classmethod
+  def optional_int(cls,
+                   value: Any,
+                   name: str = "value",
+                   parse_str: bool = True) -> int | None:
+    if value is None or value == "":
+      return None
+    return cls.any_int(value, name, parse_str)
 
   @classmethod
   def positive_zero_int(cls,

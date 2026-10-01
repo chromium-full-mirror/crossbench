@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime as dt
 from unittest import mock
 
-from crossbench.pinpoint.format_time import format_time
+from crossbench.pinpoint.format_time import format_datetime, format_time
 from tests import test_helper
 from tests.crossbench.base import BaseCrossbenchTestCase
 
@@ -56,6 +56,11 @@ class FormatTimeTest(BaseCrossbenchTestCase):
       result = format_time(input_str)
       self.assertEqual(result, input_str)
       mock_logging.assert_called_once()
+
+  def test_format_datetime(self):
+    self.assertEqual(format_datetime(None), "")
+    dt_obj = dt.datetime(2024, 1, 1, 12, 0, 0)
+    self.assertEqual(format_datetime(dt_obj), "2024-01-01 12:00:00")
 
 
 if __name__ == "__main__":

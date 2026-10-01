@@ -11,6 +11,12 @@ from typing import Final
 DATETIME_FORMAT: Final[str] = "%Y-%m-%d %H:%M:%S"
 
 
+def format_datetime(time_obj: dt.datetime | None) -> str:
+  if time_obj:
+    return time_obj.strftime(DATETIME_FORMAT)
+  return ""
+
+
 def format_time(time_str: str) -> str:
   try:
     time = dt.datetime.strptime(time_str, DATETIME_FORMAT)

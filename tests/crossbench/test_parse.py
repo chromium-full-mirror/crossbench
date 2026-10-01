@@ -390,6 +390,24 @@ class ObjectParserTestCase(CrossbenchFakeFsTestCase):
       with self.assertRaises(argparse.ArgumentTypeError):
         _ = NumberParser.any_int(invalid, parse_str=False)
 
+  def test_parse_optional_int(self):
+    self.assertIsNone(NumberParser.optional_int(None))
+    self.assertIsNone(NumberParser.optional_int(""))
+    self.assertEqual(NumberParser.optional_int("1"), 1)
+    self.assertEqual(NumberParser.optional_int(1), 1)
+    self.assertEqual(NumberParser.optional_int("0"), 0)
+    self.assertEqual(NumberParser.optional_int(0), 0)
+    self.assertEqual(NumberParser.optional_int("-5"), -5)
+    self.assertEqual(NumberParser.optional_int(-5), -5)
+
+  def test_parse_optional_int_invalid(self):
+    invalid: Any
+    for invalid in ("1.2", 1.2, "Nan", math.nan, "inf", math.inf, "-inf",
+                    -math.inf, "invalid"):
+      with self.assertRaises(
+          argparse.ArgumentTypeError, msg=f"invalid={invalid!r}"):
+        _ = NumberParser.optional_int(invalid)
+
   def test_parse_positive_int(self):
     self.assertEqual(NumberParser.positive_int("1"), 1)
     self.assertEqual(NumberParser.positive_int(1), 1)
@@ -795,6 +813,52 @@ class ObjectParserTestCase(CrossbenchFakeFsTestCase):
     for invalid in ("False", "false", "True", "true"):
       with self.assertRaises(argparse.ArgumentTypeError):
         ObjectParser.optional_bool(invalid, strict=True)
+
+  def test_parse_datetime_success(self):
+    now = dt.datetime.now()
+    self.assertIs(ObjectParser.datetime(now), now)
+    date = dt.date(2024, 1, 1)
+    self.assertEqual(ObjectParser.datetime(date), dt.datetime(2024, 1, 1, 0, 0))
+    self.assertEqual(
+        ObjectParser.datetime("2024-01-01T12:00:00Z"),
+        dt.datetime(2024, 1, 1, 12, 0, 0, tzinfo=dt.UTC),
+    )
+    self.assertEqual(
+        ObjectParser.datetime("2024-01-01T12:00:00+00:00"),
+        dt.datetime(2024, 1, 1, 12, 0, 0, tzinfo=dt.UTC),
+    )
+    self.assertEqual(
+        ObjectParser.datetime("2024-01-01 12:00:00"),
+        dt.datetime(2024, 1, 1, 12, 0, 0),
+    )
+    self.assertEqual(
+        ObjectParser.datetime("2024-01-01"),
+        dt.datetime(2024, 1, 1, 0, 0),
+    )
+    self.assertEqual(
+        ObjectParser.datetime("  2024-01-01 12:00:00  "),
+        dt.datetime(2024, 1, 1, 12, 0, 0),
+    )
+
+  def test_parse_datetime_invalid(self):
+    invalid: Any
+    for invalid in (None, 1, [], {}, "invalid", "", "2024-99-99"):
+      with self.assertRaises(argparse.ArgumentTypeError):
+        ObjectParser.datetime(invalid)
+
+  def test_parse_optional_datetime(self):
+    self.assertIsNone(ObjectParser.optional_datetime(None))
+    self.assertIsNone(ObjectParser.optional_datetime(""))
+    self.assertEqual(
+        ObjectParser.optional_datetime("2024-01-01 12:00:00"),
+        dt.datetime(2024, 1, 1, 12, 0, 0),
+    )
+
+  def test_parse_optional_datetime_invalid(self):
+    invalid: Any
+    for invalid in (1, [], {}, "invalid", "2024-99-99"):
+      with self.assertRaises(argparse.ArgumentTypeError):
+        ObjectParser.optional_datetime(invalid)
 
   def test_parse_sh_cmd(self):
     self.assertSequenceEqual(

@@ -22,3 +22,11 @@ def type_name(t: type) -> str:
   if not module:
     return t.__qualname__
   return f"{module}.{t.__qualname__}"
+
+
+def plural_str(value: int, singular: str, plural: str | None = None) -> str:
+  if value == 1:
+    return singular
+  if plural:
+    return plural
+  return f"{singular}s"
