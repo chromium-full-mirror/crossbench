@@ -12,11 +12,12 @@ from crossbench.action_runner.virtual_device.pointing import \
 from crossbench.action_runner.virtual_device.virtual_device_type import \
     VirtualDeviceType
 
-DEFAULT_TOUCH_POLLING_RATE_HZ: Final[int] = 120
+# Standard USB mouse reporting rate (8ms interval).
+DEFAULT_MOUSE_POLLING_RATE_HZ: Final[int] = 125
 
 
 @dataclasses.dataclass(frozen=True)
-class TouchscreenVirtualDeviceConfig(PointingVirtualDeviceConfig):
-  TYPE: ClassVar[VirtualDeviceType] = VirtualDeviceType.TOUCHSCREEN
-  DEFAULT_POLLING_RATE_HZ: ClassVar[int] = DEFAULT_TOUCH_POLLING_RATE_HZ
-  polling_rate_hz: int = DEFAULT_TOUCH_POLLING_RATE_HZ
+class MouseVirtualDeviceConfig(PointingVirtualDeviceConfig):
+  TYPE: ClassVar[VirtualDeviceType] = VirtualDeviceType.MOUSE
+  DEFAULT_POLLING_RATE_HZ: ClassVar[int] = DEFAULT_MOUSE_POLLING_RATE_HZ
+  polling_rate_hz: int = DEFAULT_MOUSE_POLLING_RATE_HZ

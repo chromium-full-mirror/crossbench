@@ -19,6 +19,8 @@ from crossbench.action_runner.config import DEFAULT_VIRTUAL_DEVICES, \
     ActionRunnerConfig, ActionRunnerType
 from crossbench.action_runner.virtual_device.keyboard import \
     KeyboardVirtualDeviceConfig
+from crossbench.action_runner.virtual_device.mouse import \
+    MouseVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.touchscreen import \
     TouchscreenVirtualDeviceConfig
 from crossbench.runner.run import Run
@@ -116,11 +118,17 @@ class ActionRunnerConfigTest(unittest.TestCase):
                 "width": 1080,
                 "height": 2400,
             },
+            {
+                "type": "mouse",
+                "name": "mouse1",
+                "width": 1920,
+                "height": 1080,
+            },
         ],
     }
     action_runner_config = ActionRunnerConfig.parse_dict(config_dict)
     self.assertEqual(action_runner_config.type, ActionRunnerType.ANDROID)
-    self.assertEqual(len(action_runner_config.virtual_devices), 2)
+    self.assertEqual(len(action_runner_config.virtual_devices), 3)
     self.assertEqual(
         action_runner_config.virtual_devices[0],
         KeyboardVirtualDeviceConfig(name="kb1"),
@@ -128,6 +136,10 @@ class ActionRunnerConfigTest(unittest.TestCase):
     self.assertEqual(
         action_runner_config.virtual_devices[1],
         TouchscreenVirtualDeviceConfig(name="ts1", width=1080, height=2400),
+    )
+    self.assertEqual(
+        action_runner_config.virtual_devices[2],
+        MouseVirtualDeviceConfig(name="mouse1", width=1920, height=1080),
     )
 
 

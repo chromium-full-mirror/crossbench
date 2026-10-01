@@ -13,3 +13,4 @@ from crossbench.config import ConfigEnum
 class VirtualDeviceType(ConfigEnum):
   KEYBOARD = ("keyboard", "Virtual keyboard device")
   TOUCHSCREEN = ("touchscreen", "Virtual touchscreen device")
+  MOUSE = ("mouse", "Virtual mouse device")
