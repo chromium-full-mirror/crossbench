@@ -27,17 +27,24 @@ GCS_FILE_SIZE: Final[int] = 45678
 class FakeGcsBlob:
   """Minimal stand-in for google.cloud.storage.blob.Blob."""
 
-  def __init__(self, size: int, download_size: int) -> None:
+  def __init__(self,
+               size: int,
+               download_size: int,
+               download_error: BaseException | None = None) -> None:
     # Size reported by the object metadata.
     self.size: int = size
     # Number of bytes written by a download.
     self.download_size: int = download_size
+    # Raised by a download after writing download_size bytes.
+    self.download_error: BaseException | None = download_error
 
   def reload(self) -> None:
     pass
 
   def download_to_filename(self, filename: str) -> None:
     pathlib.Path(filename).write_bytes(b"\0" * self.download_size)
+    if self.download_error:
+      raise self.download_error
 
 
 class BaseMockPlatformTestCase(CrossbenchFakeFsTestCase, metaclass=abc.ABCMeta):
@@ -130,6 +137,21 @@ class BaseMockPlatformTestCase(CrossbenchFakeFsTestCase, metaclass=abc.ABCMeta):
     self._download_gcs_file(FakeGcsBlob(GCS_FILE_SIZE, GCS_FILE_SIZE), dest)
     self.assertEqual(dest.stat().st_size, GCS_FILE_SIZE)
 
+  def _assert_gcs_nothing_cached(self, dest: pth.LocalPath) -> None:
+    # Nothing is cached, so the next run downloads the file again.
+    self.assertFalse(dest.exists())
+    self.assertEqual([], list(dest.parent.iterdir()))
+
+  def test_download_gcs_file_failure_is_not_kept(self) -> None:
+    dest = self._gcs_download_dest()
+    for error in (OSError("Connection reset"), KeyboardInterrupt()):
+      with self.subTest(error=type(error).__name__):
+        # Downloads that fail halfway still leave bytes on disk.
+        blob = FakeGcsBlob(GCS_FILE_SIZE, GCS_FILE_SIZE // 2, error)
+        with self.assertRaises(type(error)):
+          self._download_gcs_file(blob, dest)
+        self._assert_gcs_nothing_cached(dest)
+
   def test_download_gcs_file_size_mismatch_is_rejected(self) -> None:
     dest = self._gcs_download_dest()
     for download_size in (0, GCS_FILE_SIZE - 1, GCS_FILE_SIZE + 1):
@@ -137,9 +159,7 @@ class BaseMockPlatformTestCase(CrossbenchFakeFsTestCase, metaclass=abc.ABCMeta):
         with self.assertRaisesRegex(OSError, "Size mismatch"):
           self._download_gcs_file(
               FakeGcsBlob(GCS_FILE_SIZE, download_size), dest)
-        # Nothing is cached, so the next run downloads the file again.
-        self.assertFalse(dest.exists())
-        self.assertEqual([], list(dest.parent.iterdir()))
+        self._assert_gcs_nothing_cached(dest)
 
 
 class BaseLocalMockPlatformTestMixin:

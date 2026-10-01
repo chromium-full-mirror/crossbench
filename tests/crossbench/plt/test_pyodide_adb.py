@@ -45,8 +45,6 @@ class MockWebAdb:
     self.forward_calls: list[tuple[str, str]] = []
     self.reverse_calls: list[tuple[str, str]] = []
     self.gcs_downloads: list[tuple[str, str]] = []
-    # Raised by a mocked download after writing a partial file.
-    self.gcs_download_error: BaseException | None = None
     self.is_interrupted: bool = False
     self.spawned_processes: list[str] = []
     self.killed_processes: list[int] = []
@@ -155,10 +153,6 @@ class MockWebAdb:
     self.gcs_downloads.append((url, dest))
     dest_path = pathlib.Path(dest)
     dest_path.parent.mkdir(parents=True, exist_ok=True)
-    if self.gcs_download_error:
-      # Downloads that fail halfway still leave bytes on disk.
-      dest_path.write_bytes(b"\0" * (MOCK_GCS_FILE_SIZE // 2))
-      raise self.gcs_download_error
     dest_path.write_bytes(b"\0" * MOCK_GCS_FILE_SIZE)
 
   def isInterrupted(self) -> bool:  # noqa: N802
@@ -239,18 +233,6 @@ class PyodideMockPlatformTestCase(LocalLinuxMockPlatformTestCase):
     self.assertEqual(self.webadb.gcs_downloads[-1],
                      (url, "/cache/wpr/archive.wprgo"))
     self.assertEqual(dest.stat().st_size, MOCK_GCS_FILE_SIZE)
-
-  def test_gcs_failed_download_is_not_kept(self) -> None:
-    url = "gs://chrome-partner-loadline/archive_phone_20260331.wprgo"
-    dest = self.platform.local_path("/cache/wpr/archive.wprgo")
-    for error in (OSError("Connection reset"), KeyboardInterrupt()):
-      with self.subTest(error=type(error).__name__):
-        self.webadb.gcs_download_error = error
-        with self.assertRaises(type(error)):
-          self.platform.download_gcs_file(url, dest)
-        # Nothing is cached, so the next run downloads the file again.
-        self.assertFalse(self.platform.exists(dest))
-        self.assertEqual([], list(dest.parent.iterdir()))
 
 
 class PyodideAdbTest(CrossbenchFakeFsTestCase):
