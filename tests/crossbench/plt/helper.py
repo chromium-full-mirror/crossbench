@@ -8,6 +8,7 @@ import abc
 import argparse
 import datetime as dt
 import pathlib
+from typing import Final
 from unittest import mock
 
 from typing_extensions import override
@@ -17,6 +18,26 @@ from crossbench import plt
 from crossbench.plt.posix import PosixPlatform
 from tests.crossbench.base import CrossbenchFakeFsTestCase
 from tests.crossbench.mock_helper import MockPlatform
+
+GCS_URL: Final[str] = (
+    "gs://chrome-partner-loadline/archive_phone_20260331.wprgo")
+GCS_FILE_SIZE: Final[int] = 45678
+
+
+class FakeGcsBlob:
+  """Minimal stand-in for google.cloud.storage.blob.Blob."""
+
+  def __init__(self, size: int, download_size: int) -> None:
+    # Size reported by the object metadata.
+    self.size: int = size
+    # Number of bytes written by a download.
+    self.download_size: int = download_size
+
+  def reload(self) -> None:
+    pass
+
+  def download_to_filename(self, filename: str) -> None:
+    pathlib.Path(filename).write_bytes(b"\0" * self.download_size)
 
 
 class BaseMockPlatformTestCase(CrossbenchFakeFsTestCase, metaclass=abc.ABCMeta):
@@ -95,6 +116,30 @@ class BaseMockPlatformTestCase(CrossbenchFakeFsTestCase, metaclass=abc.ABCMeta):
           "'[' -e /opt/google/chrome-remote-desktop/is-remoting-session ']'",
           returncode=1)
     self.assertFalse(self.platform.is_remote_desktop)
+
+  def _gcs_download_dest(self) -> pth.LocalPath:
+    # GCS downloads always land on the host, even for remote platforms.
+    return self.host_platform.local_path("/cache/wpr/archive.wprgo")
+
+  def _download_gcs_file(self, blob: FakeGcsBlob, dest: pth.LocalPath) -> None:
+    with mock.patch.object(self.platform, "get_gcs_blob", return_value=blob):
+      self.platform.download_gcs_file(GCS_URL, dest)
+
+  def test_download_gcs_file(self) -> None:
+    dest = self._gcs_download_dest()
+    self._download_gcs_file(FakeGcsBlob(GCS_FILE_SIZE, GCS_FILE_SIZE), dest)
+    self.assertEqual(dest.stat().st_size, GCS_FILE_SIZE)
+
+  def test_download_gcs_file_size_mismatch_is_rejected(self) -> None:
+    dest = self._gcs_download_dest()
+    for download_size in (0, GCS_FILE_SIZE - 1, GCS_FILE_SIZE + 1):
+      with self.subTest(download_size=download_size):
+        with self.assertRaisesRegex(OSError, "Size mismatch"):
+          self._download_gcs_file(
+              FakeGcsBlob(GCS_FILE_SIZE, download_size), dest)
+        # Nothing is cached, so the next run downloads the file again.
+        self.assertFalse(dest.exists())
+        self.assertEqual([], list(dest.parent.iterdir()))
 
 
 class BaseLocalMockPlatformTestMixin:

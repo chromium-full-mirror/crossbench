@@ -1186,6 +1186,10 @@ class Platform(abc.ABC):
     local_path.parent.mkdir(parents=True, exist_ok=True)
     try:
       blob.download_to_filename(str(local_path))
+      downloaded_size: int = self.host_platform.file_size(local_path)
+      if downloaded_size != blob.size:
+        raise OSError(f"Size mismatch for {gcs_url}: expected "
+                      f"{blob.size} bytes, but got {downloaded_size}.")
     except BaseException:
       # Caches treat the existence of a file as proof that it is complete,
       # so never leave a partially downloaded file behind.
