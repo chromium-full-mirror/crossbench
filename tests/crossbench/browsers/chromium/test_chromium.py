@@ -75,6 +75,24 @@ class LocalChromeWebDriverAndroidTestCase(BaseCrossbenchTestCase):
       self.assertFalse(browser.version.has_channel)
       self.assertEqual(browser.version.version_str, version_str)
 
+  def test_find_build_dir(self):
+    gn_dir = pth.LocalPath("/home/testuser/chrome/src/out/gn_build")
+    self.fs.create_file(gn_dir / "args.gn")
+    self.assertEqual(helper.find_build_dir(gn_dir, self.platform), gn_dir)
+    self.assertEqual(
+        helper.find_build_dir(gn_dir / "chrome", self.platform), gn_dir)
+
+    ninja_dir = pth.LocalPath("/home/testuser/chrome/src/out/ninja_build")
+    self.fs.create_file(ninja_dir / "build.ninja")
+    self.assertEqual(helper.find_build_dir(ninja_dir, self.platform), ninja_dir)
+
+    unstripped_dir = pth.LocalPath("/home/testuser/chrome/src/out/isolated")
+    self.fs.create_dir(unstripped_dir / "lib.unstripped")
+    self.assertEqual(
+        helper.find_build_dir(
+            unstripped_dir / "clang_x64/chromedriver", self.platform),
+        unstripped_dir)
+
   def test_profile_data_dir(self):
     build_dir = pathlib.Path("/home/testuser/chrome/src/out/release")
     path = build_dir / mock_browser.MockChromium.mock_app_binary()

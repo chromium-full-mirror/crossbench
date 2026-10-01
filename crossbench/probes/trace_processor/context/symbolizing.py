@@ -7,14 +7,16 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final, Iterator
 
 from typing_extensions import override
 
+from crossbench import path as pth
 from crossbench.browsers.chromium_based import helper as chromium_helper
 from crossbench.browsers.version import BrowserVersionChannel
 from crossbench.cli.ui import ui
 from crossbench.helper.path_finder import ChromiumCheckoutFinder
+from crossbench.helper.path_finder_base import BasePathFinder
 from crossbench.plt.arch import MachineArch
 from crossbench.plt.base import SubprocessError
 from crossbench.probes.cb_perfetto import traceconv
@@ -24,7 +26,6 @@ from crossbench.probes.trace_processor.query_config import \
     TraceProcessorQueryConfig
 
 if TYPE_CHECKING:
-  from crossbench import path as pth
   from crossbench import plt
   from crossbench.browsers.browser import Browser
   from crossbench.probes.results import LocalProbeResult
@@ -33,6 +34,41 @@ if TYPE_CHECKING:
   from crossbench.runner.run import Run
 
 KB = 1024
+
+
+class ChromiumSymbolPathFinder(BasePathFinder):
+
+  def __init__(self, browser: Browser) -> None:
+    self._browser: Final[Browser] = browser
+    super().__init__(browser.host_platform)
+
+  @property
+  def browser(self) -> Browser:
+    return self._browser
+
+  @override
+  def candidates(self) -> tuple[pth.AnyPath, ...]:
+    candidates: list[pth.AnyPath] = []
+    browser_platform = self._browser.platform
+    if self._browser.is_local_build or browser_platform.is_android:
+      if self._browser.app_path:
+        candidates.append(self._browser.app_path)
+    if browser_platform.is_android:
+      if self._browser.driver_path:
+        candidates.append(self._browser.driver_path)
+      candidates.append(pth.LocalPath.cwd())
+    return tuple(candidates)
+
+  @override
+  def _iterate_candidates(self) -> Iterator[pth.AnyPath]:
+    for candidate in self.candidates():
+      if build_dir := chromium_helper.find_build_dir(candidate, self.platform):
+        yield build_dir / "lib.unstripped"
+        yield build_dir
+
+  @override
+  def is_valid_path(self, candidate: pth.AnyPath) -> bool:
+    return self.platform.is_dir(candidate)
 
 
 class TraceProcessorSymbolizingProbeContext(TraceProcessorProbeContext):
@@ -47,9 +83,11 @@ class TraceProcessorSymbolizingProbeContext(TraceProcessorProbeContext):
 
   @property
   def should_symbolize_profile(self) -> bool:
-    if not self.probe.symbolize_profile:
-      return False
-    return self.run.has_probe_context_by_name("profiling")
+    return self.probe.symbolize_profile
+
+  @property
+  def should_export_pprof(self) -> bool:
+    return self.has_symbols and self.run.has_probe_context_by_name("profiling")
 
   @override
   def _merge_trace_files(self) -> LocalProbeResult:
@@ -62,7 +100,7 @@ class TraceProcessorSymbolizingProbeContext(TraceProcessorProbeContext):
   @override
   def queries(self) -> tuple[TraceProcessorQueryConfig, ...]:
     queries = super().queries
-    if self.has_symbols and not self.has_pprof_query(queries):
+    if self.should_export_pprof and not self.has_pprof_query(queries):
       logging.info("trace_processor probe: auto-adding pprof query")
       queries += (TraceProcessorQueryConfig.parse("pprof"),)
     return queries
@@ -73,7 +111,7 @@ class TraceProcessorSymbolizingProbeContext(TraceProcessorProbeContext):
     # TODO: fix and respect needs_btp_run, add pprof query earlier.
     if super().needs_tp_run:
       return True
-    return self.has_symbols
+    return self.should_export_pprof
 
   def _symbolize_profile(self, result: LocalProbeResult) -> LocalProbeResult:
     llvm_symbolizer_bin = self.probe.llvm_symbolizer_bin
@@ -94,6 +132,10 @@ class TraceProcessorSymbolizingProbeContext(TraceProcessorProbeContext):
     if not symbols_path:
       logging.error("Could not find any input symbol directories")
       return result
+
+    llvm_symbolizer_bin = llvm_symbolizer_bin.resolve()
+    traceconv_bin = traceconv_bin.resolve()
+    symbols_path = symbols_path.resolve()
 
     env = {
         "PERFETTO_SYMBOLIZER_MODE": "index",
@@ -161,11 +203,8 @@ class TraceProcessorSymbolizingProbeContext(TraceProcessorProbeContext):
     # symbolization fails but the unsymbolized trace is still available. For
     # official builds, an even better alternative would be to download from
     # the official archive.
-    if self.browser.is_local_build:
-      if path := chromium_helper.find_build_dir(self.browser.app_path,
-                                                self.host_platform):
-        return self.host_platform.local_path(path)
-      return None
+    if build_symbols := ChromiumSymbolPathFinder(self.browser).local_path:
+      return build_symbols
 
     if self.host_platform.is_macos:
       return _download_macos_symbols(self.host_platform, self.browser)

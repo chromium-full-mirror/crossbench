@@ -1,6 +1,7 @@
 // Perfetto tracing probe for WV Shell memory metrics.
 {
   "probes": {
+    "trace_processor": {}
     "perfetto": {
       "textproto": "webview_shell_heapdump"
       "config_via_stdin": true

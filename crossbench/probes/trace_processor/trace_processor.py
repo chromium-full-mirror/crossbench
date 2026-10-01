@@ -306,11 +306,11 @@ class TraceProcessorProbe(Probe):
         extra_flags=extra_flags)
 
   @override
-  def get_context_cls(self) -> type[TraceProcessorProbeContext]:
-    # TODO: enable on linux and android
-    if self._platform.is_macos:
-      return TraceProcessorSymbolizingProbeContext
-    return TraceProcessorProbeContext
+  def create_context(self, run: Run) -> TraceProcessorProbeContext:
+    # TODO: enable on linux
+    if run.browser_platform.is_macos or run.browser_platform.is_android:
+      return TraceProcessorSymbolizingProbeContext(self, run)
+    return TraceProcessorProbeContext(self, run)
 
   @override
   def validate_env(self, env: RunnerEnv) -> None:

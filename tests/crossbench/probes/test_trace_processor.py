@@ -16,8 +16,10 @@ from crossbench.cli.config.probe_list import ProbeListConfig
 from crossbench.exception import ArgumentTypeMultiException
 from crossbench.probes.all import TraceProcessorProbe
 from crossbench.probes.trace_processor.constants import QUERIES_DIR
+from crossbench.probes.trace_processor.context.base import \
+    TraceProcessorProbeContext
 from crossbench.probes.trace_processor.context.symbolizing import \
-    TraceProcessorSymbolizingProbeContext
+    ChromiumSymbolPathFinder, TraceProcessorSymbolizingProbeContext
 from crossbench.probes.trace_processor.query_config import \
     DeviceSpecificTraceProcessorQuery, TraceProcessorQueryConfig
 from tests import test_helper
@@ -159,6 +161,30 @@ class TraceProcessorProbeFakeFsTestCase(CrossbenchFakeFsTestCase):
           RuntimeError, "Clipboard tool unavailable on current platform."):
         TraceProcessorProbe(output_to_clipboard=["json"])
 
+  def test_create_context_platform(self):
+    probe = TraceProcessorProbe.parse_dict({"queries": self._QUERIES})
+
+    run_macos = unittest.mock.MagicMock()
+    run_macos.browser_platform.is_macos = True
+    run_macos.browser_platform.is_android = False
+    self.assertIsInstance(
+        probe.create_context(run_macos), TraceProcessorSymbolizingProbeContext)
+
+    run_android = unittest.mock.MagicMock()
+    run_android.browser_platform.is_macos = False
+    run_android.browser_platform.is_android = True
+    self.assertIsInstance(
+        probe.create_context(run_android),
+        TraceProcessorSymbolizingProbeContext)
+
+    run_linux = unittest.mock.MagicMock()
+    run_linux.browser_platform.is_macos = False
+    run_linux.browser_platform.is_android = False
+    context_linux = probe.create_context(run_linux)
+    self.assertIsInstance(context_linux, TraceProcessorProbeContext)
+    self.assertNotIsInstance(
+        context_linux, TraceProcessorSymbolizingProbeContext)
+
   def test_has_pprof_query(self):
     run = unittest.mock.MagicMock()
 
@@ -202,6 +228,7 @@ class TraceProcessorProbeFakeFsTestCase(CrossbenchFakeFsTestCase):
 
   def test_symbolizing_context_auto_adds_pprof(self):
     run = unittest.mock.MagicMock()
+    run.has_probe_context_by_name.return_value = True
     probe = TraceProcessorProbe.parse_dict(
         {"queries": [{
             "name": "other",
@@ -211,11 +238,26 @@ class TraceProcessorProbeFakeFsTestCase(CrossbenchFakeFsTestCase):
     context = TraceProcessorSymbolizingProbeContext(probe, run)
     with self.mock_has_symbols():
       queries = context.queries
+      self.assertTrue(context.needs_tp_run)
+    run.has_probe_context_by_name.assert_called_with("profiling")
     self.assertEqual(len(queries), 2)
     self.assertEqual(queries[1].name, "pprof")
 
+  def test_symbolizing_context_skips_pprof_without_profiling(self):
+    run = unittest.mock.MagicMock()
+    run.has_probe_context_by_name.return_value = False
+    probe = TraceProcessorProbe.parse_dict({})
+
+    context = TraceProcessorSymbolizingProbeContext(probe, run)
+    with self.mock_has_symbols():
+      queries = context.queries
+      self.assertFalse(context.needs_tp_run)
+    run.has_probe_context_by_name.assert_called_with("profiling")
+    self.assertEqual(len(queries), 0)
+
   def test_symbolizing_context_skips_pprof_with_perf_sample(self):
     run = unittest.mock.MagicMock()
+    run.has_probe_context_by_name.return_value = True
     probe = TraceProcessorProbe.parse_dict({
         "queries": [{
             "name": "jetstream_3/perf_sample_span",
@@ -229,27 +271,102 @@ class TraceProcessorProbeFakeFsTestCase(CrossbenchFakeFsTestCase):
     self.assertEqual(len(queries), 1)
     self.assertEqual(queries[0].name, "jetstream_3_perf_sample_span")
 
-  def _test_should_symbolize_profile(self,
-                                     run: unittest.mock.MagicMock) -> bool:
-    probe = TraceProcessorProbe.parse_dict({"queries": ["pprof"]})
-    context = TraceProcessorSymbolizingProbeContext(probe, run)
-
-    # We must access the property FIRST before asserting the mock was called,
-    # because the property itself makes the call.
-    result = context.should_symbolize_profile
-    run.has_probe_context_by_name.assert_called_once_with("profiling")
-    return result
-
-  def test_should_symbolize_profile_skips_without_profiling(self):
+  def test_should_symbolize_profile(self):
     run = unittest.mock.MagicMock()
-    run.runner.has_probe.return_value = True
+
+    probe_default = TraceProcessorProbe.parse_dict({"queries": ["pprof"]})
+    context_default = TraceProcessorSymbolizingProbeContext(probe_default, run)
+    self.assertTrue(context_default.should_symbolize_profile)
+
+    probe_enabled = TraceProcessorProbe.parse_dict({
+        "queries": ["pprof"],
+        "symbolize_profile": True,
+    })
+    context_enabled = TraceProcessorSymbolizingProbeContext(probe_enabled, run)
+    self.assertTrue(context_enabled.should_symbolize_profile)
+
+    probe_disabled = TraceProcessorProbe.parse_dict({
+        "queries": ["pprof"],
+        "symbolize_profile": False,
+    })
+    context_disabled = TraceProcessorSymbolizingProbeContext(
+        probe_disabled, run)
+    self.assertFalse(context_disabled.should_symbolize_profile)
+
+  def test_chromium_symbol_path_finder_local_and_android(self):
+    build_dir = pth.LocalPath("/out/Release")
+    self.fs.create_file(build_dir / "build.ninja")
+    unstripped_dir = build_dir / "lib.unstripped"
+    self.fs.create_dir(unstripped_dir)
+
+    browser = unittest.mock.MagicMock()
+    browser.host_platform = plt.PLATFORM
+    browser.platform.is_android = True
+    browser.is_local_build = False
+    browser.app_path = pth.AnyPath("org.chromium.webview_shell")
+    browser.driver_path = build_dir / "clang_x64/chromedriver"
+
+    self.assertEqual(
+        ChromiumSymbolPathFinder(browser).local_path, unstripped_dir)
+
+    desktop_dir = pth.LocalPath("/out/Default")
+    self.fs.create_file(desktop_dir / "args.gn")
+    desktop_browser = unittest.mock.MagicMock()
+    desktop_browser.host_platform = plt.PLATFORM
+    desktop_browser.platform.is_android = False
+    desktop_browser.is_local_build = True
+    desktop_browser.app_path = desktop_dir / "chrome"
+
+    self.assertEqual(
+        ChromiumSymbolPathFinder(desktop_browser).local_path, desktop_dir)
+
+  def test_symbolize_profile_teardown(self):
+    build_dir = pth.LocalPath("/out/Release")
+    self.fs.create_file(build_dir / "build.ninja")
+    unstripped_dir = build_dir / "lib.unstripped"
+    self.fs.create_dir(unstripped_dir)
+
+    traceconv_bin = pth.LocalPath("/bin/traceconv")
+    llvm_symbolizer_bin = pth.LocalPath("/bin/llvm-symbolizer")
+    self.fs.create_file(traceconv_bin, st_mode=0o755)
+    self.fs.create_file(llvm_symbolizer_bin, st_mode=0o755)
+
+    out_dir = pth.LocalPath("/results")
+    result_dir = out_dir / "trace_processor"
+    trace_file = out_dir / "perfetto/trace.pb.gz"
+    self.fs.create_file(trace_file, contents=b"trace_data")
+
+    probe = TraceProcessorProbe.parse_dict({
+        "traceconv_bin": str(traceconv_bin),
+        "llvm_symbolizer_bin": str(llvm_symbolizer_bin),
+    })
+
+    run = unittest.mock.MagicMock()
+    run.out_dir = out_dir
+    run.get_default_probe_result_path.return_value = result_dir
+    run.results.all_traces.return_value = [trace_file]
     run.has_probe_context_by_name.return_value = False
-    self.assertFalse(self._test_should_symbolize_profile(run))
+    run.browser.host_platform = plt.PLATFORM
+    run.browser.platform.is_android = True
+    run.browser.is_local_build = False
+    run.browser.app_path = pth.AnyPath("org.chromium.webview_shell")
+    run.browser.driver_path = build_dir / "clang_x64/chromedriver"
 
-  def test_should_symbolize_profile_with_profiling(self):
-    run = unittest.mock.MagicMock()
-    run.has_probe_context_by_name.return_value = True
-    self.assertTrue(self._test_should_symbolize_profile(run))
+    def fake_sh(*args, **kwargs):
+      del kwargs
+      symbols_pb = args[4]
+      self.fs.create_file(
+          symbols_pb, contents=bytes(i % 256 for i in range(150 * 1024)))
+
+    context = TraceProcessorSymbolizingProbeContext(probe, run)
+    with unittest.mock.patch.object(
+        plt.PLATFORM, "sh", side_effect=fake_sh) as mock_sh:
+      context.teardown()
+
+    self.assertTrue(context.has_symbols)
+    mock_sh.assert_called_once()
+    env = mock_sh.call_args.kwargs["env"]
+    self.assertEqual(env["PERFETTO_BINARY_PATH"], str(unstripped_dir))
 
 
 TARGET_P9 = "web_power/power_rails_tensor_g4"
