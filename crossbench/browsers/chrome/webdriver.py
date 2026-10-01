@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 import selenium.common.exceptions
@@ -18,8 +17,6 @@ from crossbench.browsers.chrome.base import ChromeBaseMixin
 from crossbench.browsers.chromium.webdriver import ChromiumBasedWebDriver, \
     ChromiumWebDriverAndroid, ChromiumWebDriverChromeOsSsh, \
     ChromiumWebDriverSsh, LocalChromiumWebDriverAndroid
-from crossbench.browsers.chromium_based import helper
-from crossbench.browsers.webdriver import DriverException
 
 if TYPE_CHECKING:
   from selenium.webdriver.chromium.options import ChromiumOptions
@@ -46,16 +43,7 @@ class ChromeWebDriver(ChromeBaseMixin, ChromiumBasedWebDriver):
     try:
       return webdriver.Chrome(options=options, service=service)
     except selenium.common.exceptions.WebDriverException as e:
-      msg: list[str] = [f"Could not start WebDriver: {e.msg}"]
-      if self.is_locally_compiled():
-        local_build_dir = self.local_build_dir()
-        assert local_build_dir is not None, "expected local_build_dir to be set"
-        msg.append(
-            helper.get_chromedriver_build_instructions(
-                local_build_dir, self.platform.is_android))
-      msg_str = "\n".join(msg)
-      logging.error(msg_str)
-      raise DriverException(msg_str) from e
+      self._handle_startup_error(e)
 
 
 class ChromeWebDriverAndroid(ChromiumWebDriverAndroid, ChromeWebDriver):

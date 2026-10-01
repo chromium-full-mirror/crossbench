@@ -284,6 +284,15 @@ Crossbench supports various network settings directly, see `./cb.py help network
 | `--network=path/to/archive.wprgo` | Use 'wpr' replay network with the given request archive. |
 | `--network='{type:"wpr", path:"./archive.wprgo", speed:"3G-regular"}'`| Use 'wpr' network with 3G traffic shaping. |
 
+## 📊 Results and Output Directory Structure
+
+By default, Crossbench stores all results in a timestamped folder under `results/`. A symlink `results/latest` is also created for convenience.
+
+Inside the result directory, you will find:
+*   **`cb.results.json`**: The aggregated high-level metrics (min, max, average) across all runs and stories. *Note: Some probes (like `trace_processor`) may strip story metadata during aggregation.*
+*   **`<browser_name>/stories/<story_name>/<run_index>/`**: Detailed raw outputs for each individual run. This includes Perfetto traces (`perfetto.trace.pb.gz`), Chrome logs, and screenshots (if enabled).
+*   **`output/trace_processor/`**: If you are using the `trace_processor` probe, this folder contains the unmerged, raw CSV files (e.g., `<metric_name>.csv`). These files retain the `cb_story` column, allowing you to see exact metrics separated by individual stories.
+
 ## 🛠️ Development
 
 ### Checking Out Code

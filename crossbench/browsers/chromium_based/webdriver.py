@@ -228,6 +228,17 @@ class ChromiumBasedWebDriver(
     pass
 
   @override
+  def _startup_error_hints(self) -> list[str]:
+    hints = super()._startup_error_hints()
+    if self.is_locally_compiled():
+      local_build_dir = self.local_build_dir()
+      assert local_build_dir is not None, "expected local_build_dir to be set"
+      hints.append(
+          helper.get_chromedriver_build_instructions(
+              local_build_dir, self.platform.is_android))
+    return hints
+
+  @override
   def _validate_driver_version(self) -> None:
     error_message = None
     if self.is_local and helper.is_build_dir(

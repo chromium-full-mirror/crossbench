@@ -4,7 +4,11 @@
 from __future__ import annotations
 
 import argparse
+from unittest import mock
 
+import selenium.common.exceptions
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chrome.service import Service as ChromeService
 from typing_extensions import override
 
 from crossbench import path as pth
@@ -12,6 +16,8 @@ from crossbench.browsers.chrome.version import ChromeVersion
 from crossbench.browsers.chrome.webdriver import ChromeWebDriver, \
     LocalChromeWebDriverAndroid
 from crossbench.browsers.settings import Settings
+from crossbench.browsers.viewport import Viewport
+from crossbench.browsers.webdriver import DriverException
 from crossbench.flags.chrome import ChromeFlags
 from tests import test_helper
 from tests.crossbench import mock_browser
@@ -75,6 +81,40 @@ class ChromeWebdriverTestCase(BaseCrossbenchTestCase):
     self.assertTrue(self.browsers)
     for browser in self.browsers:
       self.assertFalse(browser.is_local_build)
+
+  def test_startup_error_headless_platform(self) -> None:
+    browser = ChromeWebDriverForTesting(
+        label="browser-label",
+        path=mock_browser.MockChromeStable.mock_app_path(),
+        settings=Settings(platform=self.platform))
+    with mock.patch(
+        "selenium.webdriver.Chrome",
+        side_effect=selenium.common.exceptions.WebDriverException(
+            "session not created")), mock.patch.object(
+                type(self.platform),
+                "has_display",
+                new_callable=mock.PropertyMock,
+                return_value=False):
+      with self.assertRaises(DriverException) as cm:
+        browser._create_driver(ChromeOptions(), ChromeService())
+      self.assertIn("Try running with --headless", str(cm.exception))
+
+    headless_browser = ChromeWebDriverForTesting(
+        label="browser-label",
+        path=mock_browser.MockChromeStable.mock_app_path(),
+        settings=Settings(
+            platform=self.platform, viewport=Viewport.HEADLESS))
+    with mock.patch(
+        "selenium.webdriver.Chrome",
+        side_effect=selenium.common.exceptions.WebDriverException(
+            "session not created")), mock.patch.object(
+                type(self.platform),
+                "has_display",
+                new_callable=mock.PropertyMock,
+                return_value=False):
+      with self.assertRaises(DriverException) as cm:
+        headless_browser._create_driver(ChromeOptions(), ChromeService())
+      self.assertNotIn("Try running with --headless", str(cm.exception))
 
 
 class LocalChromeWebDriverAndroidTestCase(BaseCrossbenchTestCase):

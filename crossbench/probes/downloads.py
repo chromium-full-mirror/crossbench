@@ -68,7 +68,10 @@ class DownloadsProbe(Probe):
       return FileWatchDownloadsProbeContext(self, run,
                                             self.CHROME_OS_DOWNLOADS_DIR)
     raise NotImplementedError(
-        f"Probe({self}): Unsupported browser: {run.browser}")
+        f"Probe({self}): Unsupported browser: {run.browser}. "
+        "The downloads probe is currently only supported on Android and "
+        "ChromeOS. If running locally on Linux/Mac, please use "
+        "--no-probe=downloads.")
 
   @property
   def clear_downloads(self) -> bool:

@@ -183,6 +183,9 @@ class LinuxPlatform(PosixPlatform):
 
   def screenshot(self, result_path: pth.AnyPath) -> None:
     # TODO: maybe use imagemagick's 'import' as more portable alternative
+    if not self.has_display:
+      logging.warning("DISPLAY environment variable is not set. "
+                      "gnome-screenshot may fail or hang.")
     self.sh("gnome-screenshot", "--file", result_path)
 
   @functools.lru_cache(maxsize=1)

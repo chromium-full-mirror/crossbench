@@ -11,7 +11,7 @@ import os
 import time
 import traceback
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Final, Iterator, Sequence, cast
+from typing import TYPE_CHECKING, Any, Final, Iterator, NoReturn, Sequence, cast
 
 import selenium.common.exceptions
 import urllib3
@@ -166,13 +166,31 @@ class WebDriverBrowser(Browser, metaclass=abc.ABCMeta):
     try:
       self._private_driver = self._start_driver(session, self.driver_path)
     except selenium.common.exceptions.WebDriverException as e:
-      msg = e.msg or "Could not create Webdriver session."
-      raise DriverException(msg, self) from e
+      self._handle_startup_error(e)
     self._is_running = True
     atexit.register(self.force_quit)
     self._find_driver_pid()
     self._set_driver_timeouts(session)
     self._setup_window()
+
+  def _handle_startup_error(
+      self, e: selenium.common.exceptions.WebDriverException) -> NoReturn:
+    msg: list[str] = [
+        f"Could not start WebDriver: {e.msg}"
+        if e.msg else "Could not create Webdriver session.",
+    ]
+    msg.extend(self._startup_error_hints())
+    msg_str = "\n".join(msg)
+    logging.error(msg_str)
+    raise DriverException(msg_str, self) from e
+
+  def _startup_error_hints(self) -> list[str]:
+    if not self.platform.has_display and not self.viewport.is_headless:
+      return [
+          f"No display is available on {self.platform}. "
+          "Try running with --headless.",
+      ]
+    return []
 
   def _find_driver_pid(self) -> None:
     pass

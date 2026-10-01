@@ -96,3 +96,10 @@ If running `./cb.py` fails, try the following:
   block on an interactive prompt for environment validation. Use the
   `--env-validation=warn` flag to prevent blocking while still seeing warning
   outputs.
+- **Headless VM Crashes**: If the browser exits immediately with a WebDriver
+  error, you are likely on a headless VM. Try passing `--headless` to your
+  command.
+- **Hanging / Unsupported Probes**: The `downloads` and `screenshot` probes may
+  not be fully supported on all local setups (e.g., Linux CloudTop). If you
+  encounter errors, omit them using `--no-probe=downloads` /
+  `--no-probe=screenshot` or a custom `--probe-config`.
