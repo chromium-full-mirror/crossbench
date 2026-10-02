@@ -45,6 +45,9 @@ if TYPE_CHECKING:
   from crossbench.runner.groups.session import BrowserSessionRunGroup
 
 
+_DEFAULT_TAB_TIMEOUT: Final[dt.timedelta] = dt.timedelta(seconds=0)
+
+
 class ChromiumBasedWebDriver(
     WebDriverBrowser, ChromiumBased, metaclass=abc.ABCMeta):
 
@@ -312,7 +315,7 @@ class ChromiumBasedWebDriver(
       url: re.Pattern | None = None,
       tab_index: int | None = None,
       relative_tab_index: int | None = None,
-      timeout: dt.timedelta = dt.timedelta(seconds=0),
+      timeout: dt.timedelta = _DEFAULT_TAB_TIMEOUT,
   ) -> str:
     assert not (tab_index is not None and relative_tab_index is not None)
     driver = self._private_driver
@@ -357,7 +360,7 @@ class ChromiumBasedWebDriver(
       url: re.Pattern | None = None,
       tab_index: int | None = None,
       relative_tab_index: int | None = None,
-      timeout: dt.timedelta = dt.timedelta(seconds=0),
+      timeout: dt.timedelta = _DEFAULT_TAB_TIMEOUT,
   ) -> None:
     driver = self._private_driver
     original_handle = driver.current_window_handle

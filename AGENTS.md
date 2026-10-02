@@ -23,6 +23,9 @@ If running `./cb.py` fails, try the following:
   referring to TYPE_CHECKING are an exception.)
 - Disallow `getattr`,  `setattr` and `hasattr`: dynamic attribute access is
   strictly banned by `PRESUBMIT.py`. Only use it when strictly unavoidable.
+- Avoid complex or multi-line inline if-else assignments. Only use simple
+  inline if expressions that fit on one line and are easy to read; otherwise
+  use a default value + if or an explicit if-else assignment.
 
 ## Crossbench Platform Code
 - Avoid using raw shell-commands if possible and directly use the platform

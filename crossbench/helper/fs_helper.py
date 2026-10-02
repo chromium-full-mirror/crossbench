@@ -4,9 +4,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final, Iterable, TypeVar
+from typing import TYPE_CHECKING, Iterable, TypeVar
 
 from crossbench import plt
+from crossbench.helper.size import Size
 
 if TYPE_CHECKING:
   from crossbench import path as pth
@@ -19,17 +20,8 @@ def sort_by_file_size(files: Iterable[PathT],
   return sorted(files, key=lambda f: (real_platform.file_size(f), f.name))
 
 
-SIZE_UNITS: Final[tuple[str, ...]] = ("B", "KiB", "MiB", "GiB", "TiB")
-
-
 def get_file_size(file: pth.AnyPath,
                   digits: int = 2,
                   platform: plt.Platform | None = None) -> str:
   real_platform = platform or plt.PLATFORM
-  size: float = float(real_platform.file_size(file))
-  unit_index = 0
-  divisor = 1024.0
-  while (unit_index < len(SIZE_UNITS)) and size >= divisor:
-    unit_index += 1
-    size /= divisor
-  return f"{size:.{digits}f} {SIZE_UNITS[unit_index]}"
+  return Size.format(real_platform.file_size(file), digits=digits)

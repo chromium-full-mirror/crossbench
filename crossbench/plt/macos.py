@@ -33,6 +33,8 @@ if TYPE_CHECKING:
   from crossbench.plt.types import TupleCmdArgs
   from crossbench.plt.version import PlatformVersion
 
+from crossbench.helper.size import Size
+
 DISPLAY_NDRV_RE: Final[re.Pattern] = re.compile(
     "(?P<resX>[0-9]+) x (?P<resY>[0-9]+) @ (?P<freq>[0-9.]+)Hz")
 
@@ -754,6 +756,6 @@ class MacOSPlatform(PosixPlatform):
       total_bytes = (in_use_sys or alloc_sys) + (in_use_vid or alloc_vid)
       if (total_bytes and isinstance(total_bytes, (int, float)) and
           total_bytes > 0):
-        results[f"gpu_{i}"] = float(total_bytes) / (1024.0 * 1024.0)
+        results[f"gpu_{i}"] = float(total_bytes) / Size.MiB
 
     return results

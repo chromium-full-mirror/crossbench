@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Final, Iterator
 from typing_extensions import override
 
 from crossbench import path as pth
+from crossbench.helper.size import Size
 from crossbench.parse import NumberParser
 from crossbench.plt.base import SubprocessError
 from crossbench.plt.posix import PosixPlatform, RemotePosixPlatform
@@ -169,7 +170,7 @@ class LinuxPlatform(PosixPlatform):
     output = self.sh_stdout("grep", "MemTotal", "/proc/meminfo")
     match = re.search(r"MemTotal:\s+(\d+)\s+kB", output)
     if match:
-      return int(match.group(1)) * 1024
+      return int(match.group(1)) * Size.KiB
     raise RuntimeError("Could not find MemTotal in /proc/meminfo")
 
   def search_binary(self, app_or_bin: pth.AnyPathLike) -> pth.AnyPath | None:
@@ -273,7 +274,7 @@ class LinuxPlatform(PosixPlatform):
           with contextlib.suppress(OSError, ValueError):
             total_bytes += int(self.cat(gtt_file).strip())
       if total_bytes > 0:
-        return {"amd_gpu": total_bytes / (1024.0 * 1024.0)}
+        return {"amd_gpu": total_bytes / Size.MiB}
     except OSError as e:
       logging.debug("Failed to query AMD sysfs: %s", e)
 
@@ -285,7 +286,7 @@ class LinuxPlatform(PosixPlatform):
         with contextlib.suppress(OSError, ValueError):
           total_lmem += int(self.cat(lmem_file).strip())
       if total_lmem > 0:
-        return {"intel_gpu": total_lmem / (1024.0 * 1024.0)}
+        return {"intel_gpu": total_lmem / Size.MiB}
     except OSError as e:
       logging.debug("Failed to query Intel sysfs: %s", e)
 

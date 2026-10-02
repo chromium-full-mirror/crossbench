@@ -32,6 +32,7 @@ except ImportError:
 KeyHandler = Callable[[], None]
 _POLL_INTERVAL_SEC: Final[float] = 0.05
 _JOIN_TIMEOUT_SEC: Final[float] = 0.5
+_DEFAULT_TIMEOUT: Final[dt.timedelta] = dt.timedelta(seconds=10)
 
 
 def shared() -> StdinCoordinator:
@@ -44,8 +45,7 @@ def prompt(message: str) -> str:
   return _SHARED.prompt(message)
 
 
-def input_with_timeout(timeout: dt.timedelta = dt.timedelta(
-    seconds=10)) -> str | None:
+def input_with_timeout(timeout: dt.timedelta = _DEFAULT_TIMEOUT) -> str | None:
   """Suspends the key listener and reads a line within `timeout`.
 
   Returns None on timeout or EOF (Ctrl-D).
@@ -64,7 +64,7 @@ class StdinCoordinator:
 
   def input_with_timeout(
       self,
-      timeout: dt.timedelta = dt.timedelta(seconds=10),
+      timeout: dt.timedelta = _DEFAULT_TIMEOUT,
   ) -> str | None:
     timeout_s = max(0.0, timeout.total_seconds())
     return self._reader.read_line_threaded(timeout_s)
@@ -106,7 +106,7 @@ class PosixStdinCoordinator(StdinCoordinator):
   @override
   def input_with_timeout(
       self,
-      timeout: dt.timedelta = dt.timedelta(seconds=10),
+      timeout: dt.timedelta = _DEFAULT_TIMEOUT,
   ) -> str | None:
     """Suspends the key listener and reads a line within `timeout`.
 

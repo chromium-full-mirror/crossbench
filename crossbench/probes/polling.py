@@ -9,7 +9,7 @@ import datetime as dt
 import logging
 import threading
 import time
-from typing import TYPE_CHECKING, ClassVar, Iterable, Self
+from typing import TYPE_CHECKING, ClassVar, Final, Iterable, Self
 
 from typing_extensions import override
 
@@ -25,6 +25,9 @@ if TYPE_CHECKING:
   from crossbench.plt.types import CmdArg, TupleCmdArgs
   from crossbench.runner.run import Run
 
+_DEFAULT_POLL_INTERVAL: Final[dt.timedelta] = dt.timedelta(seconds=1)
+_MIN_POLL_INTERVAL: Final[dt.timedelta] = dt.timedelta(seconds=0.1)
+
 
 class PollingProbe(Probe, metaclass=abc.ABCMeta):
   """
@@ -39,21 +42,22 @@ class PollingProbe(Probe, metaclass=abc.ABCMeta):
     parser = super().config_parser()
     parser.add_argument(
         "interval",
-        type=DurationParser.positive_duration,
-        default=dt.timedelta(seconds=1),
+        type=DurationParser.duration_range(_MIN_POLL_INTERVAL),
+        default=_DEFAULT_POLL_INTERVAL,
         help="Run the cmd at this interval and produce separate results.")
     return parser
 
   def __init__(
       self,
       cmd: Iterable[CmdArg],
-      interval: dt.timedelta = dt.timedelta(seconds=1),
+      interval: dt.timedelta = _DEFAULT_POLL_INTERVAL,
   ) -> None:
     super().__init__()
     self._cmd: TupleCmdArgs = tuple(cmd)
     self._interval = interval
-    if interval.total_seconds() < 0.1:
-      raise ValueError(f"Polling interval must be >= 0.1s, but got: {interval}")
+    if interval < _MIN_POLL_INTERVAL:
+      raise ValueError(f"Polling interval must be >= {_MIN_POLL_INTERVAL}s, "
+                       f"but got: {interval}")
 
   @property
   @override

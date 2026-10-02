@@ -35,6 +35,7 @@ import psutil
 from crossbench import __version__, parse
 from crossbench import path as pth
 from crossbench.helper import wait
+from crossbench.helper.size import Size
 from crossbench.parse import NumberParser, ObjectParser
 from crossbench.plt import proc_helper
 from crossbench.plt.arch import MachineArch
@@ -375,7 +376,7 @@ class Platform(abc.ABC):
     return psutil.virtual_memory().total
 
   def total_memory_mb(self) -> int:
-    return self.system_memory_bytes // (1024 * 1024)
+    return self.system_memory_bytes // Size.MiB
 
   def device_config(self) -> dict[str, Any]:
     """Returns a hierarchical dictionary of device/host configuration.

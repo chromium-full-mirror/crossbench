@@ -18,6 +18,7 @@ if TYPE_CHECKING:
   from crossbench.plt.types import TupleCmdArgs
 
 from crossbench import path as pth
+from crossbench.helper.size import Size
 from crossbench.plt.base import Platform
 from crossbench.plt.signals import WinSignals
 from crossbench.plt.version import PlatformVersion
@@ -240,6 +241,6 @@ class WinPlatform(Platform):
         if part.isdigit():
           total_bytes += int(part)
     if total_bytes > 0:
-      return {"gpu_wmic": total_bytes / (1024.0 * 1024.0)}
+      return {"gpu_wmic": total_bytes / Size.MiB}
 
     return super().gpu_vram_used()

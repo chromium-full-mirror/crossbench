@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import datetime as dt
 import threading
-from typing import TYPE_CHECKING, Any, ClassVar, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Final, Self
 
 from typing_extensions import override
 
@@ -24,6 +24,8 @@ if TYPE_CHECKING:
   from crossbench.runner.run import Run
   from crossbench.types import Json
 
+_MIN_POLL_INTERVAL: Final[dt.timedelta] = dt.timedelta(seconds=0.05)
+_DEFAULT_POLL_INTERVAL: Final[dt.timedelta] = dt.timedelta(seconds=1)
 
 class VramProbe(JsonResultProbe):
   """
@@ -39,14 +41,14 @@ class VramProbe(JsonResultProbe):
     parser.add_default_argument(
         "interval",
         type=DurationParser.duration_range(
-            min=dt.timedelta(seconds=0.05), name="interval"),
-        default=dt.timedelta(seconds=1),
+            min=_MIN_POLL_INTERVAL, name="interval"),
+        default=_DEFAULT_POLL_INTERVAL,
         help="Polling interval for VRAM / GPU memory usage.")
     return parser
 
-  def __init__(self, interval: dt.timedelta = dt.timedelta(seconds=1)) -> None:
+  def __init__(self, interval: dt.timedelta = _DEFAULT_POLL_INTERVAL) -> None:
     super().__init__()
-    if interval < dt.timedelta(seconds=0.05):
+    if interval < _MIN_POLL_INTERVAL:
       raise ValueError(f"Interval {interval} is too small, must be >= 0.05s")
     self._interval = interval
 

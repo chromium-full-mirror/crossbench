@@ -105,6 +105,31 @@ import subprocess
   if browser_type := args.browser_type:
     ...
   ```
+- **Avoid complex inline if-else assignments**: Only use simple inline if
+  expressions that fit on one line and are easy to read. For complex or nested
+  expressions, use a default value + if or an explicit if-else statement.
+  ```python
+  # BAD: Hard to read, multi-line or complex ternary assignment
+  arguments = (
+      self._parse_dict(raw_data.get("args"))
+      if isinstance(raw_data.get("args"), dict) and self._is_valid(raw_data)
+      else self._default_fallback(source))
+
+  # GOOD: Short and simple inline if-else on a single line
+  arguments = raw_arguments if isinstance(raw_arguments, dict) else {}
+
+  # GOOD: Default value + if for multi-step logic
+  arguments = {}
+  raw_arguments = data.get("arguments")
+  if isinstance(raw_arguments, dict):
+    arguments = raw_arguments
+
+  # GOOD: Explicit if-else assignment
+  if isinstance(raw_arguments, dict):
+    arguments = raw_arguments
+  else:
+    arguments = {}
+  ```
 
 ______________________________________________________________________
 

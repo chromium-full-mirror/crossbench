@@ -27,6 +27,7 @@ from crossbench.benchmarks.loading.point import Point
 from crossbench.browsers.chromium.devtools import DevToolsRemoteClient
 from crossbench.flags.base import Flags, FlagsData
 from crossbench.helper.path_finder import BundletoolFinder
+from crossbench.helper.size import Size
 from crossbench.parse import NumberParser
 from crossbench.plt import axml
 from crossbench.plt.arch import MachineArch
@@ -1241,7 +1242,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
   def system_memory_bytes(self) -> int:
     meminfo = self.system_meminfo()
     if "total_ram_kb" in meminfo:
-      return int(meminfo["total_ram_kb"] * 1024)
+      return int(meminfo["total_ram_kb"] * Size.KiB)
     raise RuntimeError("Total RAM not found in system_meminfo")
 
   def system_meminfo(
@@ -1489,7 +1490,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
       if self.exists(page_alloc):
         val = int(self.cat(page_alloc).strip())
         if val > 0:
-          return {"adreno_gpu": val / (1024.0 * 1024.0)}
+          return {"adreno_gpu": val / Size.MiB}
     except Exception as e:  # noqa: BLE001
       logging.debug("Failed to read kgsl page_alloc: %s", e)
 
