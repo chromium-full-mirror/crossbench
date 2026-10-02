@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import sys
 from typing import Final
@@ -23,6 +24,7 @@ if REPO_DIR not in sys.path:
 from tests import test_helper  # noqa: E402
 
 if __name__ == "__main__":
+  os.chdir(REPO_DIR)
   more_flags = []
   parser = argparse.ArgumentParser(allow_abbrev=False)
   parser.add_argument("--ignore-tests", required=False)

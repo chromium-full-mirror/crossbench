@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import os
 import pathlib
 import sys
 from typing import Final
@@ -21,6 +22,7 @@ if REPO_DIR not in sys.path:
 from tests.test_helper import DEFAULT_PYTEST_FLAGS, to_flags  # noqa: E402
 
 if __name__ == "__main__":
+  os.chdir(REPO_DIR)
   pass_through_args = sys.argv[1:]
   flags = dict(DEFAULT_PYTEST_FLAGS)
   flags["--numprocesses"] = "auto"
