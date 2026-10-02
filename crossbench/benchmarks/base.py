@@ -762,16 +762,15 @@ class PressBenchmark(SubStoryBenchmark):
       assert (all((isinstance(part, int)) for part in raw_version)), (
           "All version parts should be integers.")
     version = [str(v) for v in raw_version]
-    assert version, "Expected non-empty version tuple."
-    version_names = []
+    version_names: OrderedSet[str] = OrderedSet()
     dot_version = ".".join(version)
     for name in (cls.short_base_name(), cls.base_name()):
       assert name, "Expected non-empty base name."
       if not is_branch_version:
-        version_names.append(f"{name}{dot_version}")
+        version_names.add(f"{name}{dot_version}")
       version_name = f"{name}_{dot_version}"
       if version_name != cls.NAME:
-        version_names.append(version_name)
+        version_names.add(version_name)
     return tuple(version_names)
 
   @classmethod

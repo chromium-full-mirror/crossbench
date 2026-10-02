@@ -7,12 +7,12 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import pathlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from typing_extensions import Self, override
 
+from crossbench import path as pth
 from crossbench.config import ConfigObject, ConfigParser
 from crossbench.probes.probe import Probe, ProbeContext
 from crossbench.probes.result_location import ResultLocation
@@ -166,7 +166,7 @@ class PerfettoInfoProbeContext(ProbeContext[PerfettoInfoProbe]):
 
   @override
   def teardown(self) -> ProbeResult:
-    output_path = pathlib.Path(self.local_result_path)
+    output_path = pth.LocalPath(self.local_result_path)
     with output_path.open("w", encoding="utf-8") as f:
       json.dump([cat.as_dict() for cat in self._categories], f, indent=2)
     return self.local_result(json=(output_path,))

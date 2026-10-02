@@ -249,7 +249,7 @@ def TestFilePatternsToCheck(
   else:
     # Only check a small subset on upload
     test_dir = crossbench_test_path / "cli"
-    file_pattern = "*test_cli_fast_.*.py"
+    file_pattern = "*test_cli_fast_*.py"
   return test_dir, file_pattern
 
 

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import pathlib
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from typing_extensions import override
@@ -255,7 +254,7 @@ class MockRunner:
     self.create_symlinks = True
     self.probes: list[Probe] = probes if probes else []
     self.browsers: list[Browser] = []
-    self.out_dir = pathlib.Path("results/out")
+    self.out_dir = pth.LocalPath("results/out")
     self.timing = Timing()
     self.env = RunnerEnv(self.platform, self.out_dir, self.browsers,
                          self.probes, self.repetitions)
@@ -302,6 +301,6 @@ class MockProbeContext(ProbeContext):
     pass
 
   def teardown(self) -> ProbeResult:
-    with pathlib.Path(self.result_path).open("w", encoding="utf-8") as f:
+    with pth.LocalPath(self.result_path).open("w", encoding="utf-8") as f:
       json.dump(self.probe.test_data, f)
-    return LocalProbeResult(json=(self.result_path,))
+    return LocalProbeResult(json=(pth.LocalPath(self.result_path),))

@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import unittest
-import xml.etree.ElementTree as ET
+from xml.etree import ElementTree
 
 from crossbench.action_runner.display_rectangle import DisplayRectangle
 from crossbench.action_runner.screenshot_annotation import \
@@ -19,7 +19,7 @@ class ScreenshotAnnotationTestCase(unittest.TestCase):
   SVG_NAMESPACE = {"": "http://www.w3.org/2000/svg"}
 
   def test_empty(self):
-    svg = ET.fromstring(
+    svg = ElementTree.fromstring(
         annotate_screenshot_svg(1366, 768, "screenshot.png", []))
     self.assertEqual(svg.attrib["width"], "1366")
     self.assertEqual(svg.attrib["height"], "768")
@@ -29,7 +29,7 @@ class ScreenshotAnnotationTestCase(unittest.TestCase):
     self.assertIsNotNone(image)
 
   def test_point(self):
-    svg = ET.fromstring(
+    svg = ElementTree.fromstring(
         annotate_screenshot_svg(
             1366, 768, "screenshot.png",
             [ScreenshotPointAnnotation("point", Point(123, 456))]))
@@ -39,7 +39,7 @@ class ScreenshotAnnotationTestCase(unittest.TestCase):
     self.assertIsNotNone(rect)
 
   def test_rect(self):
-    svg = ET.fromstring(
+    svg = ElementTree.fromstring(
         annotate_screenshot_svg(1366, 768, "screenshot.png", [
             ScreenshotRectAnnotation("rect",
                                      DisplayRectangle(Point(123, 456), 89, 97)),

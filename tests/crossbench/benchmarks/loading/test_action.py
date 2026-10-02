@@ -4,8 +4,12 @@
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
+import inspect
+import re
 import unittest
+from typing import Any, Final, cast
 
 from crossbench.action_runner.action.action import ACTION_TIMEOUT, ACTIONS, \
     Action
@@ -49,6 +53,8 @@ from crossbench.probes.screenshot import ScreenshotProbe
 from tests import test_helper
 from tests.crossbench.base import CrossbenchFakeFsTestCase
 
+_MOCK_CLASS_RE: Final[re.Pattern[str]] = re.compile(r"^Mock|Mock$")
+
 
 class ActionTestCase(CrossbenchFakeFsTestCase):
 
@@ -79,6 +85,51 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
           f"{action_cls}: missing "
           "@functools.lru_cache decorator on config_parser() method")
       self.assertIs(action_cls.TYPE, action_type)
+
+  def _get_concrete_action_classes(self) -> list[type[Action]]:
+
+    def all_subclasses(cls: type[Any]):
+      for sub_cls in cls.__subclasses__():
+        if _MOCK_CLASS_RE.search(sub_cls.__name__):
+          continue
+        yield from all_subclasses(sub_cls)
+        if inspect.isabstract(sub_cls):
+          continue
+        yield sub_cls
+
+    return list(all_subclasses(Action))
+
+  def test_all_actions_are_frozen_dataclasses(self):
+    action_classes = self._get_concrete_action_classes()
+    self.assertGreater(len(action_classes), 0)
+    for action_cls in action_classes:
+      with self.subTest(action_cls=action_cls.__name__):
+        self.assertTrue(
+            dataclasses.is_dataclass(action_cls),
+            f"{action_cls.__name__} must be a dataclass")
+        self.assertTrue(
+            cast(Any, action_cls).__dataclass_params__.frozen,
+            f"{action_cls.__name__} must be a frozen dataclass")
+
+  def test_all_actions_have_unique_type(self):
+    action_classes = self._get_concrete_action_classes()
+    seen_types: set[ActionType] = set()
+    for action_cls in action_classes:
+      with self.subTest(action_cls=action_cls.__name__):
+        self.assertIn("TYPE", action_cls.__dict__,
+                      f"{action_cls.__name__} must define a TYPE ClassVar")
+        action_type = action_cls.TYPE
+        self.assertIsInstance(
+            action_type, ActionType,
+            f"{action_cls.__name__}.TYPE must be an ActionType enum value")
+        self.assertNotIn(
+            action_type, seen_types,
+            f"{action_cls.__name__}.TYPE {action_type} is already used")
+        seen_types.add(action_type)
+
+  def test_all_actions_registered_in_actions_tuple(self):
+    action_classes = set(self._get_concrete_action_classes())
+    self.assertEqual(action_classes, set(ACTIONS_TUPLE))
 
   def test_parse_get_default(self):
     config_dict = {"action": "get", "url": "http://crossben.ch"}

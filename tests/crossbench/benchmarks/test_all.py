@@ -4,108 +4,63 @@
 
 from __future__ import annotations
 
+import inspect
+import re
 import unittest
-from typing import TYPE_CHECKING, MutableSet
+from typing import TYPE_CHECKING, Final, Iterator, MutableSet
 
 from ordered_set import OrderedSet
 
-from crossbench.benchmarks.embedder.embedder_benchmark import EmbedderBenchmark
-from crossbench.benchmarks.jetstream.jetstream_1_1 import JetStream11Benchmark
-from crossbench.benchmarks.jetstream.jetstream_2_0 import JetStream20Benchmark
-from crossbench.benchmarks.jetstream.jetstream_2_1 import JetStream21Benchmark
-from crossbench.benchmarks.jetstream.jetstream_2_2 import JetStream22Benchmark
-from crossbench.benchmarks.jetstream.jetstream_3_0 import JetStream30Benchmark
-from crossbench.benchmarks.jetstream.jetstream_main import \
-    JetStreamMainBenchmark
-from crossbench.benchmarks.loading.browser_startup import \
-    BrowserStartupBenchmark
+import crossbench.benchmarks.all as all_benchmarks
+from crossbench.benchmarks.base import Benchmark, SubStoryBenchmark
 from crossbench.benchmarks.loading.loading_benchmark import LoadingBenchmark
-from crossbench.benchmarks.loadline import LoadLine1PhoneBenchmark, \
-    LoadLine1PhoneDebugBenchmark, LoadLine1PhoneFastBenchmark, \
-    LoadLine1TabletBenchmark, LoadLine1TabletDebugBenchmark, \
-    LoadLine1TabletFastBenchmark, LoadLine2PhoneBenchmark, \
-    LoadLine2PhoneDebugBenchmark, LoadLine2TabletBenchmark, \
-    LoadLine2TabletDebugBenchmark
-from crossbench.benchmarks.manual.manual_benchmark import ManualBenchmark
 from crossbench.benchmarks.memory.memory_benchmark import MemoryBenchmark
-from crossbench.benchmarks.motionmark.motionmark_1_0 import \
-    MotionMark10Benchmark
-from crossbench.benchmarks.motionmark.motionmark_1_1 import \
-    MotionMark11Benchmark
-from crossbench.benchmarks.motionmark.motionmark_1_2 import \
-    MotionMark12Benchmark
-from crossbench.benchmarks.motionmark.motionmark_1_3 import \
-    MotionMark13Benchmark
-from crossbench.benchmarks.motionmark.motionmark_1_3_1 import \
-    MotionMark131Benchmark
-from crossbench.benchmarks.motionmark.motionmark_1_3_2 import \
-    MotionMark132Benchmark
-from crossbench.benchmarks.motionmark.motionmark_2_0 import \
-    MotionMark20Benchmark
-from crossbench.benchmarks.motionmark.motionmark_main import \
-    MotionMarkMainBenchmark
-from crossbench.benchmarks.speedometer.speedometer_1_0 import \
-    Speedometer10Benchmark
-from crossbench.benchmarks.speedometer.speedometer_2_0 import \
-    Speedometer20Benchmark
-from crossbench.benchmarks.speedometer.speedometer_2_1 import \
-    Speedometer21Benchmark
-from crossbench.benchmarks.speedometer.speedometer_3_0 import \
-    Speedometer30Benchmark
-from crossbench.benchmarks.speedometer.speedometer_3_1 import \
-    Speedometer31Benchmark
-from crossbench.benchmarks.speedometer.speedometer_main import \
-    SpeedometerMainBenchmark
-from crossbench.benchmarks.webxprt.webxprt_main import WebXPRT5Benchmark
+from crossbench.benchmarks.web_power.base import WebPowerBenchmarkBase
 from tests import test_helper
 
 if TYPE_CHECKING:
   from crossbench.stories.story import Story
 
-ALL = (
-    JetStream11Benchmark,
-    JetStream20Benchmark,
-    JetStream21Benchmark,
-    JetStream22Benchmark,
-    JetStream30Benchmark,
-    JetStreamMainBenchmark,
-    BrowserStartupBenchmark,
-    LoadLine1PhoneBenchmark,
-    LoadLine1PhoneDebugBenchmark,
-    LoadLine1PhoneFastBenchmark,
-    LoadLine1TabletBenchmark,
-    LoadLine1TabletDebugBenchmark,
-    LoadLine1TabletFastBenchmark,
-    LoadLine2PhoneBenchmark,
-    LoadLine2PhoneDebugBenchmark,
-    LoadLine2TabletBenchmark,
-    LoadLine2TabletDebugBenchmark,
-    ManualBenchmark,
-    MotionMark10Benchmark,
-    MotionMark11Benchmark,
-    MotionMark12Benchmark,
-    MotionMark13Benchmark,
-    MotionMark131Benchmark,
-    MotionMark132Benchmark,
-    MotionMark20Benchmark,
-    MotionMarkMainBenchmark,
-    LoadingBenchmark,
-    Speedometer10Benchmark,
-    Speedometer20Benchmark,
-    Speedometer21Benchmark,
-    Speedometer30Benchmark,
-    Speedometer31Benchmark,
-    SpeedometerMainBenchmark,
-    MemoryBenchmark,
-    EmbedderBenchmark,
-    WebXPRT5Benchmark,
+EXCLUDED_BENCHMARKS: Final[tuple[type[Benchmark], ...]] = (
+    SubStoryBenchmark,
+    WebPowerBenchmarkBase,
 )
+
+_MOCK_CLASS_RE: Final[re.Pattern[str]] = re.compile(r"^Mock|Mock$")
+
+
+def all_benchmark_classes() -> tuple[type[Benchmark], ...]:
+
+  def all_subclasses(
+      benchmark_cls: type[Benchmark]) -> Iterator[type[Benchmark]]:
+    for sub_cls in benchmark_cls.__subclasses__():
+      if _MOCK_CLASS_RE.search(sub_cls.__name__):
+        continue
+      # Ignore internal (e.g. PerfettoInfoBenchmark) and test benchmarks.
+      if not sub_cls.__module__.startswith("crossbench.benchmarks."):
+        continue
+      yield from all_subclasses(sub_cls)
+      if inspect.isabstract(sub_cls):
+        continue
+      if sub_cls in EXCLUDED_BENCHMARKS:
+        continue
+      yield sub_cls
+
+  return tuple(OrderedSet(all_subclasses(Benchmark)))
+
+
+ALL: Final[tuple[type[Benchmark], ...]] = all_benchmark_classes()
 
 
 class AllBenchmarksTestCase(unittest.TestCase):
 
   def test_unique_classes(self):
     self.assertSequenceEqual(ALL, tuple(OrderedSet(ALL)))
+
+  def test_all_benchmarks_registered(self):
+    all_public_benchmark_names = set(all_benchmarks.__all__)
+    actual_benchmark_names = {cls.__name__ for cls in ALL}
+    self.assertEqual(actual_benchmark_names, all_public_benchmark_names)
 
   def test_aliases(self):
     seen_names: MutableSet[str] = OrderedSet()
@@ -126,6 +81,8 @@ class AllBenchmarksTestCase(unittest.TestCase):
       if issubclass(benchmark_cls,
                     LoadingBenchmark) and (benchmark_cls
                                            is not LoadingBenchmark):
+        continue
+      if not issubclass(benchmark_cls, SubStoryBenchmark):
         continue
       self.assertNotIn(benchmark_cls.DEFAULT_STORY_CLS, seen_story_classes)
       seen_story_classes.add(benchmark_cls.DEFAULT_STORY_CLS)

@@ -7,12 +7,12 @@ from __future__ import annotations
 import abc
 import datetime as dt
 import json
-import pathlib
 from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
 import tabulate as tbl
 from typing_extensions import TypeAlias, override
 
+from crossbench import path as pth
 from crossbench import plt
 from crossbench.benchmarks.base import Benchmark
 from crossbench.browsers.settings import Settings
@@ -168,7 +168,8 @@ class PerfettoBaseSubcommand(abc.ABC):
         driver_path=driver_path)
 
     browser = browser_cls("browser", browser_config.path, settings)
-    browser.set_log_file(pathlib.Path("perfetto_query.log"))
+    # WebDriver runs on the host platform and writes logs locally.
+    browser.set_log_file(pth.LocalPath("perfetto_query.log"))
     browser.validate()
     return browser
 
@@ -176,7 +177,7 @@ class PerfettoBaseSubcommand(abc.ABC):
     benchmark = PerfettoInfoBenchmark()
     perfetto_info_probe = PerfettoInfoProbe()
     with plt.PLATFORM.TemporaryDirectory(prefix="crossbench") as tmp_dir:
-      out_dir = pathlib.Path(tmp_dir) / "results"
+      out_dir = pth.LocalPath(tmp_dir) / "results"
       runner = Runner(
           out_dir=out_dir,
           browsers=(browser,),

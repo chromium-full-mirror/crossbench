@@ -8,8 +8,7 @@ from typing import TYPE_CHECKING
 
 from pyfakefs import fake_filesystem_unittest
 
-import crossbench.config
-import crossbench.path
+from crossbench import path as pth
 from crossbench import plt
 from crossbench.benchmarks.loadline import LoadLine1TabletBenchmark, \
     LoadLine1TabletDebugBenchmark, LoadLine2TabletBenchmark, \
@@ -38,7 +37,7 @@ class ProbeConfigTestCase(fake_filesystem_unittest.TestCase):
   def setUp(self) -> None:
     self.real_config_dir = test_helper.config_dir()
     super().setUp()
-    self.setUpPyfakefs(modules_to_reload=[crossbench.path])
+    self.setUpPyfakefs(modules_to_reload=[pth])
     self._add_real_directory(test_helper.crossbench_dir() /
                              "probes/trace_processor/queries")
     self.set_up_required_paths()
@@ -55,7 +54,7 @@ class ProbeConfigTestCase(fake_filesystem_unittest.TestCase):
 
   def _test_parse_config_dir(self,
                              real_config_dir: pathlib.Path) -> list[Probe]:
-    probes = []
+    probes: list[Probe] = []
     self._add_real_directory(real_config_dir)
     # make sure we have a fakefs path
     fake_config_dir = pathlib.Path(real_config_dir)
@@ -64,7 +63,7 @@ class ProbeConfigTestCase(fake_filesystem_unittest.TestCase):
         probes += self._parse_config(probe_config)
     return probes
 
-  def _parse_config(self, config_file: pathlib.Path) -> list[Probe]:
+  def _parse_config(self, config_file: pathlib.Path) -> tuple[Probe, ...]:
     probe_name = config_file.parent.name
     if probe_name not in PROBE_LOOKUP:
       probe_name = config_file.name.split(".")[0]
@@ -77,7 +76,7 @@ class ProbeConfigTestCase(fake_filesystem_unittest.TestCase):
       self.assertFalse(probe.is_attached)
     return probes
 
-  def _add_real_directory(self, path: crossbench.path.LocalPath) -> None:
+  def _add_real_directory(self, path: pth.LocalPath) -> None:
     self.fs.add_real_directory(path, lazy_read=True)
 
   def test_parse_example_configs(self):

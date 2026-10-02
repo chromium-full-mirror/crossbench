@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
-import pathlib
 from concurrent.futures import ThreadPoolExecutor
 from functools import cache, partial
 from typing import TYPE_CHECKING, Any, Callable
@@ -244,7 +243,7 @@ def download_results(job_id: str,
   """Downloads results of a Pinpoint job."""
   job_results = PinpointJobResults(job_id)
 
-  out_dir = out_dir or pth.get_out_dir(pathlib.Path.cwd(
+  out_dir = out_dir or pth.get_out_dir(pth.LocalPath.cwd(
   )) / ".." / f"{job_results.created_date}_pinpoint_{job_results.job_id}"
   out_dir = out_dir.resolve()
   if out_dir.exists() and not force:

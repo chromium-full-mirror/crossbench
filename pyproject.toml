@@ -167,16 +167,34 @@ ignore = [
     "UP035",  # Deprecated import aliases (like typing.Tuple)
 ]
 
+[tool.ruff.lint.flake8-import-conventions.aliases]
+"crossbench.path" = "pth"
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"pathlib".msg = "Use `from crossbench import path as pth` and `pth.LocalPath` / `pth.AnyPath` instead."
+
 [tool.ruff.lint.per-file-ignores]
 "PRESUBMIT.py" = [
     "N",        # Presubmit functions in depot_tools are CamelCase
     "PLC0415",  # Inline imports inside CheckChange for PresubmitLocalPath
+    "TID251",   # Presubmit needs raw pathlib
 ]
 "tools/presubmit/*" = [
     "N",        # Presubmit functions in depot_tools are CamelCase
+    "TID251",   # Presubmit tools need raw pathlib
 ]
-"tools/protoc/compile.py" = [
+"agents/scripts/*" = [
+    "TID251",   # Standalone bootstrap scripts without crossbench dependency
+]
+"crossbench/path.py" = [
+    "TID251",   # Defines path aliases wrapping pathlib
+]
+"crossbench/plt/*" = [
+    "TID251",   # Platform implementations encapsulate low-level path operations
+]
+"tools/protoc/*" = [
     "E402",     # Executable script modifies sys.path before importing crossbench
+    "TID251",   # Protoc compiler script
 ]
 "tests/*" = [
     "ANN",      # tests are allowed to skip type annotations
@@ -185,6 +203,7 @@ ignore = [
     "BLE",      # flake8-blind-except
     "SLF001",   # Allow private field access for tests.
     "ARG",      # Allow unused args in tests
+    "TID251",   # Allow tests to use pathlib for now
 ]
 "crossbench/action_runner/chromeos_scripts/*" = [
     "INP001",   # Need module __init__.py

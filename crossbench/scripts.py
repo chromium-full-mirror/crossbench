@@ -6,10 +6,10 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 
 import hjson
 
+from crossbench import path as pth
 from crossbench.cli.btp import BTPUtil
 from crossbench.cli.cli import CrossBenchCLI
 
@@ -32,7 +32,7 @@ def cb_validate_hjson(argv: list[str] | None = None) -> None:
   if not argv:
     argv = sys.argv
   for path_str in argv[1:]:
-    path = Path(path_str)
+    path = pth.LocalPath(path_str)
     with path.open(encoding="utf-8") as f:
       match path.suffix:
         case ".json":
