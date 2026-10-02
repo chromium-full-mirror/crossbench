@@ -110,8 +110,9 @@ class SafariWebDriver(WebDriverBrowser, Safari):
               "Please run '%s --enable' or enable it in "
               "Safari's 'Develop' menu.", driver_path)
           raise DriverException("Could not start SafariWebDriver") from e
-        logging.warning("SafariWebDriver: startup failed (%s), retrying...",
-                        exception_type)
+        logging.warning(
+            "SafariWebDriver: startup failed (%s: %s), retrying...",
+            exception_type, e)
         # After 2 retries we don't accept the same error twice.
         if retries >= 2 and exception_type in seen_exceptions:
           logging.error("SafariWebDriver: startup error %s", e)

@@ -376,8 +376,13 @@ class BrowserSessionRunGroup(RunGroup, ResultOrigin):
     # TODO: move complete implementation here
     # This can happen if a browser / probe setup error occurs and we're
     # in a unclean state.
-    if self.browser.is_running:
-      self._runs[-1]._teardown_browser(is_dry_run)  # noqa: SLF001
+    try:
+      if self.browser.is_running:
+        self._runs[-1]._teardown_browser(is_dry_run)  # noqa: SLF001
+    finally:
+      # Counterpart of _setup_browser(): release resources acquired by
+      # browser.setup(), even if the browser failed to start or crashed.
+      self.browser.teardown()
 
   def handle_startup_failure(self) -> None:
     runs = tuple(self.runs)

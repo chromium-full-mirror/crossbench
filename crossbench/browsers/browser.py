@@ -363,6 +363,13 @@ class Browser(abc.ABC):
         f"Cache dir should not have been setup, but got {self._cache_dir}")
     self._cache_dir = self._setup_cache_dir()
 
+  def teardown(self) -> None:
+    """Counterpart of setup(): releases resources acquired in setup().
+    Called by the session after quit(), or after a failed start()."""
+    assert not self._is_running, "teardown() called while browser is running."
+    if self._cache_dir:
+      self._teardown_cache_dir()
+
   def _setup_binary(self) -> None:
     """ This helper is called in the setup steps of each Session.
     This can be used to install a custom binary on remote devices. """

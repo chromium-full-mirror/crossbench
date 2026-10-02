@@ -139,7 +139,8 @@ class MockBrowser(Browser, metaclass=abc.ABCMeta):
 
   @override
   def _clear_cache(self, cache_dir: pth.AnyPath | None) -> None:
-    pass
+    del cache_dir
+    self._cache_dir = None
 
   @override
   def start(self, session: BrowserSessionRunGroup) -> None:

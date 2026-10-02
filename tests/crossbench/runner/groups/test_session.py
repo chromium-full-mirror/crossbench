@@ -300,6 +300,32 @@ class BrowserSessionRunGroupTestCase(BaseRunGroupTestCase):
     self.assertFalse(run.did_teardown_browser)
     self.assertIn("Network startup error", str(session.exceptions[0].exception))
 
+  def test_open_browser_startup_error_teardown_cache_dir(self):
+    session = self.default_session(throw=False)
+    run = MockRun(self.runner, session, "story 0")
+    session.append(run)
+    session.set_ready()
+    cache_dir = self.platform.path("/tmp/custom_cache_dir")
+    with (
+        mock.patch.object(
+            session.browser, "_setup_cache_dir", return_value=cache_dir),
+        mock.patch.object(
+            session.browser,
+            "start",
+            side_effect=ValueError("Browser startup error")),
+        mock.patch.object(
+            session.browser,
+            "teardown",
+            wraps=session.browser.teardown) as mock_teardown,
+    ):
+      with session.open() as startup_is_success:
+        self.assertFalse(startup_is_success)
+      mock_teardown.assert_called_once_with()
+      self.assertIsNone(session.browser._cache_dir)
+      # Subsequent setup() must succeed without AssertionError.
+      session.browser.setup()
+      self.assertEqual(session.browser._cache_dir, cache_dir)
+
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)
