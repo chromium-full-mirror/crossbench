@@ -6,6 +6,7 @@ configs {
   description: "Enforces Google Python style, 80-character line limit, typing, and bans on getattr/hasattr."
   skills: "agents/skills/python-style/SKILL.md"
   include_filters {
+    project: "crossbench"
     path_regex: ".*\\.py$"
   }
   exclude_filters {
@@ -20,6 +21,7 @@ configs {
   description: "Enforces usage of Platform helpers, path abstractions (LocalPath vs AnyPath), and bans raw shell commands or shell=True."
   skills: "agents/skills/platform-code/SKILL.md"
   include_filters {
+    project: "crossbench"
     path_regex: "crossbench/.*\\.py$"
   }
   automatic: true
@@ -31,6 +33,7 @@ configs {
   description: "Ensures inputs use crossbench.parse and complex options use immutable ConfigObjects with unit tests."
   skills: "agents/skills/config-objects/SKILL.md"
   include_filters {
+    project: "crossbench"
     path_regex: ".*\\.py$"
   }
   exclude_filters {

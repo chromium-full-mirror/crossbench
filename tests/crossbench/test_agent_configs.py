@@ -18,6 +18,7 @@ from tests import test_helper
 _TYPE_STR: Final[int] = descriptor_pb2.FieldDescriptorProto.TYPE_STRING
 _TYPE_MSG: Final[int] = descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE
 _TYPE_BOOL: Final[int] = descriptor_pb2.FieldDescriptorProto.TYPE_BOOL
+_EXPECTED_PROJECT: Final[str] = "crossbench"
 
 # We do not have a default standalone validator in this repository, nor do we
 # have direct access to the upstream internal CRACS protobuf schema. We define
@@ -152,6 +153,24 @@ def validate_path_regexes(
   return errors
 
 
+def validate_include_filters(
+    agent_id: str,
+    filters: Sequence[Any],
+) -> list[str]:
+  errors: list[str] = []
+  for f in filters:
+    if not f.project:
+      errors.append(
+          f"Agent '{agent_id}': include_filter is missing 'project' "
+          f"(must explicitly specify project: '{_EXPECTED_PROJECT}' to avoid "
+          "host-wide matching across other repositories).")
+    elif list(f.project) != [_EXPECTED_PROJECT]:
+      errors.append(
+          f"Agent '{agent_id}': unexpected project in include_filter: "
+          f"{list(f.project)} (expected: ['{_EXPECTED_PROJECT}']).")
+  return errors
+
+
 def validate_agent_config(
     config: Any,
     root_path: pathlib.Path,
@@ -175,6 +194,7 @@ def validate_agent_config(
   else:
     errors.extend(
         validate_path_regexes(agent_id, config.include_filters, "include"))
+    errors.extend(validate_include_filters(agent_id, config.include_filters))
 
   errors.extend(
       validate_path_regexes(agent_id, config.exclude_filters, "exclude"))
@@ -182,7 +202,10 @@ def validate_agent_config(
   return errors
 
 
-def validate_agent_configs(content: str, root_path: pathlib.Path) -> list[str]:
+def validate_agent_configs(
+    content: str,
+    root_path: pathlib.Path,
+) -> list[str]:
   host_agents_class = create_host_agents_message_class()
   msg = host_agents_class()
   try:
@@ -249,6 +272,7 @@ class AgentConfigsValidatorMockTestCase(unittest.TestCase):
                   '  description: "Validates skills."\n'
                   '  skills: "agents/skills/my-skill/SKILL.md"\n'
                   "  include_filters {\n"
+                  '    project: "crossbench"\n'
                   '    path_regex: ".*\\\\.py$"\n'
                   "  }\n"
                   "}\n")
@@ -266,6 +290,7 @@ class AgentConfigsValidatorMockTestCase(unittest.TestCase):
                   '  description: "Validates skills."\n'
                   '  skills: "agents/skills/nonexistent/SKILL.md"\n'
                   "  include_filters {\n"
+                  '    project: "crossbench"\n'
                   '    path_regex: ".*\\\\.py$"\n'
                   "  }\n"
                   "}\n")
@@ -278,6 +303,7 @@ class AgentConfigsValidatorMockTestCase(unittest.TestCase):
                   '  description: "Validates skills."\n'
                   '  skills: "agents/skills/my-skill/SKILL.md"\n'
                   "  include_filters {\n"
+                  '    project: "crossbench"\n'
                   '    path_regex: ".*\\\\.py$"\n'
                   "  }\n"
                   "}\n")
@@ -291,6 +317,7 @@ class AgentConfigsValidatorMockTestCase(unittest.TestCase):
                   '  description: "Different description."\n'
                   '  skills: "agents/skills/my-skill/SKILL.md"\n'
                   "  include_filters {\n"
+                  '    project: "crossbench"\n'
                   '    path_regex: ".*\\\\.py$"\n'
                   "  }\n"
                   "}\n")
@@ -303,6 +330,7 @@ class AgentConfigsValidatorMockTestCase(unittest.TestCase):
                   '  description: "Validates skills."\n'
                   '  skills: "agents/skills/my-skill/SKILL.md"\n'
                   "  include_filters {\n"
+                  '    project: "crossbench"\n'
                   '    path_regex: "[invalid regex"\n'
                   "  }\n"
                   "}\n")
@@ -316,6 +344,7 @@ class AgentConfigsValidatorMockTestCase(unittest.TestCase):
                   '  description: "Validates skills."\n'
                   '  skills: "agents/skills/my-skill/SKILL.md"\n'
                   "  include_filters {\n"
+                  '    project: "crossbench"\n'
                   '    path_regex: ".*\\\\.py$"\n'
                   "  }\n"
                   "}\n")
@@ -330,6 +359,7 @@ class AgentConfigsValidatorMockTestCase(unittest.TestCase):
                   '  description: "Validates skills."\n'
                   '  skills: "agents/skills/my-skill/SKILL.md"\n'
                   "  include_filters {\n"
+                  '    project: "crossbench"\n'
                   '    path_regex: ".*\\\\.py$"\n'
                   "  }\n"
                   "}\n")
@@ -342,6 +372,7 @@ class AgentConfigsValidatorMockTestCase(unittest.TestCase):
                   '  description: "Validates skills."\n'
                   '  skills: "agents/skills/my-skill/SKILL.md"\n'
                   "  include_filters {\n"
+                  '    project: "crossbench"\n'
                   '    path_regex: ".*\\\\.py$"\n'
                   "  }\n"
                   "}\n"
@@ -350,11 +381,40 @@ class AgentConfigsValidatorMockTestCase(unittest.TestCase):
                   '  description: "Validates skills."\n'
                   '  skills: "agents/skills/my-skill/SKILL.md"\n'
                   "  include_filters {\n"
+                  '    project: "crossbench"\n'
                   '    path_regex: ".*\\\\.py$"\n'
                   "  }\n"
                   "}\n")
     errors = validate_agent_configs(proto_text, self.root_path)
     self.assertTrue(any("Duplicate agent id found" in e for e in errors))
+
+  def test_missing_project_in_include_filter(self) -> None:
+    proto_text = ("configs {\n"
+                  '  id: "crossbench-my-skill"\n'
+                  '  display_name: "My Skill"\n'
+                  '  description: "Validates skills."\n'
+                  '  skills: "agents/skills/my-skill/SKILL.md"\n'
+                  "  include_filters {\n"
+                  '    path_regex: ".*\\\\.py$"\n'
+                  "  }\n"
+                  "}\n")
+    errors = validate_agent_configs(proto_text, self.root_path)
+    self.assertTrue(any("missing 'project'" in e for e in errors))
+
+  def test_invalid_project_in_include_filter(self) -> None:
+    proto_text = ("configs {\n"
+                  '  id: "crossbench-my-skill"\n'
+                  '  display_name: "My Skill"\n'
+                  '  description: "Validates skills."\n'
+                  '  skills: "agents/skills/my-skill/SKILL.md"\n'
+                  "  include_filters {\n"
+                  '    project: "other-project"\n'
+                  '    path_regex: ".*\\\\.py$"\n'
+                  "  }\n"
+                  "}\n")
+    errors = validate_agent_configs(proto_text, self.root_path)
+    self.assertTrue(
+        any("unexpected project in include_filter" in e for e in errors))
 
   def test_extract_md_frontmatter_valid(self) -> None:
     content = ("---\n"
