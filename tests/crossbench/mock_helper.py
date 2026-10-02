@@ -455,18 +455,19 @@ class MockPlatformMixin:
 
     return process
 
-  def popen(self,
-            *args: CmdArg,
-            bufsize=-1,
-            shell: bool = False,
-            stdout: ProcessIo = None,
-            stderr: ProcessIo = None,
-            stdin: ProcessIo = None,
-            env: Mapping[str, str] | None = None,
-            cwd: pth.AnyPath | None = None,
-            encoding: str | None = None,
-            quiet: bool = False) -> MockPopen:
-    del bufsize, stdout, stderr, stdin, encoding
+  def _popen(self,
+             *args: CmdArg,
+             bufsize=-1,
+             shell: bool = False,
+             stdout: ProcessIo = None,
+             stderr: ProcessIo = None,
+             stdin: ProcessIo = None,
+             env: Mapping[str, str] | None = None,
+             cwd: pth.AnyPath | None = None,
+             encoding: str | None = None,
+             quiet: bool = False,
+             auto_terminate: bool = True) -> MockPopen:
+    del bufsize, stdout, stderr, stdin, encoding, auto_terminate
     self.sh_stdout(*args, shell=shell, quiet=quiet, env=env, cwd=cwd)
 
     if not self.popens:
@@ -567,7 +568,9 @@ class MockPopen:
 
   def poll(self):
     assert self.state != MockPopenState.UNUSED
-    return
+    if self.state == MockPopenState.RUNNING:
+      return None
+    return 0
 
   def terminate(self):
     assert self.state != MockPopenState.UNUSED

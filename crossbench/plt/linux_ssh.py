@@ -38,31 +38,17 @@ class LinuxSshPlatform(SshPlatformMixin, RemoteLinuxPlatform):
   def os_name(self) -> str:
     return "linux"
 
+  @override
   def build_ssh_cmd(self,
                     *args: CmdArg,
                     shell: bool = False,
                     env: Mapping[str, str] | None = None,
                     cwd: pth.AnyPath | None = None) -> ListCmdArgs:
-    if env:
-      # TODO: support env with "export FOO=bar;" prefixes
-      raise ValueError(f"{self} platform only supports an empty env for now.")
-    if cwd:
-      # TODO: support env with "cd foo/bar &&" prefix
-      raise ValueError(f"{self} platform does not support custom cwd")
     self.validate_shell_args(args, shell)
-    ssh_cmd: ListCmdArgs = [
-        "ssh",
-        "-p",
-        f"{self._ssh_port}",
-        f"{self._ssh_user}@{self._host}",
-    ]
-    ssh_cmd.append(shlex.join(map(str, args)))
-
+    ssh_cmd = self.build_shell_cmd(*args, shell=False, env=env, cwd=cwd)
     if not shell:
       return ssh_cmd
-
-    combined_ssh_cmd: str = " ".join(map(str, ssh_cmd))
-    return [combined_ssh_cmd]
+    return [" ".join(map(str, ssh_cmd))]
 
   @override
   def build_shell_cmd(
@@ -72,7 +58,21 @@ class LinuxSshPlatform(SshPlatformMixin, RemoteLinuxPlatform):
       env: Mapping[str, str] | None = None,
       cwd: pth.AnyPath | None = None,
   ) -> ListCmdArgs:
-    return self.build_ssh_cmd(*args, shell=shell, env=env, cwd=cwd)
+    if env:
+      # TODO: support env with "export FOO=bar;" prefixes
+      raise ValueError(f"{self} platform only supports an empty env for now.")
+    if cwd:
+      # TODO: support env with "cd foo/bar &&" prefix
+      raise ValueError(f"{self} platform does not support custom cwd")
+    self.validate_shell_args(args, shell)
+    remote_cmd = str(args[0]) if shell else shlex.join(map(str, args))
+    return [
+        "ssh",
+        "-p",
+        f"{self._ssh_port}",
+        f"{self._ssh_user}@{self._host}",
+        remote_cmd,
+    ]
 
   def processes(self, attrs: list[str] | None = None) -> list[dict[str, Any]]:
     del attrs

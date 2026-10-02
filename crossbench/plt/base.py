@@ -24,6 +24,7 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
+import weakref
 from typing import TYPE_CHECKING, Any, Callable, Final, Generator, Iterable, \
     Iterator, Mapping, Sequence
 
@@ -130,6 +131,8 @@ class Platform(abc.ABC):
     self._cache_dir_root: pth.AnyPath | None = None
     self._default_port_manager: Final[PortManager] = self._create_port_manager()
     self._default_tmp_dir: Final[pth.AnyPath] = self._create_default_tmp_dir()
+    self._popens: weakref.WeakSet[subprocess.Popen] = weakref.WeakSet()
+    atexit.register(self.kill_all_popens)
 
   def _create_port_manager(self) -> PortManager:
     return LocalPortManager(self)
@@ -641,6 +644,15 @@ class Platform(abc.ABC):
     del process_name
     raise NotImplementedError(f"killall not implemented for {self}")
 
+  @property
+  def active_popens(self) -> tuple[subprocess.Popen, ...]:
+    return tuple(proc for proc in self._popens if proc.poll() is None)
+
+  def kill_all_popens(self) -> None:
+    for proc in self.active_popens:
+      with contextlib.suppress(*proc_helper.PROCESS_NOT_FOUND_EXCEPTIONS):
+        self.kill(proc)
+
   def terminate_gracefully(self,
                            process: ProcessLike,
                            timeout: int = 1,
@@ -1087,14 +1099,47 @@ class Platform(abc.ABC):
             env: Mapping[str, str] | None = None,
             cwd: pth.AnyPath | None = None,
             encoding: str | None = None,
-            quiet: bool = False) -> subprocess.Popen:
+            quiet: bool = False,
+            auto_terminate: bool = True) -> subprocess.Popen:
     """Platform-dependent wrapper around subprocess.Popen.
-    See subprocess.run for detailed argument help."""
-    self.assert_is_local()
+    See subprocess.run for detailed argument help.
+    - auto_terminate: if enabled the Popen's will be tracked and auto-killed
+      on platform teardown.
+    """
     self.validate_shell_args(args, shell)
     if not quiet:
       logging.debug("SHELL: %s", shlex.join(map(str, args)))
       logging.debug("CWD: %s", pth.LocalPath.cwd())
+    proc = self._popen(
+        *args,
+        bufsize=bufsize,
+        shell=shell,
+        stdout=stdout,
+        stderr=stderr,
+        stdin=stdin,
+        env=env,
+        cwd=cwd,
+        encoding=encoding,
+        quiet=quiet,
+        auto_terminate=auto_terminate)
+    if auto_terminate:
+      self._popens.add(proc)
+    return proc
+
+  def _popen(self,
+             *args: CmdArg,
+             bufsize: int = -1,
+             shell: bool = False,
+             stdout: ProcessIo = None,
+             stderr: ProcessIo = None,
+             stdin: ProcessIo = None,
+             env: Mapping[str, str] | None = None,
+             cwd: pth.AnyPath | None = None,
+             encoding: str | None = None,
+             quiet: bool = False,
+             auto_terminate: bool = True) -> subprocess.Popen:
+    self.assert_is_local()
+    del quiet, auto_terminate
     return subprocess.Popen(
         args,
         bufsize=bufsize,

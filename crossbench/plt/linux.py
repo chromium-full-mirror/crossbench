@@ -18,9 +18,8 @@ from typing_extensions import override
 from crossbench import path as pth
 from crossbench.parse import NumberParser
 from crossbench.plt.base import SubprocessError
-from crossbench.plt.posix import PosixPlatform
+from crossbench.plt.posix import PosixPlatform, RemotePosixPlatform
 from crossbench.plt.process_meminfo import ProcessMeminfo
-from crossbench.plt.remote import RemotePlatformMixin
 from crossbench.plt.signals import LinuxSignals
 
 if TYPE_CHECKING:
@@ -320,5 +319,5 @@ class LinuxPlatform(PosixPlatform):
         "kernel.perf_event_paranoid")
 
 
-class RemoteLinuxPlatform(RemotePlatformMixin, LinuxPlatform):
+class RemoteLinuxPlatform(RemotePosixPlatform, LinuxPlatform):
   pass

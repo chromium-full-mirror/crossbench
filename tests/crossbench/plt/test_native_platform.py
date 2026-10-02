@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import gc
 import gzip
 import json
 import os
@@ -24,7 +25,8 @@ from typing_extensions import override
 import crossbench.path as pth
 from crossbench import __version__, plt
 from crossbench.plt.base import DEFAULT_CACHE_DIR, SubprocessError
-from crossbench.plt.posix import PosixPlatform
+from crossbench.plt.posix import PosixPlatform, RemotePosixPlatform
+from crossbench.plt.remote import RemotePopen
 from tests import test_helper
 from tests.crossbench.mock_helper import MockRemotePortManager
 
@@ -955,16 +957,11 @@ class PosixNativePlatformTestCase(BaseNativePlatformTestCase):
             check=False), "")
 
   def test_popen_watch(self):
-    # TODO: implement mock remote popen
-    if self.platform.is_remote:
-      self.skipTest("Missing remote platform popen")
-      return
-    popen = None
-    try:
-      popen = self.platform.popen("sleep", "5")
+    with self.platform.popen("sleep", "5") as popen:
+      self.assertIn(popen, self.platform.active_popens)
       self.assertTrue(popen.pid)
       self.assertTrue(self.platform.host_platform.process_info(popen.pid))
-    finally:
+      self.assertTrue(self.platform.process_info(popen))
       popen.kill()
 
   def test_popen_encoding(self):
@@ -982,6 +979,36 @@ class PosixNativePlatformTestCase(BaseNativePlatformTestCase):
       self.assertEqual(proc.stdout.read().strip(), "hello from popen")
     finally:
       self.platform.terminate(proc)
+
+  def test_popen_auto_terminate_false(self):
+    with self.platform.popen("sleep", "5", auto_terminate=False) as proc:
+      self.assertNotIn(proc, self.platform.active_popens)
+      proc.kill()
+
+  def test_popen_weaklist_gc(self):
+
+    def spawn() -> int:
+      with self.platform.popen("true") as proc:
+        return proc.pid
+
+    pid = spawn()
+    gc.collect()
+    active_pids = [p.pid for p in self.platform.active_popens]
+    self.assertNotIn(pid, active_pids)
+
+  def test_kill_all_popens(self):
+    with (self.platform.popen("sleep", "5") as
+          proc1, self.platform.popen("sleep", "5") as proc2):
+      self.assertIn(proc1, self.platform.active_popens)
+      self.assertIn(proc2, self.platform.active_popens)
+      self.platform.kill_all_popens()
+      proc1.wait(timeout=2)
+      proc2.wait(timeout=2)
+      self.assertEqual(self.platform.active_popens, ())
+      self.assertIsNotNone(proc1.poll())
+      self.assertIsNotNone(proc2.poll())
+      self.assertIsNone(self.platform.process_info(proc1))
+      self.assertIsNone(self.platform.process_info(proc2))
 
   def test_display_details(self):
     displays = self.platform.display_details()
@@ -1003,25 +1030,26 @@ class PosixNativePlatformTestCase(BaseNativePlatformTestCase):
     self.assertIs(displays, displays_2)
 
 
-class MockRemotePosixPlatform(type(plt.PLATFORM)):
+class MockRemotePosixPlatform(RemotePosixPlatform, type(plt.PLATFORM)):
+
+  def __init__(self) -> None:
+    super().__init__(plt.PLATFORM)
 
   @override
   def _create_port_manager(self) -> PortManager:
     return MockRemotePortManager(self)
 
-  @property
-  @override
-  def host_platform(self):
-    return plt.PLATFORM
-
-  @property
-  def is_remote(self) -> bool:
-    return True
-
   @override
   def local_path(self, path):
     # override to bypass is_local checks
     return pathlib.Path(path)
+
+  @override
+  def build_shell_cmd(self, *args, shell: bool = False, env=None, cwd=None):
+    del env, cwd
+    if shell:
+      return ["sh", "-c", str(args[0])]
+    return [str(arg) for arg in args]
 
   @override
   def sh(self, *args, **kwargs):
@@ -1068,6 +1096,24 @@ class MockRemotePosixPlatformTestCase(PosixNativePlatformTestCase):
       self.assertNotEqual(tmp_file.stat()[stat.ST_MODE] & 0o755, 0o755)
       self.platform.chmod(tmp_file, 0o755)
       self.assertEqual(tmp_file.stat()[stat.ST_MODE] & 0o755, 0o755)
+
+  def test_remote_popen_kill_sends_remote_signal(self):
+    with self.platform.popen("sleep", "5") as proc:
+      self.assertIsInstance(proc, RemotePopen)
+      self.assertNotEqual(proc.remote_pid, proc.pid)
+      self.assertIn(proc, self.platform.active_popens)
+      self.assertNotIn(proc, self.platform.host_platform.active_popens)
+      with (mock.patch.object(self.platform, "sh", wraps=self.platform.sh) as
+            mock_sh, mock.patch("subprocess.Popen.send_signal") as
+            mock_local_send_signal):
+        self.platform.kill_all_popens()
+      mock_local_send_signal.assert_not_called()
+      mock_sh.assert_called_once_with(
+          "kill", "-9", str(proc.remote_pid), check=False, capture_output=True)
+      proc.wait(timeout=2)
+      self.assertEqual(self.platform.active_popens, ())
+      self.assertIsNone(self.platform.process_info(proc.remote_pid))
+      self.assertIsNone(self.platform.host_platform.process_info(proc.pid))
 
 
 class MacOSNativePlatformTestCase(PosixNativePlatformTestCase):

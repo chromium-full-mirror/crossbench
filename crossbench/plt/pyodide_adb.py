@@ -397,7 +397,7 @@ class PyodideAndroidAdbPlatform(android_adb.AndroidAdbPlatform):
         f"echo -n {content} > {dest_file}", shell=True)
 
   @override
-  def popen(
+  def _popen(
       self,
       *args: CmdArg,
       bufsize: int = -1,
@@ -409,8 +409,9 @@ class PyodideAndroidAdbPlatform(android_adb.AndroidAdbPlatform):
       cwd: pth.AnyPath | None = None,
       encoding: str | None = None,
       quiet: bool = False,
+      auto_terminate: bool = True,
   ) -> subprocess.Popen:
-    del shell, bufsize, stdin, quiet, encoding
+    del shell, bufsize, stdin, quiet, encoding, auto_terminate
     assert not env, "ADB does not support env vars"
     self._check_interrupted()
 

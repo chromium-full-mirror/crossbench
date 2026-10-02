@@ -219,6 +219,90 @@ class LinuxSshMockPlatformTestCase(BasePosixMockPlatformTestCase):
     self.assertEqual(self.host_platform.mkdir_calls, 1)
     self.assertTrue(pth.LocalPath("local/dest/path").exists())
 
+  def _expect_remote_popen_pid(self, pid: int = 4242) -> None:
+    tmp_dir = self.platform.default_tmp_dir
+    self._expect_sh_ssh(
+        f"mktemp {tmp_dir}/XXXXXXXXXXXpopen_pid_", result="/tmp/pid1")
+    self._expect_sh_ssh("cat /tmp/pid1", result=f"{pid}\n")
+    self._expect_sh_ssh("'[' -e /tmp/pid1 ']'")
+    self._expect_sh_ssh("rm /tmp/pid1")
+
+  def test_popen_kill_all_sends_remote_ssh_kill(self):
+    self._expect_remote_popen_pid(4242)
+    self._expect_sh_ssh("kill -9 4242")
+    with (mock.patch("subprocess.Popen.__init__", return_value=None)
+          as mock_popen_init,
+          mock.patch("subprocess.Popen.poll", return_value=None),
+          mock.patch("subprocess.Popen.send_signal") as mock_local_send_signal):
+      proc = self.platform.popen("sleep", "5")
+      self.assertIsInstance(proc, plt.remote.RemotePopen)
+      self.assertEqual(proc.remote_pid, 4242)
+      # The local Popen on host_platform is the SSH transport command waiting
+      # on the remote background PID ($PID).
+      mock_popen_init.assert_called_once_with([
+          "ssh",
+          "-p",
+          str(self.SSH_PORT),
+          f"{self.SSH_USER}@{self.HOST}",
+          "set -m; sleep 5 & PID=$! && echo $PID >/tmp/pid1 && wait $PID",
+      ],
+                                              bufsize=-1,
+                                              stdout=None,
+                                              stderr=None,
+                                              stdin=None)
+      # RemotePopen is tracked only on the remote platform, not host_platform.
+      self.assertEqual(self.platform.active_popens, (proc,))
+      self.assertEqual(self.host_platform.active_popens, ())
+
+      self.platform.kill_all_popens()
+      # Killing RemotePopen sends "kill -9 4242" over SSH to the remote host
+      # (which lets remote `wait $PID` finish and exit the SSH session),
+      # rather than sending a local signal on host_platform.
+      mock_local_send_signal.assert_not_called()
+      self.assertEqual(self.host_platform.sh_cmds[-1],
+                       ("ssh", "-p", str(self.SSH_PORT),
+                        f"{self.SSH_USER}@{self.HOST}", "kill -9 4242"))
+
+  def test_build_shell_cmd(self):
+    ssh_prefix = [
+        "ssh",
+        "-p",
+        str(self.SSH_PORT),
+        f"{self.SSH_USER}@{self.HOST}",
+    ]
+    self.assertEqual(
+        self.platform.build_shell_cmd("echo", "hello world", shell=False),
+        [*ssh_prefix, "echo 'hello world'"])
+    self.assertEqual(
+        self.platform.build_shell_cmd("echo 'hello world' | cat", shell=True),
+        [*ssh_prefix, "echo 'hello world' | cat"])
+    with self.assertRaisesRegex(ValueError, "shell=True"):
+      self.platform.build_shell_cmd("echo", "hello", shell=True)
+
+  def test_popen_terminate_and_send_signal(self):
+    self._expect_remote_popen_pid(4242)
+    self._expect_sh_ssh("kill -2 4242")
+    self._expect_sh_ssh("kill -15 4242")
+    with (mock.patch("subprocess.Popen.__init__", return_value=None),
+          mock.patch("subprocess.Popen.poll", return_value=None)):
+      proc = self.platform.popen("sleep", "5")
+      proc.send_signal(self.platform.signals.SIGINT)
+      proc.terminate()
+
+  def test_popen_auto_terminate_false(self):
+    self._expect_remote_popen_pid(4242)
+    self._expect_sh_ssh("kill -9 4242")
+    with (mock.patch("subprocess.Popen.__init__", return_value=None),
+          mock.patch("subprocess.Popen.poll", return_value=None)):
+      proc = self.platform.popen("sleep", "5", auto_terminate=False)
+      self.assertIsInstance(proc, plt.remote.RemotePopen)
+      self.assertEqual(self.platform.active_popens, ())
+      self.assertEqual(self.host_platform.active_popens, ())
+      # kill_all_popens() does not touch untracked processes:
+      self.platform.kill_all_popens()
+      # Explicit kill() still sends kill -9 4242 to the remote SSH device:
+      proc.kill()
+
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)

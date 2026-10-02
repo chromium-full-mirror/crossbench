@@ -42,6 +42,7 @@ from crossbench.plt.axml import RES_STRING_POOL_TYPE, \
 from crossbench.plt.evemu_platform_mixin import VirtualDeviceState
 from crossbench.plt.port_manager import PortForwardException
 from crossbench.plt.process_meminfo import ProcessMeminfo
+from crossbench.plt.remote import RemotePopen
 from tests import test_helper
 from tests.crossbench.mock_helper import ShResult, ShResultType, \
     WinMockPlatform
@@ -184,6 +185,42 @@ class BaseAndroidAdbMockPlatformTestCase(BasePosixMockPlatformTestCase):
 
   def test_os_name(self):
     self.assertEqual(self.platform.os_name, "android")
+
+  def test_popen_kill_all_sends_remote_adb_kill(self):
+    self.expect_sh(
+        "mktemp /data/local/tmp/XXXXXXXXXXX", result="/data/local/tmp/pid1")
+    self.expect_sh("mv /data/local/tmp/pid1 /data/local/tmp/pid1popen_pid_")
+    self.expect_sh("cat /data/local/tmp/pid1popen_pid_", result="4242\n")
+    self.expect_sh("'[' -e /data/local/tmp/pid1popen_pid_ ']'")
+    self.expect_sh("rm /data/local/tmp/pid1popen_pid_")
+    self.expect_sh("kill -9 4242")
+    with (mock.patch("subprocess.Popen.__init__", return_value=None)
+          as mock_popen_init,
+          mock.patch("subprocess.Popen.poll", return_value=None),
+          mock.patch("subprocess.Popen.send_signal") as mock_local_send_signal):
+      proc = self.platform.popen("sleep", "5")
+      self.assertIsInstance(proc, RemotePopen)
+      self.assertEqual(proc.remote_pid, 4242)
+      mock_popen_init.assert_called_once_with([
+          self.adb._adb_bin,
+          "-s",
+          self.DEVICE_ID,
+          "shell",
+          "set -m; sleep 5 & PID=$!"
+          " && echo $PID >/data/local/tmp/pid1popen_pid_ && wait $PID",
+      ],
+                                              bufsize=-1,
+                                              stdout=None,
+                                              stderr=None,
+                                              stdin=None)
+      self.assertEqual(self.platform.active_popens, (proc,))
+      self.assertEqual(self.host_platform.active_popens, ())
+
+      self.platform.kill_all_popens()
+      mock_local_send_signal.assert_not_called()
+      self.assertEqual(
+          self.host_platform.sh_cmds[-1],
+          (self.adb._adb_bin, "-s", self.DEVICE_ID, "shell", "kill -9 4242"))
 
   def test_is_battery_powered(self):
     self.expect_sh("dumpsys battery --proto", result=AC_POWERED_OUTPUT)

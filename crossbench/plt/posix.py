@@ -553,18 +553,19 @@ class RemotePosixEnviron(Environ):
 class RemotePosixPlatform(RemotePlatformMixin, PosixPlatform):
 
   @override
-  def popen(self,
-            *args: CmdArg,
-            bufsize: int = -1,
-            shell: bool = False,
-            stdout: ProcessIo = None,
-            stderr: ProcessIo = None,
-            stdin: ProcessIo = None,
-            env: Mapping[str, str] | None = None,
-            cwd: pth.AnyPath | None = None,
-            encoding: str | None = None,
-            quiet: bool = False) -> subprocess.Popen:
-    del shell, encoding
+  def _popen(self,
+             *args: CmdArg,
+             bufsize: int = -1,
+             shell: bool = False,
+             stdout: ProcessIo = None,
+             stderr: ProcessIo = None,
+             stdin: ProcessIo = None,
+             env: Mapping[str, str] | None = None,
+             cwd: pth.AnyPath | None = None,
+             encoding: str | None = None,
+             quiet: bool = False,
+             auto_terminate: bool = True) -> subprocess.Popen:
+    del shell, encoding, auto_terminate
     assert not (self.is_android and env), "ADB does not support env vars"
 
     with self.NamedTemporaryFile("popen_pid_") as temp_pid_file:

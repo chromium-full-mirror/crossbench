@@ -111,26 +111,3 @@ class SshPlatformMixin(RemotePlatformMixin, metaclass=abc.ABCMeta):
         input=input,
         quiet=quiet,
         check=check)
-
-  def popen(self,
-            *args: CmdArg,
-            bufsize: int = -1,
-            shell: bool = False,
-            stdout: ProcessIo = None,
-            stderr: ProcessIo = None,
-            stdin: ProcessIo = None,
-            env: Mapping[str, str] | None = None,
-            cwd: pth.AnyPath | None = None,
-            encoding: str | None = None,
-            quiet: bool = False) -> subprocess.Popen:
-    ssh_cmd: ListCmdArgs = self.build_ssh_cmd(
-        *args, shell=shell, env=env, cwd=cwd)
-    return self._host_platform.popen(
-        *ssh_cmd,
-        shell=False,
-        bufsize=bufsize,
-        stdout=stdout,
-        stderr=stderr,
-        stdin=stdin,
-        encoding=encoding,
-        quiet=quiet)

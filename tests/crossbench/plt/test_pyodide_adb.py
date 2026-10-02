@@ -501,6 +501,17 @@ class PyodideAndroidAdbPlatformTest(AndroidAdbMockPlatformTest):
   def test_reverse_port_forward_auto_close(self) -> None:
     pass
 
+  @override
+  def test_popen_kill_all_sends_remote_adb_kill(self) -> None:
+    self.expect_sh("kill -9 101")
+    proc = self.platform.popen("sleep", "5")
+    self.assertIsInstance(proc, PyodideStreamingPopen)
+    self.assertEqual(self.platform.active_popens, (proc,))
+    self.assertEqual(self.host_platform.active_popens, ())
+
+    self.platform.kill_all_popens()
+    self.assertEqual(self.webadb.shell_calls[-1], "kill -9 101")
+
 
 class PyodideStreamingPopenTest(CrossbenchFakeFsTestCase):
   __test__ = True
