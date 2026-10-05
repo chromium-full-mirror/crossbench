@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import atexit
 import contextlib
 import ctypes
 import ctypes.util
@@ -398,11 +397,9 @@ class MacOSPlatform(PosixPlatform):
   @contextlib.contextmanager
   def wakelock(self) -> Iterator[None]:
     process: subprocess.Popen = self.popen("caffeinate", "-imdsu")
-    atexit.register(process.kill)
     try:
       yield
     finally:
-      atexit.unregister(process.kill)
       process.kill()
 
   def check_system_monitoring(self, disable: bool = False) -> bool:

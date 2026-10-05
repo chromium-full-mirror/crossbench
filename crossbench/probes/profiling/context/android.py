@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import atexit
 import io
 import logging
 import subprocess
@@ -62,7 +61,6 @@ class AndroidProfilingContext(PosixProfilingContext):
           error_msg = stdout.read().decode("utf-8")
           logging.error(error_msg)
       raise ValueError(f"Unable to start simpleperf. {error_msg}")
-    atexit.register(self.stop_process)
     self.browser.performance_mark("probe-profiling-start")
 
   def _get_simpleperf_pids(self) -> list[int]:

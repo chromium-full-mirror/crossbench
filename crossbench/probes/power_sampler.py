@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import atexit
 import csv
 import datetime as dt
 import enum
@@ -190,7 +189,6 @@ class PowerSamplerProbeContext(ProbeContext[PowerSamplerProbe]):
         stdout=subprocess.DEVNULL)
     if self._active_user_process.poll():
       raise ValueError("Could not start active user background sampler")
-    atexit.register(self.stop_processes)
     if self.probe.wait_for_battery:
       self._wait_for_battery_not_full(self.run)
 

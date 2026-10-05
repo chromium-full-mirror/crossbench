@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import atexit
 import dataclasses
 import datetime as dt
 import shlex
@@ -269,8 +268,6 @@ class ChromeOSInputActionRunner(ActionRunner):
     super().__init__(run, virtual_devices, step_by_step_mode)
     self._touch_device: TouchDevice | None = None
     self._mouse_process: subprocess.Popen | None = None
-
-    atexit.register(self._kill_mouse_process)
 
   def _kill_mouse_process(self) -> None:
     if self._mouse_process:

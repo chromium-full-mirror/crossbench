@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import atexit
 import subprocess
 from typing import TYPE_CHECKING, ClassVar, Self, TextIO
 
@@ -101,7 +100,6 @@ class DTraceProbeContext(ProbeContext[DTraceProbe]):
     self._log_path: pth.LocalPath = self.local_result_path.with_suffix(".log")
     self._dtrace_process: subprocess.Popen | None = None
     self._log_file: TextIO | None = None
-    atexit.register(self.stop_dtrace_process)
 
   def start(self) -> None:
     self._log_file = self._log_path.open("w", encoding="utf-8")

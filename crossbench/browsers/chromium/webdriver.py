@@ -443,7 +443,6 @@ class AutoForwardingRemoteWebDriver(RemoteWebDriver):
       self._chromedriver = platform.popen(
           chromedriver_path or Binaries.CHROMEDRIVER.resolve(platform),
           stdin=subprocess.PIPE)
-      atexit.register(self._stop_remote_driver)
       driver_port = self._wait_for_driver_port()
       self._forward_port = platform.ports.forward(0, driver_port)
       logging.info(

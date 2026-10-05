@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import atexit
 import datetime as dt
 import enum
 import subprocess
@@ -121,7 +120,6 @@ class PowerMetricsProbeContext(ProbeContext[PowerMetricsProbe]):
         stdout=subprocess.DEVNULL)
     if self._power_metrics_process.poll():
       raise ValueError("Could not start powermetrics")
-    atexit.register(self.stop_process)
 
   def stop(self) -> None:
     if self._power_metrics_process:

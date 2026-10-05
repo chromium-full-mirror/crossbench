@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import atexit
 import json
 import logging
 import multiprocessing
@@ -85,7 +84,6 @@ class LinuxProfilingContext(PosixProfilingContext):
         stdin=subprocess.PIPE)
     if self._profiling_process.poll():
       raise ValueError("Could not start linux profiler")
-    atexit.register(self.stop_process)
 
   @override
   def start_story_run(self) -> None:

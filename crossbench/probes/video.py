@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import atexit
 import logging
 import os
 import subprocess
@@ -288,7 +287,6 @@ class VideoProbeContext(ProbeContext[VideoProbe]):
         stdout=self._recorder_log_file)
     if self._record_process.poll():
       raise ValueError("Could not start screen recorder")
-    atexit.register(self.stop_process)
     # TODO: Add common start-story-delay on runner for these cases.
     self.host_platform.sleep(1)
 

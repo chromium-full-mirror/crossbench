@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import atexit
 from typing import TYPE_CHECKING
 
 from typing_extensions import override
@@ -59,14 +58,11 @@ class DesktopPerfettoProbeContext(PerfettoProbeContext):
     return super().teardown()
 
   def _setup_tracebox(self) -> subprocess.Popen:
-    tracebox_proc = self.browser_platform.popen(self._tracebox_bin, "traced",
-                                                "traced_probes")
-    atexit.register(self._teardown_tracebox)
-    return tracebox_proc
+    return self.browser_platform.popen(self._tracebox_bin, "traced",
+                                       "traced_probes")
 
   def _teardown_tracebox(self) -> None:
     if self._tracebox_proc:
-      atexit.unregister(self._teardown_tracebox)
       self._tracebox_proc.terminate()
       self._tracebox_proc = None
 

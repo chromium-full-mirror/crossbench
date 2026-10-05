@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import atexit
 import io
 import logging
 import subprocess
@@ -230,7 +229,6 @@ class EtmProbeContext(ProbeContext[EtmProbe]):
           error_msg = stdout.read().decode("utf-8")
           logging.error(error_msg)
       raise ValueError(f"Unable to start etm. {error_msg}")
-    atexit.register(self.stop_process)
 
   def _get_etm_pids(self) -> list[int]:
     etm_pids: list[int] = []

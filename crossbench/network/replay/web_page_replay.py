@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import abc
-import atexit
 import contextlib
 import logging
 import os
@@ -193,7 +192,6 @@ class WprBase(abc.ABC):
 
   def start(self) -> None:
     try:
-      atexit.register(self.stop, force_shutdown=True)
       self._start_wpr()
       logging.info("WPR: waiting for startup...")
       self._wait_for_startup()
@@ -319,7 +317,6 @@ class WprBase(abc.ABC):
     return url_helper.get(test_url, timeout=1, verbose=verbose)
 
   def stop(self, force_shutdown: bool = False) -> None:
-    atexit.unregister(self.stop)
     if not self._process:
       return
     try:
