@@ -321,6 +321,10 @@ class Platform(abc.ABC):
     return False
 
   @property
+  def pathsep(self) -> str:
+    return ":"
+
+  @property
   def is_remote_ssh(self) -> bool:
     return False
 
@@ -955,6 +959,27 @@ class Platform(abc.ABC):
     if parts and parts[0] == "~":
       return self.home().joinpath(*parts[1:])
     return platform_path
+
+  def join_path_list(self,
+                     paths: Iterable[pth.AnyPathLike] | pth.AnyPathLike) -> str:
+    """Joins paths into a search path string using the platform's pathsep."""
+    if isinstance(paths, (str, os.PathLike)):
+      paths = (paths,)
+    normalized: list[str] = []
+    for path in paths:
+      if not path:
+        continue
+      if isinstance(path, str):
+        normalized.extend(str(p) for p in self.split_path_list(path))
+      else:
+        normalized.append(str(self.path(path)))
+    return self.pathsep.join(normalized)
+
+  def split_path_list(self, paths_str: str) -> tuple[pth.AnyPath, ...]:
+    """Splits a search path string into platform-specific paths."""
+    if not paths_str:
+      return ()
+    return tuple(self.path(p) for p in paths_str.split(self.pathsep) if p)
 
   def home(self) -> pth.AnyPath:
     self.assert_is_local()

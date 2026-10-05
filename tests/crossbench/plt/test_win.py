@@ -41,6 +41,9 @@ class WinMockPlatformTestCase(BaseLocalMockPlatformTestMixin,
   def test_is_win(self):
     self.assertTrue(self.platform.is_win)
 
+  def test_pathsep(self):
+    self.assertEqual(self.platform.pathsep, ";")
+
   def test_name(self):
     self.assertEqual(self.platform.name, "mock.win")
 

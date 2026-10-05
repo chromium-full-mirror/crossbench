@@ -75,6 +75,27 @@ class BaseNativePlatformTestCase(unittest.TestCase):
     self.assertIsInstance(memory, int)
     self.assertGreater(memory, 0)
 
+  def test_pathsep(self):
+    expected = ";" if self.platform.is_win else ":"
+    self.assertEqual(self.platform.pathsep, expected)
+
+  def test_join_path_list(self):
+    self.assertEqual(self.platform.join_path_list(""), "")
+    self.assertEqual(self.platform.join_path_list([]), "")
+    p1 = self.platform.path("/foo/bar")
+    p2 = self.platform.path("/baz/qux")
+    self.assertEqual(self.platform.join_path_list(p1), str(p1))
+    self.assertEqual(
+        self.platform.join_path_list([p1, p2]),
+        f"{p1}{self.platform.pathsep}{p2}")
+
+  def test_split_path_list(self):
+    self.assertEqual(self.platform.split_path_list(""), ())
+    p1 = self.platform.path("/foo/bar")
+    p2 = self.platform.path("/baz/qux")
+    path_str = f"{p1}{self.platform.pathsep}{p2}"
+    self.assertEqual(self.platform.split_path_list(path_str), (p1, p2))
+
   def test_total_memory_mb(self):
     memory_mb = self.platform.total_memory_mb()
     self.assertIsInstance(memory_mb, int)

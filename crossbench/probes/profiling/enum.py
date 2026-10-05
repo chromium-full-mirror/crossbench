@@ -23,7 +23,7 @@ class CleanupMode(StrEnumWithHelp):
 
   ALWAYS = ("always", "Always clean up temp files")
   AUTO = ("auto", "Best-guess auto-cleanup")
-  NEVER = ("never", "Always clean up temp files")
+  NEVER = ("never", "Never clean up temp files")
 
 
 @enum.unique
@@ -46,3 +46,37 @@ class CallGraphMode(StrEnumWithHelp):
   NO_CALL_GRAPH = ("no_call_graph", "Do not record a call graph")
   DWARF = ("dwarf", "Run DWARF-based unwinding")
   FRAME_POINTER = ("fp", "Run frame pointer unwinding")
+
+
+@enum.unique
+class PprofMode(StrEnumWithHelp):
+  """Execution mode for corp pprof profile symbolization and upload."""
+
+  @classmethod
+  def _missing_(cls, value: Any) -> PprofMode | None:
+    if value is True:
+      return PprofMode.ALWAYS
+    if value is False:
+      return PprofMode.NEVER
+    return super()._missing_(value)
+
+  ALWAYS = ("always", "Always run corp pprof")
+  AUTO = ("auto", "Run corp pprof if available")
+  NEVER = ("never", "Do not run corp pprof")
+
+
+@enum.unique
+class TraceconvMode(StrEnumWithHelp):
+  """Execution mode for local traceconv profile conversion."""
+
+  @classmethod
+  def _missing_(cls, value: Any) -> TraceconvMode | None:
+    if value is True:
+      return TraceconvMode.ALWAYS
+    if value is False:
+      return TraceconvMode.NEVER
+    return super()._missing_(value)
+
+  ALWAYS = ("always", "Always run traceconv")
+  AUTO = ("auto", "Run traceconv if available")
+  NEVER = ("never", "Do not run traceconv")

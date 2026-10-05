@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
 from typing import TYPE_CHECKING, Final, Iterator
 
@@ -137,13 +136,8 @@ class TraceProcessorSymbolizingProbeContext(TraceProcessorProbeContext):
     traceconv_bin = traceconv_bin.resolve()
     symbols_path = symbols_path.resolve()
 
-    env = {
-        "PERFETTO_SYMBOLIZER_MODE": "index",
-        "PERFETTO_BINARY_PATH": str(symbols_path),
-        **self.host_platform.environ,
-    }
-    env["PATH"] = (os.pathsep).join(
-        (str(llvm_symbolizer_bin.parent), env.get("PATH", "")))
+    env = traceconv.symbolizer_env(
+        self.host_platform, symbols_path, llvm_symbolizer=llvm_symbolizer_bin)
 
     traceconv_log = self.local_result_path / "traceconv.log"
     has_traceconv_error = False

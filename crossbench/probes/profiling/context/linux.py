@@ -14,22 +14,27 @@ from typing import TYPE_CHECKING, Final
 
 from typing_extensions import override
 
+from crossbench import path as pth
 from crossbench import plt
 from crossbench.browsers.chromium.version import ChromiumVersion
 from crossbench.cli.ui import ui
 from crossbench.helper import fs_helper
+from crossbench.plt.bin import Binaries
 from crossbench.probes.profiling.context.base import PosixProfilingContext
 from crossbench.probes.profiling.enum import CleanupMode
 
 if TYPE_CHECKING:
-  import crossbench.path as pth
+  from crossbench.plt.base import Platform
+  from crossbench.plt.types import ListCmdArgs
   from crossbench.probes.profiling.system_profiling import ProfilingProbe
   from crossbench.probes.results import ProbeResult
   from crossbench.runner.run import Run
 
 V8_PERF_PROF_PATH_FLAG_MIN_VERSION: Final = ChromiumVersion((118, 0, 5993, 48))
-PERF_DATA_PATTERN: Final = "*.perf.data"
-JIT_DUMP_PATTERN: Final = "jit-*.dump"
+PERF_DATA_PATTERN: Final[str] = "*.perf.data"
+JIT_DUMP_PATTERN: Final[str] = "jit-*.dump"
+PPROF_SUFFIX: Final[str] = ".pprof"
+JITTED_SUFFIX: Final[str] = ".jitted"
 
 
 class LinuxProfilingContext(PosixProfilingContext):
@@ -38,10 +43,14 @@ class LinuxProfilingContext(PosixProfilingContext):
       "jitted-*.so",
       JIT_DUMP_PATTERN,
   )
+  TEMP_DIR_PATTERNS = (
+      "jitdump",
+      "debug",
+  )
 
   def __init__(self, probe: ProfilingProbe, run: Run) -> None:
     super().__init__(probe, run)
-    self._run_pprof: bool | None = self.probe.run_pprof(run.browser)
+    self._run_pprof: Final[bool] = self.probe.run_pprof(run.browser)
 
   @override
   def get_default_result_path(self) -> pth.AnyPath:
@@ -55,8 +64,12 @@ class LinuxProfilingContext(PosixProfilingContext):
 
   @property
   def run_pprof(self) -> bool:
-    assert self._run_pprof is not None, "pprof status not initialized"
     return self._run_pprof
+
+  @property
+  @override
+  def traceconv_platform(self) -> Platform:
+    return self.browser_platform
 
   @override
   def setup(self) -> None:
@@ -64,6 +77,7 @@ class LinuxProfilingContext(PosixProfilingContext):
     if self.has_perf_prof_path:
       self.session.extra_js_flags["--perf-prof-path"] = str(self.result_path)
     prepare_linux_perf_env(self.browser_platform, self.result_path, {})
+    self.setup_traceconv()
 
   def start(self) -> None:
     if not self.probe.sample_browser_process:
@@ -115,17 +129,27 @@ class LinuxProfilingContext(PosixProfilingContext):
     perf_files = self._filter_perf_files(perf_files)
     raw_perf_files = perf_files
     urls: list[str] = []
+    pprof_files: list[pth.AnyPath] = []
     try:
       if self.probe.sample_js:
         perf_files = self._inject_v8_symbols(self.run, perf_files)
+      if self.run_traceconv:
+        pprof_files = self._export_to_traceconv(self.run, perf_files)
       if self.run_pprof:
-        urls = self._export_to_pprof(self.run, perf_files)
+        urls = self._export_to_pprof(self.run, pprof_files or perf_files)
     finally:
-      self._clean_up_temp_files(self.run)
-    if self.run_pprof:
+      self._clean_up_temp_files(
+          self.run, has_exported_profile=bool(pprof_files or urls))
+    if urls:
       logging.debug("Profiling results: %s", urls)
-      return self.browser_result(url=urls, file=raw_perf_files)
-    if self.browser_platform.which("pprof"):
+      return self.browser_result(
+          url=urls, file=raw_perf_files, pprof=pprof_files)
+    if pprof_files:
+      return self.browser_result(file=raw_perf_files, pprof=pprof_files)
+    # Fall back to raw_perf_files if .jitted files were removed by cleanup.
+    perf_files = [f for f in perf_files if self.browser_platform.exists(f)
+                 ] or raw_perf_files
+    if Binaries.PPROF.exists(self.browser_platform):
       logging.info("Run pprof over all (or single) perf data files "
                    "for interactive analysis:")
       logging.info("   pprof --http=localhost:1984 %s",
@@ -219,18 +243,36 @@ class LinuxProfilingContext(PosixProfilingContext):
         logging.debug("Failed to run pprof: %s", e)
       return urls
 
-  def _clean_up_temp_files(self, run: Run) -> None:
+  @override
+  def _get_traceconv_symbol_dirs(self) -> tuple[pth.AnyPath, ...]:
+    return (
+        self.browser.path.parent,
+        self.result_path,
+        self.result_path / "debug",
+        self.result_path / "jitdump",
+    )
+
+  def _clean_up_temp_files(self,
+                           run: Run,
+                           has_exported_profile: bool = False) -> None:
+    """Cleans up temporary profiling files and symbol directories."""
     if self.probe.cleanup_mode == CleanupMode.NEVER:
       logging.debug("%s: skipping cleanup", self.probe)
       return
     if self.probe.cleanup_mode == CleanupMode.AUTO:
-      if not self.run_pprof:
-        logging.debug("%s: skipping auto cleanup without pprof upload",
+      if not has_exported_profile:
+        logging.debug("%s: skipping auto cleanup without exported profile",
                       self.probe)
         return
-    for pattern in self.TEMP_FILE_PATTERNS:
-      for file in run.out_dir.glob(pattern):
-        file.unlink()
+    cleanup_dirs = {self.result_path, run.out_dir}
+    for cleanup_dir in cleanup_dirs:
+      for pattern in self.TEMP_FILE_PATTERNS:
+        for file in self.browser_platform.glob(cleanup_dir, pattern):
+          self.browser_platform.rm(file, missing_ok=True)
+    if has_exported_profile:
+      for pattern in self.TEMP_DIR_PATTERNS:
+        for directory in self.browser_platform.glob(self.result_path, pattern):
+          self.browser_platform.rm(directory, dir=True, missing_ok=True)
 
 
 def prepare_linux_perf_env(platform: plt.Platform,
@@ -290,15 +332,15 @@ def linux_perf_probe_pprof(perf_data_file: pth.AnyPath,
   env = prepare_linux_perf_env(platform, perf_data_file.parent)
   url: str = ""
   try:
-    url = platform.sh_stdout(
-        "pprof",
-        "-symbolize=force",
-        "-flame",
-        f"-add_comment={run_details}",
-        perf_data_file,
-        env=env,
-    ).strip()
+    cmd: ListCmdArgs = [Binaries.PPROF.resolve_cached(platform)]
+    if perf_data_file.suffix != PPROF_SUFFIX:
+      cmd.append("-symbolize=force")
+    cmd.extend(("-flame", f"-add_comment={run_details}", perf_data_file))
+    url = platform.sh_stdout(*cmd, env=env).strip()
   except plt.SubprocessError as e:
+    if perf_data_file.suffix == PPROF_SUFFIX:
+      logging.warning("Failed processing pprof file: %s\n%s", perf_data_file, e)
+      return None
     # Occasionally small .jitted files fail, likely due perf inject silently
     # failing?
     perf_data_file, maybe_url = _linux_perf_probe_pprof_fallback(
@@ -307,11 +349,13 @@ def linux_perf_probe_pprof(perf_data_file: pth.AnyPath,
       logging.warning("Failed processing: %s\n%s", perf_data_file, e)
       return None
     url = maybe_url
-  if perf_data_file.suffix == ".jitted":
+  if perf_data_file.suffix == PPROF_SUFFIX:
+    logging.info("PPROF (symbolized via traceconv):")
+  elif perf_data_file.suffix == JITTED_SUFFIX:
     logging.info("PPROF (with js-symbols):")
   else:
     logging.info("PPROF (no js-symbols):")
-  logging.info("  linux-perf:   %s [%s]", perf_data_file.name, size)
+  logging.info("  file:         %s [%s]", perf_data_file.name, size)
   logging.info("  pprof result: %s", url)
   return url
 
@@ -320,7 +364,7 @@ def _linux_perf_probe_pprof_fallback(
     perf_data_file: pth.AnyPath, run_details: str, platform: plt.Platform,
     e: Exception) -> tuple[pth.AnyPath, str | None]:
   raw_perf_data_file = perf_data_file.with_suffix("")
-  if perf_data_file.suffix != ".jitted" or (
+  if perf_data_file.suffix != JITTED_SUFFIX or (
       not platform.exists(raw_perf_data_file)):
     return perf_data_file, None
   logging.debug(
@@ -330,7 +374,7 @@ def _linux_perf_probe_pprof_fallback(
   url = None
   try:
     url = platform.sh_stdout(
-        "pprof",
+        Binaries.PPROF.resolve_cached(platform),
         "-symbolize=force",
         "-flame",
         f"-add_comment={run_details}",

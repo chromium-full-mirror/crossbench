@@ -103,6 +103,7 @@ class AndroidProfilingContext(PosixProfilingContext):
       # retrieving Renderer PID, if needed.
       chromium.flags.enable_benchmarking_api()
     self._stop_existing_simpleperf()
+    self.setup_traceconv()
 
   def start(self) -> None:
     if not self.start_profiling_after_setup():
@@ -130,7 +131,14 @@ class AndroidProfilingContext(PosixProfilingContext):
       self.browser.performance_mark("probe-profiling-stop")
 
   def teardown(self) -> ProbeResult:
-    return self.browser_result(perfetto=[self.result_path])
+    result = self.browser_result(perfetto=[self.result_path])
+    if not self.run_traceconv:
+      return result
+    pprof_files = self._export_to_traceconv(self.run, result.perfetto_list)
+    if not pprof_files:
+      return result
+    local_pprof = [self.host_platform.local_path(f) for f in pprof_files]
+    return self.local_result(perfetto=result.perfetto_list, pprof=local_pprof)
 
 
 def generate_simpleperf_command_line(

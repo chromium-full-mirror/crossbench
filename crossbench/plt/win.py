@@ -49,6 +49,11 @@ class WinPlatform(Platform):
 
   @property
   @override
+  def pathsep(self) -> str:
+    return ";"
+
+  @property
+  @override
   def os_name(self) -> str:
     return "win"
 

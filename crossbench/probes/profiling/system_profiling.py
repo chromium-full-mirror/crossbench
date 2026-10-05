@@ -17,14 +17,15 @@ from crossbench import plt
 from crossbench.browsers.chromium_based.chromium_based import ChromiumBased
 from crossbench.helper import fs_helper
 from crossbench.parse import NumberParser, ObjectParser
-from crossbench.probes.probe import Probe, ProbeConfigParser, ProbeKeyT
-from crossbench.probes.probe_error import ProbeIncompatibleBrowser, \
-    ProbeValidationError
+from crossbench.plt.bin import Binaries
+from crossbench.probes.probe import Probe, ProbeConfigParser, \
+    ProbeIncompatibleBrowser, ProbeKeyT
+from crossbench.probes.probe_error import ProbeValidationError
 from crossbench.probes.profiling.context.android import AndroidProfilingContext
 from crossbench.probes.profiling.context.linux import LinuxProfilingContext
 from crossbench.probes.profiling.context.macos import MacOSProfilingContext
 from crossbench.probes.profiling.enum import CallGraphMode, CleanupMode, \
-    TargetMode
+    PprofMode, TargetMode, TraceconvMode
 from crossbench.probes.result_location import ResultLocation
 from crossbench.probes.trace_processor import profile_helper
 
@@ -99,15 +100,23 @@ class ProfilingProbe(Probe):
         ))
     parser.add_argument(
         "pprof",
-        type=ObjectParser.optional_bool,
-        help="linux-only: process collected samples with pprof.")
+        type=PprofMode,
+        default=PprofMode.AUTO,
+        help=("linux-only: Process collected samples with corp pprof. "
+              "Can be 'auto' (default), True/always, or False/never."))
+    parser.add_argument(
+        "traceconv",
+        type=TraceconvMode,
+        default=TraceconvMode.AUTO,
+        help=("Android/Linux-only: Process collected samples with traceconv. "
+              "Can be 'auto' (default), True/always, or False/never."))
     parser.add_argument(
         "cleanup",
         type=CleanupMode,
         default=CleanupMode.AUTO,
         help="Automatically clean up any temp files "
         "(perf.data.jitted and temporary .so files on linux "
-        "cleaned up automatically if pprof is set to True)")
+        "cleaned up automatically if pprof or traceconv is enabled)")
     # Android/simpleperf-specific arguments.
     parser.add_default_argument(
         "target",
@@ -201,13 +210,14 @@ class ProfilingProbe(Probe):
       self,
       js: bool = True,
       v8_interpreted_frames: bool | None = None,
-      pprof: bool | None = None,
-      cleanup: CleanupMode = CleanupMode.AUTO,
+      pprof: PprofMode | bool | str = PprofMode.AUTO,
+      traceconv: TraceconvMode | bool | str = TraceconvMode.AUTO,
+      cleanup: CleanupMode | bool | str = CleanupMode.AUTO,
       browser_process: bool = False,
       spare_renderer_process: bool = False,
-      target: TargetMode = TargetMode.AUTO,
+      target: TargetMode | str = TargetMode.AUTO,
       pin_renderer_main_core: int | None = None,
-      call_graph_mode: CallGraphMode = CallGraphMode.FRAME_POINTER,
+      call_graph_mode: CallGraphMode | str = CallGraphMode.FRAME_POINTER,
       frequency: int | str | None = None,
       clockid: str | None = None,
       count: int | None = None,
@@ -220,16 +230,22 @@ class ProfilingProbe(Probe):
     self._sample_js: bool = js
     self._sample_browser_process: bool = browser_process
     self._spare_renderer_process: bool = spare_renderer_process
-    self._run_pprof: bool | None = pprof
-    self._cleanup_mode = cleanup
+    self._pprof_mode: PprofMode = ObjectParser.enum("pprof", PprofMode, pprof,
+                                                    PprofMode)
+    self._traceconv_mode: TraceconvMode = ObjectParser.enum(
+        "traceconv", TraceconvMode, traceconv, TraceconvMode)
+    self._cleanup_mode: CleanupMode = ObjectParser.enum("cleanup", CleanupMode,
+                                                        cleanup, CleanupMode)
     if v8_interpreted_frames is None:
       v8_interpreted_frames = js
     self._expose_v8_interpreted_frames: bool = v8_interpreted_frames
     if v8_interpreted_frames:
       assert js, "Cannot expose V8 interpreted frames without js profiling."
-    self._target: TargetMode = target
+    self._target: TargetMode = ObjectParser.enum("target", TargetMode, target,
+                                                 TargetMode)
     self._pin_renderer_main_core: int | None = pin_renderer_main_core
-    self._call_graph_mode: CallGraphMode = call_graph_mode
+    self._call_graph_mode: CallGraphMode = ObjectParser.enum(
+        "call_graph_mode", CallGraphMode, call_graph_mode, CallGraphMode)
     self._frequency: int | str | None = frequency
     self._clockid: str | None = clockid
     self._count: int | None = count
@@ -243,15 +259,17 @@ class ProfilingProbe(Probe):
   def key(self) -> ProbeKeyT:
     return (*super().key, ("js", self._sample_js),
             ("v8_interpreted_frames",
-             self._expose_v8_interpreted_frames), ("pprof", self._run_pprof),
-            ("cleanup", self._cleanup_mode), ("browser_process",
-                                              self._sample_browser_process),
-            ("spare_renderer_process",
-             self._spare_renderer_process), ("target", str(self._target)),
-            ("pin_renderer_main_core",
-             self._pin_renderer_main_core), ("call_graph_mode",
-                                             str(self._call_graph_mode)),
-            ("target", str(self.target)), ("frequency", self._frequency),
+             self._expose_v8_interpreted_frames), ("pprof",
+                                                   str(self._pprof_mode)),
+            ("traceconv", str(self._traceconv_mode)), ("cleanup",
+                                                       str(self._cleanup_mode)),
+            ("browser_process",
+             self._sample_browser_process), ("spare_renderer_process",
+                                             self._spare_renderer_process),
+            ("target", str(self._target)), ("pin_renderer_main_core",
+                                            self._pin_renderer_main_core),
+            ("call_graph_mode", str(self._call_graph_mode)), ("frequency",
+                                                              self._frequency),
             ("count", self._count), ("cpu", self._cpu), ("events",
                                                          self._events),
             ("grouped_events", self._grouped_events), ("add_counters",
@@ -269,14 +287,44 @@ class ProfilingProbe(Probe):
   def sample_browser_process(self) -> bool:
     return self._sample_browser_process
 
+  @property
+  def pprof_mode(self) -> PprofMode:
+    """Returns the configured PprofMode."""
+    return self._pprof_mode
+
+  @property
+  def traceconv_mode(self) -> TraceconvMode:
+    """Returns the configured TraceconvMode."""
+    return self._traceconv_mode
+
   @functools.cache
   def run_pprof(self, browser: Browser) -> bool:
-    if self._run_pprof is not None:
-      return self._run_pprof
+    """Returns whether pprof upload is enabled and available for browser."""
+    if self._pprof_mode == PprofMode.NEVER:
+      return False
     if not browser.platform.is_linux:
       return False
-    return (browser.platform.which("pprof") is not None and
-            browser.platform.which("gcert") is not None)
+    if self._pprof_mode == PprofMode.ALWAYS:
+      return True
+    assert self._pprof_mode == PprofMode.AUTO
+    return (Binaries.PPROF.exists(browser.platform) and
+            Binaries.GCERT.exists(browser.platform))
+
+  @functools.cache
+  def run_traceconv(self, browser: Browser) -> bool:
+    """Returns whether traceconv export is enabled and available."""
+    if self._traceconv_mode == TraceconvMode.NEVER:
+      return False
+    browser_platform = browser.platform
+    if not browser_platform.is_linux and not browser_platform.is_android:
+      return False
+    if self._traceconv_mode == TraceconvMode.ALWAYS:
+      return True
+    assert self._traceconv_mode == TraceconvMode.AUTO
+    target_platform = browser_platform
+    if browser_platform.is_android:
+      target_platform = browser.host_platform
+    return Binaries.TRACE_PROCESSOR_SHELL.exists(target_platform)
 
   @property
   def cleanup_mode(self) -> CleanupMode:
@@ -351,6 +399,8 @@ class ProfilingProbe(Probe):
       self._validate_chromium_based(chromium)
     if self.run_pprof(browser):
       self._validate_pprof(env, browser)
+    if not browser_platform.is_linux:
+      self._validate_non_linux_settings(browser)
     # Check that certain Android-only options are
     # not provided by on other platforms.
     if not browser_platform.is_android and not browser_platform.is_linux:
@@ -363,12 +413,17 @@ class ProfilingProbe(Probe):
     if self.start_profiling_after_setup(browser_target_mode):
       self._validate_benchmarking_extension_version(browser)
 
+  def _validate_non_linux_settings(self, browser: Browser) -> None:
+    unsupported_settings = (("pprof", self._pprof_mode == PprofMode.ALWAYS),)
+    self._validate_unsupported_settings(browser, unsupported_settings, "Linux")
+
   def _validate_perf_settings(self, browser: Browser) -> None:
     unsupported_settings = (
         ("frequency", self._frequency),
         ("count", self._count),
         ("cpu", self._cpu),
         ("events", self._events),
+        ("traceconv", self._traceconv_mode == TraceconvMode.ALWAYS),
     )
     self._validate_unsupported_settings(browser, unsupported_settings,
                                         "Android and Linux")
@@ -392,8 +447,11 @@ class ProfilingProbe(Probe):
             f"{name!r} is currently only supported on {platforms}")
 
   def _validate_linux(self, env: RunnerEnv, browser: Browser) -> None:
-    if self.run_pprof(browser):
-      env.check_installed(binaries=["pprof"], platform=browser.platform)
+    if self._pprof_mode == PprofMode.ALWAYS:
+      env.check_installed(binaries=[Binaries.PPROF], platform=browser.platform)
+    if self._traceconv_mode == TraceconvMode.ALWAYS:
+      env.check_installed(
+          binaries=[Binaries.TRACE_PROCESSOR_SHELL], platform=browser.platform)
     assert browser.platform.which("perf"), "Please install linux-perf"
     self._validate_linux_perf_paranoid(browser)
 
@@ -421,7 +479,10 @@ class ProfilingProbe(Probe):
         f"Should be one of {supported_mac_targets!s}.")
 
   def _validate_android(self, env: RunnerEnv, browser: Browser) -> None:
-    del env
+    if self._traceconv_mode == TraceconvMode.ALWAYS:
+      env.check_installed(
+          binaries=[Binaries.TRACE_PROCESSOR_SHELL],
+          platform=browser.host_platform)
     assert browser.platform.which("simpleperf"), "simpleperf is not available"
 
   def _validate_benchmarking_extension_version(self,
@@ -433,18 +494,14 @@ class ProfilingProbe(Probe):
             "browser version >= M124 https://crrev.com/c/5374765 is required.")
 
   def _validate_pprof(self, env: RunnerEnv, browser: Browser) -> None:
-    assert self._run_pprof is not False, "Invalid pprof setting"
+    assert self._pprof_mode != PprofMode.NEVER, "Invalid pprof setting"
     host_platform = browser.host_platform
-    if host_platform.which("gcert") is None:
+    if not Binaries.GCERT.exists(host_platform):
       logging.warning(
           "Disabled automatic pprof uploading for non-googler machine.")
       return
-    if browser.platform.is_macos:
-      assert self._run_pprof is None, (
-          "Converting xctrace to pprof is not supported on macos")
-      return
     try:
-      if gcertstatus := host_platform.which("gcertstatus"):
+      if gcertstatus := Binaries.GCERTSTATUS.search(host_platform):
         host_platform.sh(gcertstatus)
         return
       env.handle_warning("Could not find gcertstatus")

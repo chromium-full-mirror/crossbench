@@ -107,6 +107,30 @@ class BaseMockPlatformTestCase(CrossbenchFakeFsTestCase, metaclass=abc.ABCMeta):
   def test_is_pyodide(self):
     self.assertFalse(self.platform.is_pyodide)
 
+  def test_pathsep(self):
+    expected = ";" if self.platform.is_win else ":"
+    self.assertEqual(self.platform.pathsep, expected)
+
+  def test_join_path_list(self):
+    self.assertEqual(self.platform.join_path_list(""), "")
+    self.assertEqual(self.platform.join_path_list([]), "")
+    p1 = self.platform.path("foo/bar")
+    p2 = self.platform.path("baz/qux")
+    self.assertEqual(self.platform.join_path_list(p1), str(p1))
+    self.assertEqual(
+        self.platform.join_path_list([p1, p2]),
+        f"{p1}{self.platform.pathsep}{p2}")
+    self.assertEqual(
+        self.platform.join_path_list([p1, "", p2]),
+        f"{p1}{self.platform.pathsep}{p2}")
+
+  def test_split_path_list(self):
+    self.assertEqual(self.platform.split_path_list(""), ())
+    p1 = self.platform.path("foo/bar")
+    p2 = self.platform.path("baz/qux")
+    path_str = f"{p1}{self.platform.pathsep}{p2}"
+    self.assertEqual(self.platform.split_path_list(path_str), (p1, p2))
+
   def test_port_forward_invalid(self):
     with self.platform.ports.nested() as ports:
       with self.assertRaisesRegex(argparse.ArgumentTypeError, "local_port"):
