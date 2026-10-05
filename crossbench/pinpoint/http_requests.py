@@ -25,15 +25,16 @@ class ServerError(requests.exceptions.HTTPError):
 
   def __init__(self, error: requests.exceptions.HTTPError) -> None:
     error_message = ""
-    try:
-      data = error.response.json()
-      if error_text := data.get("error"):
-        error_message = f"\n{error_text}"
-      else:
-        error_message = f"\n{data}"
-    except json.JSONDecodeError:
-      pass
-    super().__init__(str(error) + error_message, response=error.response)
+    if response := error.response:
+      try:
+        data = response.json()
+        if error_text := data.get("error"):
+          error_message = f"\n{error_text}"
+        else:
+          error_message = f"\n{data}"
+      except json.JSONDecodeError:
+        pass
+    super().__init__(str(error) + error_message, response=response)
 
 
 def _method(method: str, url: str, **kwargs) -> requests.Response:

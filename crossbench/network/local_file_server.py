@@ -135,7 +135,7 @@ class LocalFileNetwork(Network):
                          header_file: pth.LocalPath) -> immutabledict[str, str]:
     # Reuse python's email message library to parse headers
     message = email.parser.BytesParser().parsebytes(header_file.read_bytes())
-    return immutabledict(message)
+    return immutabledict(message.items())
 
   def _validate_extra_headers(self) -> None:
     for key, value in self._extra_headers.items():

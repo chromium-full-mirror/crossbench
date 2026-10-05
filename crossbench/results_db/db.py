@@ -12,11 +12,16 @@ import sqlalchemy
 import sqlalchemy.engine as orm_engine
 import sqlalchemy.event as orm_event
 from sqlalchemy import orm
+from sqlalchemy.dialects.sqlite import pysqlite
 
 from crossbench.results_db.records.browser import BrowserRecord
 from crossbench.results_db.records.platform import PlatformRecord
 from crossbench.results_db.records.run import RunRecord
 from crossbench.results_db.records.unit import UnitRecord
+
+# Preload the sqlite dialect before pyfakefs patches sys.modules["os"] in
+# tests, otherwise lazy loading in create_engine() binds a stale FakeOsModule.
+del pysqlite
 
 if TYPE_CHECKING:
   import sqlite3

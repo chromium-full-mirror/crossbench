@@ -33,7 +33,7 @@ if TYPE_CHECKING:
   import builtins
   import urllib.parse as urlparse
 
-  ArgParserType: TypeAlias = Callable[..., object] | type
+  ArgParserType: TypeAlias = Callable[..., object] | type[Any]
 
 
 class ConfigError(argparse.ArgumentTypeError):
@@ -401,7 +401,8 @@ class ConfigArgParser:
       # TODO: support custom depending kwargs with ConfigObject
       self._validate_type_without_depending_kwargs(depending_kwargs)
       return self.parse_config_object(config_object_type, data)
-    return self.type(data, **depending_kwargs)
+    parser_fn: Callable[..., object] = self.type
+    return parser_fn(data, **depending_kwargs)
 
   def parse_config_object(self, config_object_type: type[ConfigObject],
                           data: object) -> object:

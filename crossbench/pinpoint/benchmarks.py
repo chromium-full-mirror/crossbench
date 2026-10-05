@@ -15,7 +15,7 @@ if TYPE_CHECKING:
   from crossbench.benchmarks.base import Benchmark
 
 _BENCHMARK_BY_PINPOINT_NAME: Final[immutabledict[
-    str, Benchmark]] = immutabledict({
+    str, type[Benchmark]]] = immutabledict({
         "blink-ai.crossbench": benchmarks.BlinkAIBenchmark,
         "devtools_frontend.crossbench": benchmarks.DevToolsFrontendBenchmark,
         "embedder.crossbench": benchmarks.EmbedderBenchmark,

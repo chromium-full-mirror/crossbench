@@ -281,7 +281,7 @@ class ChromeDriverFinder:
       response = url_helper.get(url)
       return response.text
     except url_helper.HTTPError as e:
-      if e.response.status_code != 404:
+      if not e.response or e.response.status_code != 404:
         raise DriverNotFoundError(f"Could not query {url}") from e
       logging.debug("ChromeDriverFinder: Could not load latest release url %s",
                     e)
