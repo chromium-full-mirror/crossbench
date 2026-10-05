@@ -37,6 +37,7 @@ from crossbench.probes.trace_processor.context.base import \
     TraceProcessorProbeContext
 from crossbench.probes.trace_processor.context.symbolizing import \
     TraceProcessorSymbolizingProbeContext
+from crossbench.probes.trace_processor.helper import CBTraceProcessorConfig
 from crossbench.probes.trace_processor.query_config import \
     TraceProcessorQueryConfig
 from crossbench.probes.trace_processor.uri_resolver import \
@@ -287,23 +288,16 @@ class TraceProcessorProbe(Probe):
 
   @property
   def tp_config(self) -> TraceProcessorConfig:
-    extra_flags: list[str] = []
-    if self._dev_features:
-      extra_flags.append("--dev")
     is_debug_logging = logging.getLogger().isEnabledFor(logging.DEBUG)
-
-    for module_path in self.module_paths:
-      extra_flags.append("--add-sql-package")
-      extra_flags.append(module_path.as_posix())
-
-    return TraceProcessorConfig(
+    return CBTraceProcessorConfig(
         bin_path=self.trace_processor_bin,
-        ingest_ftrace_in_raw=True,
+        module_paths=self.module_paths,
         verbose=is_debug_logging,
+        enable_dev_features=self._dev_features,
         resolver_registry=ResolverRegistry(
             resolvers=[CrossbenchTraceUriResolver, PathUriResolver]),
         load_timeout=10,
-        extra_flags=extra_flags)
+    )
 
   @override
   def create_context(self, run: Run) -> TraceProcessorProbeContext:

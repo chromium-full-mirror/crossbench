@@ -1,4 +1,4 @@
-INCLUDE PERFETTO MODULE web_power.web_power_rails;
+INCLUDE PERFETTO MODULE ext.web_power_rails;
 
 SELECT
   power_rail_name,

@@ -10,9 +10,7 @@ import logging
 from typing import TYPE_CHECKING, Any, ClassVar, Iterable, cast
 
 import pandas as pd
-from perfetto.batch_trace_processor.api import BatchTraceProcessor, \
-    BatchTraceProcessorConfig
-from perfetto.trace_processor.api import TraceProcessorConfig
+from perfetto.batch_trace_processor.api import BatchTraceProcessor
 from tabulate import tabulate
 from typing_extensions import override
 
@@ -26,6 +24,8 @@ from crossbench.probes.probe import Probe, ProbePriority
 from crossbench.probes.probe_context import EmptyProbeContext
 from crossbench.probes.probe_error import ProbeMissingDataError
 from crossbench.probes.results import LocalProbeResult
+from crossbench.probes.trace_processor.helper import \
+    CBBatchTraceProcessorConfig
 from crossbench.probes.trace_processor.query_config import QUERIES_DIR, \
     DeviceSpecificTraceProcessorQuery, TraceProcessorQueryConfig
 from crossbench.probes.trace_processor.trace_processor import \
@@ -125,7 +125,6 @@ class WebPowerProbe(BenchmarkProbeMixin, Probe):
             self._get_query_config(),
             TraceProcessorQueryConfig.parse_str("web_power/cpu_time"),
         ],
-        module_paths=[QUERIES_DIR / "web_power"],
     )
 
   @override
@@ -319,10 +318,7 @@ class WebPowerProbe(BenchmarkProbeMixin, Probe):
     if not traces:
       raise ValueError(f"No traces found in {result_dir} to reprocess.")
 
-    btp_config = BatchTraceProcessorConfig(
-        tp_config=TraceProcessorConfig(
-            extra_flags=["--add-sql-package",
-                         str(QUERIES_DIR / "web_power")]))
+    btp_config = CBBatchTraceProcessorConfig()
     query_config = cls._get_query_config()
 
     browser_to_model = base_df.set_index("cb_browser")["device_model"].to_dict()

@@ -7,19 +7,20 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 from typing import Final, Sequence
 
 from perfetto.batch_trace_processor import api as btp_api
-from perfetto.trace_processor import api as tp_api
 from perfetto.trace_uri_resolver.resolver import TraceUriResolver
 
 from crossbench import path as pth
 from crossbench.cli.config.probe_list import ProbeListConfig
 from crossbench.cli.parser import CBArgumentParser
 from crossbench.parse import PathParser
-from crossbench.probes.trace_processor.trace_processor import MODULES_DIR, \
-    QUERIES_DIR, TraceProcessorProbe
+from crossbench.probes.trace_processor.constants import QUERIES_DIR
+from crossbench.probes.trace_processor.helper import \
+    CBBatchTraceProcessorConfig
+from crossbench.probes.trace_processor.trace_processor import \
+    TraceProcessorProbe
 
 DEFAULT_CONFIG_PATH: Final[pth.LocalPath] = (
     pth.ROOT_DIR / "config" / "benchmark" / "loadline" / "probe_config.hjson")
@@ -90,12 +91,8 @@ class BTPUtil:
         tp = probe
     assert tp, "Could not find TraceProcessorProbe"
 
-    tp_config = tp_api.TraceProcessorConfig(
-        bin_path=str(tp.trace_processor_bin),
-        extra_flags=["--add-sql-package",
-                     os.fspath(MODULES_DIR)])
-    btp_conf = btp_api.BatchTraceProcessorConfig(
-        tp_config=tp_config,
+    btp_conf = CBBatchTraceProcessorConfig(
+        bin_path=tp.trace_processor_bin,
         load_failure_handling=btp_api.FailureHandling.INCREMENT_STAT,
         execute_failure_handling=btp_api.FailureHandling.INCREMENT_STAT)
 

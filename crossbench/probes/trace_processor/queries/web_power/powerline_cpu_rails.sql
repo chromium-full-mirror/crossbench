@@ -6,7 +6,7 @@
 -- during a PowerLine run using go/pixel-odpm-rails. It includes all rails
 -- associated with the SoC compute logic (CPU, GPU, memory etc), but excludes
 -- radios, displays etc.
-INCLUDE PERFETTO MODULE web_power.web_power_rails;
+INCLUDE PERFETTO MODULE ext.web_power_rails;
 
 SELECT
   SUM(energy_delta) as total_energy,

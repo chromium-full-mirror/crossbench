@@ -5,21 +5,27 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import pathlib
 import unittest
 from argparse import ArgumentTypeError
 from typing import Any, Final
+
+from perfetto.trace_processor.api import TraceProcessorConfig
 
 from crossbench import path as pth
 from crossbench import plt
 from crossbench.cli.config.probe_list import ProbeListConfig
 from crossbench.exception import ArgumentTypeMultiException
 from crossbench.probes.all import TraceProcessorProbe
-from crossbench.probes.trace_processor.constants import QUERIES_DIR
+from crossbench.probes.trace_processor.constants import MODULES_DIR, \
+    QUERIES_DIR
 from crossbench.probes.trace_processor.context.base import \
     TraceProcessorProbeContext
 from crossbench.probes.trace_processor.context.symbolizing import \
     ChromiumSymbolPathFinder, TraceProcessorSymbolizingProbeContext
+from crossbench.probes.trace_processor.helper import \
+    CBBatchTraceProcessorConfig, CBTraceProcessorConfig
 from crossbench.probes.trace_processor.query_config import \
     DeviceSpecificTraceProcessorQuery, TraceProcessorQueryConfig
 from tests import test_helper
@@ -832,6 +838,60 @@ class TraceProcessorResultTestCase(BaseCrossbenchTestCase):
 
     self.assertEqual(out, '{"metric": 1}\n')
     mock_platform.set_clipboard.assert_called_once_with('{"metric": 1}')
+
+
+class TraceProcessorHelperTestCase(unittest.TestCase):
+
+  def test_default_trace_processor_config(self):
+    config = CBTraceProcessorConfig()
+    self.assertIn(os.fspath(MODULES_DIR), config.add_sql_packages)
+    self.assertIsNone(config.bin_path)
+
+  def test_default_trace_processor_config_custom_modules(self):
+    custom_dir = pth.LocalPath("/custom/path")
+    config = CBTraceProcessorConfig(
+        bin_path="/path/to/tp",
+        module_paths=[custom_dir],
+        verbose=True,
+        enable_dev_features=True)
+    self.assertEqual(config.bin_path, "/path/to/tp")
+    self.assertTrue(config.verbose)
+    self.assertTrue(config.enable_dev_features)
+    self.assertIn(os.fspath(MODULES_DIR), config.add_sql_packages)
+    self.assertIn(os.fspath(custom_dir), config.add_sql_packages)
+
+  def test_default_batch_trace_processor_config(self):
+    btp_config = CBBatchTraceProcessorConfig()
+    self.assertIsNotNone(btp_config.tp_config)
+    self.assertIn(os.fspath(MODULES_DIR), btp_config.tp_config.add_sql_packages)
+
+  def test_batch_trace_processor_config_with_tp_config(self):
+    tp_config = TraceProcessorConfig()
+    btp_config = CBBatchTraceProcessorConfig(tp_config=tp_config)
+    self.assertIs(btp_config.tp_config, tp_config)
+
+  def test_batch_trace_processor_config_conflicts(self):
+    tp_config = TraceProcessorConfig()
+    with self.assertRaisesRegex(ValueError, "bin_path"):
+      CBBatchTraceProcessorConfig(tp_config=tp_config, bin_path="/path")
+
+    with self.assertRaisesRegex(ValueError, "module_paths"):
+      CBBatchTraceProcessorConfig(tp_config=tp_config, module_paths=["/path"])
+
+    with self.assertRaisesRegex(ValueError, "extra_flags"):
+      CBBatchTraceProcessorConfig(tp_config=tp_config, extra_flags=["--flag"])
+
+    with self.assertRaisesRegex(ValueError, "verbose"):
+      CBBatchTraceProcessorConfig(tp_config=tp_config, verbose=True)
+
+    with self.assertRaisesRegex(
+        ValueError, r"bin_path.*module_paths.*extra_flags.*verbose"):
+      CBBatchTraceProcessorConfig(
+          tp_config=tp_config,
+          bin_path="/path",
+          module_paths=["/modules"],
+          extra_flags=["--flag"],
+          verbose=True)
 
 
 if __name__ == "__main__":
