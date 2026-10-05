@@ -36,7 +36,9 @@ export function log(
   const timestamp = new Date().toLocaleTimeString();
   const logEl = document.getElementById('log-output') as HTMLElement | null;
   if (logEl) {
-    logEl.innerText += `\n[${timestamp}] ${message}`;
+    const line = `[${timestamp}] ${message}`;
+    logEl.textContent =
+        logEl.textContent ? `${logEl.textContent}\n${line}` : line;
     logEl.scrollTop = logEl.scrollHeight;
   }
 }
@@ -116,6 +118,12 @@ export function setInitializing(initializing: boolean, statusText?: string) {
     if (devInfo) {
       devInfo.innerText = statusText || 'Initializing web runner modules...';
     }
+    const connErr =
+        document.getElementById('connection-error') as HTMLElement | null;
+    if (connErr) {
+      connErr.innerText = '';
+      connErr.style.display = 'none';
+    }
   } else {
     if (overlay) {
       overlay.classList.add('hidden');
@@ -163,7 +171,8 @@ export function setupUIEventListeners(): void {
   }
 }
 
-export function updateUI(connected: boolean, serial?: string|null) {
+export function updateUI(
+    connected: boolean, serial?: string|null, errorMessage?: string|null) {
   const badge =
       document.getElementById('connection-status') as HTMLElement | null;
   const devInfo = document.getElementById('device-info') as HTMLElement | null;
@@ -171,6 +180,8 @@ export function updateUI(connected: boolean, serial?: string|null) {
       document.getElementById('btn-connect') as HTMLButtonElement | null;
   const disconnectBtn =
       document.getElementById('btn-disconnect') as HTMLButtonElement | null;
+  const connErr =
+      document.getElementById('connection-error') as HTMLElement | null;
   const benchCard =
       document.getElementById('benchmark-card') as HTMLElement | null;
   const benchInput =
@@ -179,6 +190,16 @@ export function updateUI(connected: boolean, serial?: string|null) {
       document.getElementById('btn-run-benchmark') as HTMLButtonElement | null;
   const stopBtn =
       document.getElementById('btn-stop-benchmark') as HTMLButtonElement | null;
+
+  if (connErr) {
+    if (!connected && errorMessage) {
+      connErr.innerText = errorMessage;
+      connErr.style.display = 'block';
+    } else {
+      connErr.innerText = '';
+      connErr.style.display = 'none';
+    }
+  }
 
   if (connected) {
     if (badge) {

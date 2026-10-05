@@ -28,12 +28,15 @@ export function setupDeviceEventListeners(): void {
   if (btnConnect) {
     btnConnect.addEventListener('click', async () => {
       if (!isWebUsbSupported()) {
-        log('Cannot connect device: WebUSB is not supported in this browser. ' +
-                'Please use a browser with WebUSB support ' +
-                '(e.g. Google Chrome).',
-            'error');
+        const errMsg =
+            'Cannot connect device: WebUSB is not supported in this browser. ' +
+            'Please use a browser with WebUSB support ' +
+            '(e.g. Google Chrome).';
+        log(errMsg, 'error');
+        updateUI(false, null, errMsg);
         return;
       }
+      updateUI(false);
       try {
         log('Prompting for USB Android device selection...');
         const device = await webAdbBridge.requestDevice();
@@ -48,8 +51,9 @@ export function setupDeviceEventListeners(): void {
             'success');
         updateUI(true, webAdbBridge.serial);
       } catch (err: any) {
-        log(`Connection failed: ${err?.message || err}`, 'error');
-        updateUI(false);
+        const errorMsg = `Connection failed: ${err?.message || err}. `;
+        log(errorMsg, 'error');
+        updateUI(false, null, errorMsg);
       }
     });
   }

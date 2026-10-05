@@ -195,6 +195,17 @@
       .btn-success:hover {
         background-color: #059669;
       }
+      .connection-error {
+        background-color: rgba(153, 27, 27, 0.35);
+        border: 1px solid #ef4444;
+        color: #fca5a5;
+        padding: 8px 14px;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        flex: 1;
+        min-width: 240px;
+      }
       input[type="text"], input[type="password"] {
         width: 100%;
         padding: 10px 14px;
@@ -264,71 +275,45 @@
       </div>
 
       <!-- About & Purpose Overview Card -->
-      <div class="card" style="border-left: 4px solid #38bdf8; margin-bottom: 24px;">
-        <h2 style="margin-top: 0; margin-bottom: 8px; color: #38bdf8; font-size: 1.3rem;">About LoadLine Web Runner</h2>
-        <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.6; margin-top: 0; margin-bottom: 14px;">
-          <strong>LoadLine Web Runner</strong> is an performance testing tool for Chromium-based browsers on Android. Powered by the open-source <a href="https://chromium.googlesource.com/crossbench" target="_blank" rel="noopener noreferrer">Crossbench</a> benchmarking framework running in WebAssembly, it allows running reproducible, automated browser benchmarks directly from the web without complex local environment setup.
-        </p>
+      <details class="card" style="border-left: 4px solid #38bdf8; margin-bottom: 24px;">
+        <summary style="color: #38bdf8; font-size: 1.3rem; font-weight: 700; cursor: pointer; user-select: none;">About LoadLine Web Runner</summary>
+        <div style="margin-top: 12px;">
+          <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.6; margin-top: 0; margin-bottom: 14px;">
+            <strong>LoadLine Web Runner</strong> is a performance testing tool for Chromium-based browsers on Android. Powered by the open-source <a href="https://chromium.googlesource.com/crossbench" target="_blank" rel="noopener noreferrer">Crossbench</a> benchmarking framework running in WebAssembly, it allows running reproducible, automated browser benchmarks directly from the web without complex local environment setup.
+          </p>
 
-        <h4 style="margin-top: 14px; margin-bottom: 6px; color: #f8fafc; font-size: 0.95rem;">Key Features &amp; Workflow:</h4>
-        <ul style="color: #cbd5e1; font-size: 0.9rem; line-height: 1.5; margin-top: 0; margin-bottom: 14px; padding-left: 20px;">
-          <li><strong>Direct Device Control:</strong> Connects to Android devices over USB using the WebUSB / WebADB API without requiring local ADB installations.</li>
-          <li><strong>Deterministic Replay:</strong> Replays realistic web browsing scenarios using recorded Web Page Replay (WPR) archives to eliminate live-network variance.</li>
-          <li><strong>Client-Side WASM Engine:</strong> Executes Crossbench benchmark logic and Perfetto Trace Processor hermetically in the browser.</li>
-        </ul>
+          <h4 style="margin-top: 14px; margin-bottom: 6px; color: #f8fafc; font-size: 0.95rem;">Key Features &amp; Workflow:</h4>
+          <ul style="color: #cbd5e1; font-size: 0.9rem; line-height: 1.5; margin-top: 0; margin-bottom: 14px; padding-left: 20px;">
+            <li><strong>Direct Device Control:</strong> Connects to Android devices over USB using the WebUSB API without requiring a local ADB installation.</li>
+            <li><strong>Deterministic Replay:</strong> Replays realistic web browsing scenarios using recorded Web Page Replay (WPR) archives to eliminate live-network variance.</li>
+            <li><strong>Client-Side WASM Engine:</strong> Executes Crossbench benchmark logic and Perfetto Trace Processor hermetically in the browser.</li>
+          </ul>
 
-        <h4 style="margin-top: 14px; margin-bottom: 6px; color: #f8fafc; font-size: 0.95rem;">Google Account &amp; Cloud Storage Integration:</h4>
-        <p style="color: #94a3b8; font-size: 0.85rem; line-height: 1.5; margin-top: 0; margin-bottom: 0;">
-          This application connects to Google Cloud Storage to download recorded WPR archive files (<code>gs://...</code>) required to execute benchmarks. Signing in with Google is used exclusively to request read-only access (<code>https://www.googleapis.com/auth/devstorage.read_only</code>) to stream and cache authorized archive files in your browser's local Cache Storage. No personal data, credentials, or browsing telemetry are stored or transmitted to external servers. For more details, see our <a href="/privacy.html" target="_blank">Privacy Policy</a>.
-        </p>
-      </div>
+          <h4 style="margin-top: 14px; margin-bottom: 6px; color: #f8fafc; font-size: 0.95rem;">Google Account &amp; Cloud Storage Integration:</h4>
+          <p style="color: #94a3b8; font-size: 0.85rem; line-height: 1.5; margin-top: 0; margin-bottom: 0;">
+            This application connects to Google Cloud Storage to download recorded WPR archive files (<code>gs://...</code>) required to execute benchmarks. Signing in with Google is used exclusively to request read-only access (<code>https://www.googleapis.com/auth/devstorage.read_only</code>) to stream and cache authorized archive files locally in your browser (IndexedDB). No personal data, credentials, or browsing telemetry are stored or transmitted to external servers. For more details, see our <a href="/privacy.html" target="_blank">Privacy Policy</a>.
+          </p>
+        </div>
+      </details>
 
       <!-- 1. USB Device Connection Card -->
       <div class="card">
         <h3>1. USB Device Connection</h3>
+        <p style="font-size: 0.9rem; color: #cbd5e1; line-height: 1.5;">
+          Enable USB debugging on the device, connect it using a USB cable, and accept the <strong>"Allow USB debugging?"</strong> prompt on the device screen when connecting. If a local ADB server is running on your computer, stop it first (<code>adb kill-server</code>) so the browser can claim the USB interface.
+        </p>
         <p>Status: <span id="connection-status" class="status-badge loading"><span class="spinner"></span> Initializing...</span></p>
         <p id="device-info">Initializing web runner modules...</p>
-        <button id="btn-connect" class="btn" disabled>Connect Android Device (WebUSB)</button>
-        <button id="btn-disconnect" class="btn btn-danger" style="display: none;" disabled>Disconnect Device</button>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px;">
+          <button id="btn-connect" class="btn" style="margin: 0;" disabled>Connect Android Device (WebUSB)</button>
+          <button id="btn-disconnect" class="btn btn-danger" style="display: none; margin: 0;" disabled>Disconnect Device</button>
+          <div id="connection-error" class="connection-error" role="alert" style="display: none;"></div>
+        </div>
       </div>
 
       <!-- 2. WPR Archives (GCS) Card -->
       <div class="card" id="wpr-archive-card">
         <h3 style="margin-top: 0; margin-bottom: 12px;">2. WPR Archives (Google Cloud Storage)</h3>
-
-        <div style="margin-bottom: 12px;">
-          <label for="target-archive-input" style="font-size: 0.9rem; color: #cbd5e1; display: block; margin-bottom: 4px;">Target Archive (GCS URL):</label>
-          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-            <input
-              type="text"
-              id="target-archive-input"
-              value="gs://chrome-partner-loadline/archive_phone_20260331.wprgo"
-              placeholder="gs://chrome-partner-loadline/archive_phone_20260331.wprgo"
-              autocomplete="off"
-              spellcheck="false"
-              disabled
-              style="margin-top: 0; flex: 1; min-width: 250px;"
-            />
-            <div style="white-space: nowrap; font-size: 0.9rem;">
-              Cache Status: <span id="cache-status" class="status-badge">Checking cache...</span>
-            </div>
-          </div>
-        </div>
-
-        <div style="display: flex; align-items: center; flex-wrap: wrap; margin-top: 4px; margin-bottom: 16px;">
-          <button id="btn-download-archive" class="btn" style="margin-top: 0;" disabled>Download &amp; Cache Archive</button>
-          <button id="btn-clear-cache" class="btn btn-secondary" style="display: none; margin-top: 0;" disabled>Clear Cache</button>
-        </div>
-
-        <div id="download-progress-container" style="display: none; margin-bottom: 16px;">
-          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #94a3b8; margin-bottom: 4px;">
-            <span id="download-status-text">Downloading...</span>
-            <span id="download-percentage">0%</span>
-          </div>
-          <div style="background: #334155; height: 8px; border-radius: 4px; overflow: hidden;">
-            <div id="download-progress-bar" style="background: #38bdf8; height: 100%; width: 0%; transition: width 0.2s;"></div>
-          </div>
-        </div>
 
         <div style="margin-bottom: 12px; font-size: 0.9rem; color: #cbd5e1; line-height: 1.5;">
           To download the archive, please request access
@@ -380,6 +365,40 @@
             </div>
           </details>
         </div>
+
+        <div style="margin-bottom: 12px;">
+          <label for="target-archive-input" style="font-size: 0.9rem; color: #cbd5e1; display: block; margin-bottom: 4px;">Target Archive (GCS URL):</label>
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <input
+              type="text"
+              id="target-archive-input"
+              value="gs://chrome-partner-loadline/archive_phone_20260331.wprgo"
+              placeholder="gs://chrome-partner-loadline/archive_phone_20260331.wprgo"
+              autocomplete="off"
+              spellcheck="false"
+              disabled
+              style="margin-top: 0; flex: 1; min-width: 250px;"
+            />
+            <div style="white-space: nowrap; font-size: 0.9rem;">
+              Cache Status: <span id="cache-status" class="status-badge">Checking cache...</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; flex-wrap: wrap; margin-top: 4px;">
+          <button id="btn-download-archive" class="btn" style="margin-top: 0;" disabled>Download &amp; Cache Archive</button>
+          <button id="btn-clear-cache" class="btn btn-secondary" style="display: none; margin-top: 0;" disabled>Clear Cache</button>
+        </div>
+
+        <div id="download-progress-container" style="display: none; margin-top: 16px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #94a3b8; margin-bottom: 4px;">
+            <span id="download-status-text">Downloading...</span>
+            <span id="download-percentage">0%</span>
+          </div>
+          <div style="background: #334155; height: 8px; border-radius: 4px; overflow: hidden;">
+            <div id="download-progress-bar" style="background: #38bdf8; height: 100%; width: 0%; transition: width 0.2s;"></div>
+          </div>
+        </div>
       </div>
 
       <!-- 3. Benchmark Execution Card -->
@@ -408,6 +427,11 @@
           <button id="btn-copy-log" class="btn btn-secondary" style="margin: 0; padding: 6px 14px; font-size: 0.85rem;" disabled>📋 Copy Log</button>
         </div>
         <div id="log-output" class="console-log"></div>
+      </div>
+
+      <!-- Command Line Benchmark Info -->
+      <div class="card" style="font-size: 0.9rem; color: #cbd5e1; line-height: 1.5;">
+        For automation and detailed trace analysis, consider using the command-line version of the benchmark. See the <a href="https://chromium.googlesource.com/crossbench/+/refs/heads/main/config/benchmark/loadline2/README.md" target="_blank" rel="noopener noreferrer">LoadLine 2 README</a> for details.
       </div>
 
       <!-- Footer / Legal Links -->

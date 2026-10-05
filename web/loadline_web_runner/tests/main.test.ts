@@ -625,6 +625,41 @@ describe('setupUIEventListeners', () => {
         .toHaveBeenCalledWith('Sample log line 1\nSample log line 2');
     expect(btnCopy.innerText).toBe('✓ Copied!');
   });
+
+  it('preserves newlines when copying logs generated via log()', async () => {
+    document.body.innerHTML = `
+      <button id="btn-copy-log">📋 Copy Log</button>
+      <div id="log-output"></div>
+    `;
+    const {log, setupUIEventListeners} = await import('../src/main');
+    const {log: authLog} = await import('../src/auth_ui');
+    const btnCopy =
+        document.getElementById('btn-copy-log') as HTMLButtonElement;
+
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      value: {writeText: writeTextMock},
+      configurable: true,
+      writable: true,
+    });
+
+    log('First line');
+    authLog('Second line from auth');
+    log('Multi-line\ntraceback');
+
+    setupUIEventListeners();
+    btnCopy.click();
+    await Promise.resolve();
+
+    expect(writeTextMock).toHaveBeenCalledTimes(1);
+    const copiedText = writeTextMock.mock.calls[0][0] as string;
+    const lines = copiedText.split('\n');
+    expect(lines).toHaveLength(4);
+    expect(lines[0]).toContain('First line');
+    expect(lines[1]).toContain('Second line from auth');
+    expect(lines[2]).toContain('Multi-line');
+    expect(lines[3]).toBe('traceback');
+  });
 });
 
 describe('updateDownloadProgressBar', () => {
@@ -650,4 +685,123 @@ describe('updateDownloadProgressBar', () => {
     expect(percentage.innerText).toBe('50%');
     expect(progressBar.style.width).toBe('50%');
   });
+});
+
+describe('Device Connection Error Reporting', () => {
+  it('shows connection error next to the button', async () => {
+    const originalNavigator = globalThis.navigator;
+    Object.defineProperty(globalThis, 'navigator', {
+      value: {usb: {}},
+      configurable: true,
+      writable: true,
+    });
+
+    document.body.innerHTML = `
+      <span id="connection-status" class="status-badge"></span>
+      <p id="device-info"></p>
+      <button id="btn-connect" class="btn">
+        Connect Android Device (WebUSB)
+      </button>
+      <button id="btn-disconnect" class="btn btn-danger" style="display: none;">
+        Disconnect Device
+      </button>
+      <div
+        id="connection-error"
+        class="connection-error"
+        style="display: none;"></div>
+      <div id="log-output" class="console-log"></div>
+    `;
+
+    const {setupDeviceEventListeners, webAdbBridge} =
+        await import('../src/main');
+    vi.spyOn(webAdbBridge, 'requestDevice').mockResolvedValue({
+      serial: 'mock-device'
+    } as any);
+    vi.spyOn(webAdbBridge, 'connect')
+        .mockRejectedValue(new Error('Unable to claim interface.'));
+
+    setupDeviceEventListeners();
+    const btnConnect =
+        document.getElementById('btn-connect') as HTMLButtonElement;
+    const connErr = document.getElementById('connection-error') as HTMLElement;
+    const logEl = document.getElementById('log-output') as HTMLElement;
+
+    btnConnect.click();
+    for (let i = 0; i < 5; i++) {
+      await Promise.resolve();
+    }
+
+    expect(connErr.style.display).toBe('block');
+    expect(connErr.innerText)
+        .toContain('Connection failed: Unable to claim interface.');
+    expect(logEl.textContent)
+        .toContain('Connection failed: Unable to claim interface.');
+
+    // Subsequent successful connection clears the error
+    vi.spyOn(webAdbBridge, 'connect').mockResolvedValue(undefined);
+    vi.spyOn(webAdbBridge, 'serial', 'get').mockReturnValue('mock-device');
+
+    btnConnect.click();
+    for (let i = 0; i < 5; i++) {
+      await Promise.resolve();
+    }
+
+    expect(connErr.style.display).toBe('none');
+    expect(connErr.innerText).toBe('');
+
+    Object.defineProperty(globalThis, 'navigator', {
+      value: originalNavigator,
+      configurable: true,
+      writable: true,
+    });
+  });
+});
+
+describe('Input Field Persistence Across Page Reloads', () => {
+  it('saves archive and command on Run Benchmark and restores across reloads',
+     async () => {
+       document.body.innerHTML = `
+      <input
+        id="target-archive-input"
+        value="gs://chrome-partner-loadline/archive_phone_20260331.wprgo" />
+      <input
+        id="benchmark-cmd"
+        value="loadline2-phone --browser cdp:chrome" />
+      <button id="btn-run-benchmark"></button>
+    `;
+       const {setupBenchmarkEventListeners} = await import('../src/main');
+       const mockBridge = {isConnected: false, serial: null} as any;
+
+       setupBenchmarkEventListeners(mockBridge);
+       const archiveInput =
+           document.getElementById('target-archive-input') as HTMLInputElement;
+       const cmdInput =
+           document.getElementById('benchmark-cmd') as HTMLInputElement;
+       const runBtn =
+           document.getElementById('btn-run-benchmark') as HTMLButtonElement;
+
+       archiveInput.value = 'gs://custom-bucket/tablet_archive.wprgo';
+       cmdInput.value = 'loadline2-tablet --browser cdp:chrome --repeat 3';
+       runBtn.click();
+
+       // Simulate page reload with fresh default DOM
+       document.body.innerHTML = `
+      <input
+        id="target-archive-input"
+        value="gs://chrome-partner-loadline/archive_phone_20260331.wprgo" />
+      <input
+        id="benchmark-cmd"
+        value="loadline2-phone --browser cdp:chrome" />
+      <button id="btn-run-benchmark"></button>
+    `;
+       setupBenchmarkEventListeners(mockBridge);
+       const reloadedArchiveInput =
+           document.getElementById('target-archive-input') as HTMLInputElement;
+       const reloadedCmdInput =
+           document.getElementById('benchmark-cmd') as HTMLInputElement;
+       expect(reloadedArchiveInput.value)
+           .toBe('gs://custom-bucket/tablet_archive.wprgo');
+       expect(reloadedCmdInput.value)
+           .toBe('loadline2-tablet --browser cdp:chrome --repeat 3');
+     });
 });

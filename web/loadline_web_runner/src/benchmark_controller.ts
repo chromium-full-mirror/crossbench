@@ -296,6 +296,9 @@ export function getOrCreateWorkerClient(webAdbBridge: WebAdbBridge):
   return workerClient;
 }
 
+export const TARGET_ARCHIVE_STORAGE_KEY = 'crossbench_target_archive_url';
+export const BENCHMARK_CMD_STORAGE_KEY = 'crossbench_benchmark_cmd';
+
 /**
  * Initializes event listeners for Benchmark Execution, stopping, and results
  * zip download.
@@ -308,6 +311,9 @@ export function setupBenchmarkEventListeners(webAdbBridge: WebAdbBridge): void {
   const btnDownloadResults =
       document.getElementById('btn-download-results') as HTMLButtonElement |
       null;
+  const targetArchiveInput =
+      document.getElementById('target-archive-input') as HTMLInputElement |
+      null;
   const benchmarkCmdInput =
       document.getElementById('benchmark-cmd') as HTMLInputElement | null;
   const statusBadge =
@@ -318,8 +324,29 @@ export function setupBenchmarkEventListeners(webAdbBridge: WebAdbBridge): void {
       document.getElementById('download-progress-container') as HTMLElement |
       null;
 
+  if (targetArchiveInput) {
+    const savedArchive = localStorage.getItem(TARGET_ARCHIVE_STORAGE_KEY);
+    if (savedArchive) {
+      targetArchiveInput.value = savedArchive;
+    }
+  }
+  if (benchmarkCmdInput) {
+    const savedCmd = localStorage.getItem(BENCHMARK_CMD_STORAGE_KEY);
+    if (savedCmd) {
+      benchmarkCmdInput.value = savedCmd;
+    }
+  }
+
   if (btnRunBenchmark) {
     btnRunBenchmark.addEventListener('click', async () => {
+      if (targetArchiveInput && targetArchiveInput.value.trim()) {
+        localStorage.setItem(
+            TARGET_ARCHIVE_STORAGE_KEY, targetArchiveInput.value.trim());
+      }
+      if (benchmarkCmdInput && benchmarkCmdInput.value.trim()) {
+        localStorage.setItem(
+            BENCHMARK_CMD_STORAGE_KEY, benchmarkCmdInput.value.trim());
+      }
       if (!webAdbBridge.isConnected) {
         log('Cannot run benchmark: No ADB device connected.', 'error');
         return;

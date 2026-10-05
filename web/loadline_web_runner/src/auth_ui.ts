@@ -8,6 +8,7 @@
 
 import {type CachedGcsArchive, clearStoredAccessToken, deleteCachedGcsArchive, downloadGcsArchive, getCachedGcsArchive, getManualAccessToken, getStoredAccessToken, setStoredAccessToken, TARGET_GCS_ARCHIVE_URL,} from './gcs_cache';
 import {getStoredAuthSession, gisAuthManager, isSessionExpired,} from './gis_auth';
+import {log as uiLog} from './ui_state';
 
 export type LogLevel = 'info'|'warn'|'error'|'success';
 export type Logger = (message: string, level?: LogLevel) => void;
@@ -23,16 +24,10 @@ export function log(message: string, level: LogLevel = 'info'): void {
     authLogger(message, level);
     return;
   }
-  if (typeof document !== 'undefined') {
-    const logEl = document.getElementById('log-output');
-    if (logEl) {
-      const entry = document.createElement('div');
-      entry.className = `log-entry log-${level}`;
-      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-      logEl.appendChild(entry);
-      logEl.scrollTop = logEl.scrollHeight;
-      return;
-    }
+  if (typeof document !== 'undefined' &&
+      document.getElementById('log-output')) {
+    uiLog(message, level);
+    return;
   }
   if (level === 'error') {
     console.error(message);
