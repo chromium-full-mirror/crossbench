@@ -25,9 +25,9 @@ from crossbench.pinpoint.job_results import download_results
 from crossbench.pinpoint.list_benchmarks import fetch_benchmarks
 from crossbench.pinpoint.list_bots import fetch_bots
 from crossbench.pinpoint.list_builds import list_builds
-from crossbench.pinpoint.list_format import ListFormatEnum
 from crossbench.pinpoint.list_jobs import EXTRA_COLUMNS, list_jobs
 from crossbench.pinpoint.list_stories import fetch_stories
+from crossbench.pinpoint.output_format import OutputFormat
 from crossbench.pinpoint.start_job import bisect_job, start_job
 from crossbench.pinpoint.user import UserEnum, list_user
 from crossbench.pinpoint.user_metrics import collect_metrics, init_metrics
@@ -113,14 +113,8 @@ class PinpointListSubcommand(PinpointBaseSubcommand):
     list_parser.add_argument(
         "--format",
         "-f",
-        choices=[
-            ListFormatEnum.TABLE,
-            ListFormatEnum.JSON,
-            ListFormatEnum.YAML,
-            ListFormatEnum.CSV,
-            ListFormatEnum.TSV,
-        ],
-        default=ListFormatEnum.TABLE,
+        choices=OutputFormat.all(),
+        default=OutputFormat.TABLE,
         help="The output format for the list of jobs. (default: table)")
     list_parser.add_argument(
         "--truncate",

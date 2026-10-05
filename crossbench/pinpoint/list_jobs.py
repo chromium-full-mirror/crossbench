@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import csv
 import datetime as dt
 import itertools
 import json
@@ -22,7 +21,7 @@ from crossbench.pinpoint.api import PINPOINT_JOBS_API_URL, USERINFO_API_URL
 from crossbench.pinpoint.format_time import DATETIME_FORMAT, format_time
 from crossbench.pinpoint.helper import annotate
 from crossbench.pinpoint.job_info import UrlSource
-from crossbench.pinpoint.list_format import ListFormatEnum
+from crossbench.pinpoint.output_format import OutputFormat, write_delimited
 from crossbench.pinpoint.user import UserEnum
 
 
@@ -91,7 +90,7 @@ def list_jobs(
     user: UserEnum | str,
     number: int,
     truncate: int | None,
-    output_format: ListFormatEnum,
+    output_format: OutputFormat,
     extra_columns: list[str] | None = None,
     url_source: UrlSource = UrlSource.LESZEK_PERF,
 ) -> None:
@@ -209,30 +208,23 @@ def _extract_field(job: dict[str, Any], field_name: str) -> str:
 
 def _display_jobs(
     jobs: list[dict[str, Any]],
-    output_format: ListFormatEnum,
+    output_format: OutputFormat,
     all_users: bool,
     truncate: int | None,
     extra_columns: OrderedSet[str],
     url_source: UrlSource = UrlSource.LESZEK_PERF,
 ) -> None:
   match output_format:
-    case ListFormatEnum.JSON:
+    case OutputFormat.JSON:
       print(json.dumps(jobs, indent=2))
-    case ListFormatEnum.YAML:
+    case OutputFormat.YAML:
       print(yaml.dump(jobs))
-    case ListFormatEnum.CSV:
+    case OutputFormat.CSV | OutputFormat.TSV:
       headers, rows = _prepare_job_list_data(jobs, all_users, extra_columns,
                                              url_source)
-      writer = csv.writer(sys.stdout)
-      writer.writerow(headers)
-      writer.writerows(rows)
-    case ListFormatEnum.TSV:
-      headers, rows = _prepare_job_list_data(jobs, all_users, extra_columns,
-                                             url_source)
-      writer = csv.writer(sys.stdout, delimiter="\t")
-      writer.writerow(headers)
-      writer.writerows(rows)
-    case ListFormatEnum.TABLE:
+      write_delimited(
+          sys.stdout, headers, rows, delimiter=output_format.delimiter)
+    case OutputFormat.TABLE:
       headers, rows = _prepare_job_list_data(jobs, all_users, extra_columns,
                                              url_source)
       _display_jobs_as_table(headers, rows, truncate)

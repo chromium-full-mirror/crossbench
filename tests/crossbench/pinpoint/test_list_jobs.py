@@ -11,8 +11,8 @@ from unittest import mock
 from crossbench.pinpoint import http_requests
 from crossbench.pinpoint.api import USERINFO_API_URL
 from crossbench.pinpoint.job_info import UrlSource
-from crossbench.pinpoint.list_format import ListFormatEnum
 from crossbench.pinpoint.list_jobs import list_jobs, truncate
+from crossbench.pinpoint.output_format import OutputFormat
 from crossbench.pinpoint.user import UserEnum
 from tests import test_helper
 from tests.crossbench.pinpoint.http_requests_mixin import MockHttpRequestsMixin
@@ -32,7 +32,7 @@ class ListJobsTest(MockHttpRequestsMixin):
   def test_list_jobs_no_jobs(self):
     self.mock_get.return_value.json.return_value = {"jobs": []}
 
-    list_jobs(UserEnum.ALL, 10, None, ListFormatEnum.TABLE)
+    list_jobs(UserEnum.ALL, 10, None, OutputFormat.TABLE)
 
     output = self.stdout_mock.getvalue()
     self.assertIn("No jobs found.", output)
@@ -50,7 +50,7 @@ class ListJobsTest(MockHttpRequestsMixin):
         user=UserEnum.ME,
         number=10,
         truncate=None,
-        output_format=ListFormatEnum.JSON)
+        output_format=OutputFormat.JSON)
 
     # Verify calls: 1 for email, 3 for jobs (email, @google, @chromium)
     self.assertEqual(self.mock_get.call_count, 4)
@@ -70,7 +70,7 @@ class ListJobsTest(MockHttpRequestsMixin):
     }
     self.mock_get.return_value.json.return_value = {"jobs": [job_data]}
 
-    list_jobs("user@example.com", 1, None, ListFormatEnum.JSON)
+    list_jobs("user@example.com", 1, None, OutputFormat.JSON)
 
     output = self.stdout_mock.getvalue()
     parsed_output = json.loads(output)
@@ -91,7 +91,7 @@ class ListJobsTest(MockHttpRequestsMixin):
     }
     self.mock_get.return_value.json.return_value = {"jobs": [job_data]}
 
-    list_jobs("user@example.com", 1, None, ListFormatEnum.CSV)
+    list_jobs("user@example.com", 1, None, OutputFormat.CSV)
 
     output = self.stdout_mock.getvalue()
     self.assertIn("Benchmark,Config,Type,Start Time,Job URL,Status", output)
@@ -113,7 +113,7 @@ class ListJobsTest(MockHttpRequestsMixin):
     }
     self.mock_get.return_value.json.return_value = {"jobs": [job_data]}
 
-    list_jobs("user@example.com", 1, None, ListFormatEnum.TABLE)
+    list_jobs("user@example.com", 1, None, OutputFormat.TABLE)
 
     output = self.stdout_mock.getvalue()
     # Check for table headers and content
@@ -141,7 +141,7 @@ class ListJobsTest(MockHttpRequestsMixin):
         "user@example.com",
         1,
         None,
-        ListFormatEnum.TABLE,
+        OutputFormat.TABLE,
         url_source=UrlSource.PINPOINT_CLASSIC)
 
     output = self.stdout_mock.getvalue()
@@ -166,7 +166,7 @@ class ListJobsTest(MockHttpRequestsMixin):
         "user@example.com",
         1,
         None,
-        ListFormatEnum.TABLE,
+        OutputFormat.TABLE,
         url_source=UrlSource.LESZEK_PERF)
 
     output = self.stdout_mock.getvalue()
@@ -191,7 +191,7 @@ class ListJobsTest(MockHttpRequestsMixin):
         "user@example.com",
         1,
         None,
-        ListFormatEnum.TABLE,
+        OutputFormat.TABLE,
         url_source=UrlSource.LESZEK_PERF_DEV)
 
     output = self.stdout_mock.getvalue()
@@ -223,7 +223,7 @@ class ListJobsTest(MockHttpRequestsMixin):
         mock.Mock(json=lambda: page2),
     ]
 
-    list_jobs("user@example.com", 10, None, ListFormatEnum.JSON)
+    list_jobs("user@example.com", 10, None, OutputFormat.JSON)
 
     output = self.stdout_mock.getvalue()
     parsed_output = json.loads(output)
@@ -240,7 +240,7 @@ class ListJobsTest(MockHttpRequestsMixin):
     }
     self.mock_get.return_value.json.return_value = {"jobs": [job_data]}
 
-    list_jobs(UserEnum.ALL, 1, None, ListFormatEnum.CSV)
+    list_jobs(UserEnum.ALL, 1, None, OutputFormat.CSV)
 
     output = self.stdout_mock.getvalue()
     self.assertIn("User",
@@ -263,7 +263,7 @@ class ListJobsTest(MockHttpRequestsMixin):
     }
     self.mock_get.return_value.json.return_value = {"jobs": [job_data]}
 
-    list_jobs("u", 1, 10, ListFormatEnum.TABLE)
+    list_jobs("u", 1, 10, OutputFormat.TABLE)
 
     output = self.stdout_mock.getvalue()
     self.assertIn("very_lo...", output)
@@ -285,7 +285,7 @@ class ListJobsTest(MockHttpRequestsMixin):
         http_requests.requests.exceptions.HTTPError("404 Client Error"))
 
     with self.assertRaises(http_requests.requests.exceptions.HTTPError):
-      list_jobs(UserEnum.ALL, 10, None, ListFormatEnum.TABLE)
+      list_jobs(UserEnum.ALL, 10, None, OutputFormat.TABLE)
 
   def test_list_jobs_extra_columns(self):
     job_data = {
@@ -308,7 +308,7 @@ class ListJobsTest(MockHttpRequestsMixin):
         "user@example.com",
         1,
         None,
-        ListFormatEnum.TABLE,
+        OutputFormat.TABLE,
         extra_columns=["bug", "story", "attempts"])
 
     output = self.stdout_mock.getvalue()
