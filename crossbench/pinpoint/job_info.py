@@ -16,6 +16,7 @@ from crossbench.cli.ui import ui
 from crossbench.helper import txt_helper
 from crossbench.parse import NumberParser, ObjectParser
 from crossbench.pinpoint.api import JOB_SHORTEN_URL_TEMPLATE, \
+    LESZEK_PERF_DEV_JOB_URL_TEMPLATE, LESZEK_PERF_JOB_SHORT_URL_TEMPLATE, \
     PINPOINT_JOB_URL_TEMPLATE
 from crossbench.pinpoint.format_time import format_datetime
 
@@ -109,6 +110,23 @@ class ComparisonMode(enum.StrEnum):
     if self.is_bisect:
       return "bisect"
     return self.value
+
+
+class UrlSource(enum.StrEnum):
+  LESZEK_PERF = "leszek-perf"
+  PINPOINT_CLASSIC = "pinpoint-classic"
+  LESZEK_PERF_DEV = "leszek-perf-dev"
+
+  @classmethod
+  def all(cls) -> tuple[UrlSource, ...]:
+    return tuple(cls)
+
+  def format_short_job_url(self, job_id: str) -> str:
+    if self == UrlSource.PINPOINT_CLASSIC:
+      return JOB_SHORTEN_URL_TEMPLATE.format(job_id=job_id)
+    if self == UrlSource.LESZEK_PERF_DEV:
+      return LESZEK_PERF_DEV_JOB_URL_TEMPLATE.format(job_id=job_id)
+    return LESZEK_PERF_JOB_SHORT_URL_TEMPLATE.format(job_id=job_id)
 
 
 _DefaultT = TypeVar("_DefaultT")
@@ -306,11 +324,11 @@ class PinpointJobInfo:
 
   @property
   def short_url(self) -> str:
-    return JOB_SHORTEN_URL_TEMPLATE.format(job_id=self.job_id)
+    return UrlSource.LESZEK_PERF.format_short_job_url(self.job_id)
 
   @property
-  def url_link(self) -> str:
-    return ui.link(self.url)
+  def short_url_link(self) -> str:
+    return ui.link(self.short_url)
 
   @property
   def job_type(self) -> str:
@@ -393,7 +411,7 @@ class PinpointJobInfo:
     entries: list[tuple[str, str | None]] = [
         ("Job ID", self.job_id),
         ("Status", self.status_display),
-        ("URL", self.url_link),
+        ("URL", self.short_url_link),
         ("Type", self.job_type or None),
         ("Benchmark", self.benchmark),
         ("Bot", self.bot),

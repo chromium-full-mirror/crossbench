@@ -11,8 +11,10 @@ import requests
 
 from crossbench.exception import MultiException
 from crossbench.pinpoint.api import PINPOINT_START_JOB_API_URL
-from crossbench.pinpoint.config import PinpointTryJobConfig
-from crossbench.pinpoint.start_job import start_job
+from crossbench.pinpoint.config import PinpointBisectJobConfig, \
+    PinpointTryJobConfig
+from crossbench.pinpoint.job_info import UrlSource
+from crossbench.pinpoint.start_job import bisect_job, start_job
 from tests import test_helper
 from tests.crossbench.pinpoint.http_requests_mixin import MockHttpRequestsMixin
 
@@ -21,6 +23,7 @@ class StartJobTest(MockHttpRequestsMixin):
 
   def setUp(self):
     super().setUp()
+    self.mock_print = self.enterContext(mock.patch("builtins.print"))
 
     def mock_post_side_effect(url, *args, **kwargs):
       self.assertEqual(url, PINPOINT_START_JOB_API_URL,
@@ -88,6 +91,136 @@ class StartJobTest(MockHttpRequestsMixin):
     }
     self.mock_post.assert_called_with(
         PINPOINT_START_JOB_API_URL, data=expected_payload)
+    self.assertEqual(self.mock_print.call_count, 2)
+    output_data = json.loads(self.mock_print.call_args[0][0])
+    self.assertEqual(
+        output_data, {
+            "jobId": "123",
+            "jobUrl": "https://example.com/123",
+            "shortJobUrl": "http://go/l_/r/123",
+        })
+
+  def test_start_job_url_source_pinpoint_classic(self):
+    start_job(
+        config=PinpointTryJobConfig(
+            benchmark="test_benchmark",
+            bot="test_bot",
+        ),
+        url_source=UrlSource.PINPOINT_CLASSIC)
+    self.assertEqual(self.mock_print.call_count, 2)
+    output_data = json.loads(self.mock_print.call_args[0][0])
+    self.assertEqual(
+        output_data, {
+            "jobId": "123",
+            "jobUrl": "https://example.com/123",
+            "shortJobUrl": "http://go/j_/123",
+        })
+
+  def test_start_job_url_source_leszek_perf(self):
+    start_job(
+        config=PinpointTryJobConfig(
+            benchmark="test_benchmark",
+            bot="test_bot",
+        ),
+        url_source=UrlSource.LESZEK_PERF)
+    self.assertEqual(self.mock_print.call_count, 2)
+    output_data = json.loads(self.mock_print.call_args[0][0])
+    self.assertEqual(
+        output_data, {
+            "jobId": "123",
+            "jobUrl": "https://example.com/123",
+            "shortJobUrl": "http://go/l_/r/123",
+        })
+
+  def test_start_job_url_source_leszek_perf_dev(self):
+    start_job(
+        config=PinpointTryJobConfig(
+            benchmark="test_benchmark",
+            bot="test_bot",
+        ),
+        url_source=UrlSource.LESZEK_PERF_DEV)
+    self.assertEqual(self.mock_print.call_count, 2)
+    output_data = json.loads(self.mock_print.call_args[0][0])
+    self.assertEqual(
+        output_data, {
+            "jobId": "123",
+            "jobUrl": "https://example.com/123",
+            "shortJobUrl": "https://leszek-perf-dev.corp.goog/r/123",
+        })
+
+  def test_bisect_job_includes_short_url(self):
+    bisect_job(
+        config=PinpointBisectJobConfig.parse(
+            json.dumps({
+                "benchmark": "test_benchmark",
+                "bot": "test_bot",
+                "chart": "test_chart",
+                "start": {
+                    "commit": "HEAD",
+                },
+                "end": {
+                    "commit": "abcd1234",
+                },
+            })))
+    self.assertEqual(self.mock_print.call_count, 2)
+    output_data = json.loads(self.mock_print.call_args[0][0])
+    self.assertEqual(
+        output_data, {
+            "jobId": "123",
+            "jobUrl": "https://example.com/123",
+            "shortJobUrl": "http://go/l_/r/123",
+        })
+
+  def test_bisect_job_url_source_pinpoint_classic(self):
+    bisect_job(
+        config=PinpointBisectJobConfig(
+            benchmark="test_benchmark",
+            bot="test_bot",
+            chart="test_chart",
+        ),
+        url_source=UrlSource.PINPOINT_CLASSIC)
+    self.assertEqual(self.mock_print.call_count, 2)
+    output_data = json.loads(self.mock_print.call_args[0][0])
+    self.assertEqual(
+        output_data, {
+            "jobId": "123",
+            "jobUrl": "https://example.com/123",
+            "shortJobUrl": "http://go/j_/123",
+        })
+
+  def test_bisect_job_url_source_leszek_perf(self):
+    bisect_job(
+        config=PinpointBisectJobConfig(
+            benchmark="test_benchmark",
+            bot="test_bot",
+            chart="test_chart",
+        ),
+        url_source=UrlSource.LESZEK_PERF)
+    self.assertEqual(self.mock_print.call_count, 2)
+    output_data = json.loads(self.mock_print.call_args[0][0])
+    self.assertEqual(
+        output_data, {
+            "jobId": "123",
+            "jobUrl": "https://example.com/123",
+            "shortJobUrl": "http://go/l_/r/123",
+        })
+
+  def test_bisect_job_url_source_leszek_perf_dev(self):
+    bisect_job(
+        config=PinpointBisectJobConfig(
+            benchmark="test_benchmark",
+            bot="test_bot",
+            chart="test_chart",
+        ),
+        url_source=UrlSource.LESZEK_PERF_DEV)
+    self.assertEqual(self.mock_print.call_count, 2)
+    output_data = json.loads(self.mock_print.call_args[0][0])
+    self.assertEqual(
+        output_data, {
+            "jobId": "123",
+            "jobUrl": "https://example.com/123",
+            "shortJobUrl": "https://leszek-perf-dev.corp.goog/r/123",
+        })
 
   def test_start_job_api_error(self):
     self.mock_post.side_effect = requests.exceptions.HTTPError("API Error")

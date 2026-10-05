@@ -19,6 +19,7 @@ from crossbench.pinpoint.cancel_job import cancel_jobs
 from crossbench.pinpoint.config import PinpointBisectJobConfig, \
     PinpointTryJobConfig
 from crossbench.pinpoint.job_config import print_job_config
+from crossbench.pinpoint.job_info import UrlSource
 from crossbench.pinpoint.job_parser import parse_job_id, parse_job_ids
 from crossbench.pinpoint.job_results import download_results
 from crossbench.pinpoint.list_benchmarks import fetch_benchmarks
@@ -53,6 +54,15 @@ class PinpointBaseSubcommand(abc.ABC):
       self._parser.epilog = f"{epilog.rstrip()}\n\n{_BUG_EPILOG}\n"
     else:
       self._parser.epilog = _BUG_EPILOG
+
+  def add_url_source_argument(self, parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--url-source",
+        type=UrlSource,
+        choices=UrlSource.all(),
+        default=UrlSource.LESZEK_PERF,
+        help=("The URL source for shortened Pinpoint job links. "
+              f"(default: {UrlSource.LESZEK_PERF})"))
 
   @abc.abstractmethod
   def add_cli_arguments(self) -> argparse.ArgumentParser:
@@ -138,6 +148,7 @@ class PinpointListSubcommand(PinpointBaseSubcommand):
         action="store_const",
         const=[column.name for column in EXTRA_COLUMNS],
         help="Shortcut to include all extra columns in the output")
+    self.add_url_source_argument(list_parser)
     return list_parser
 
   @override
@@ -148,6 +159,7 @@ class PinpointListSubcommand(PinpointBaseSubcommand):
         truncate=args.truncate,
         output_format=args.format,
         extra_columns=args.extra_columns,
+        url_source=args.url_source,
     )
 
 
@@ -375,6 +387,7 @@ class PinpointBaseStartSubcommand(PinpointBaseSubcommand):
         help="Comma-separated list of Blink features to disable for the "
         "experiment commit.\n"
         "Example: --exp-disable-blink-features=FeatureA,FeatureB")
+    self.add_url_source_argument(start_parser)
 
     return start_parser
 
@@ -410,7 +423,7 @@ class PinpointBaseStartSubcommand(PinpointBaseSubcommand):
         exp_disable_blink_features=args.exp_disable_blink_features or
         args.disable_blink_features,
     )
-    start_job(config)
+    start_job(config, url_source=args.url_source)
 
   def add_benchmark_flag(self, parser: argparse.ArgumentParser) -> None:
     pass
@@ -530,6 +543,7 @@ class PinpointBisectSubcommand(PinpointBaseSubcommand):
         "--disable-blink-features",
         help="Blink features to disable.\n"
         "Example: --disable-blink-features=Feature1,Feature2")
+    self.add_url_source_argument(parser)
 
     parser.epilog = """Example:
   pinpoint bisect \\
@@ -570,7 +584,7 @@ class PinpointBisectSubcommand(PinpointBaseSubcommand):
         enable_blink_features=args.enable_blink_features,
         disable_blink_features=args.disable_blink_features,
     )
-    bisect_job(config)
+    bisect_job(config, url_source=args.url_source)
 
 
 class PinpointBenchmarkSubcommand(PinpointBaseStartSubcommand):

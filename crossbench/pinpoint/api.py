@@ -24,4 +24,10 @@ CHROMEPERF_DESCRIBE_API_URL: Final[str] = f"{CHROMEPERF_API_URL_BASE}/describe"
 
 USERINFO_API_URL: Final[str] = "https://www.googleapis.com/oauth2/v3/userinfo"
 JOB_SHORTEN_URL_TEMPLATE: Final[str] = "http://go/j_/{job_id}"
+LESZEK_PERF_URL_BASE: Final[str] = "http://go/l_"
+LESZEK_PERF_JOB_SHORT_URL_TEMPLATE: Final[str] = (
+    f"{LESZEK_PERF_URL_BASE}/r/{{job_id}}")
+LESZEK_PERF_DEV_URL_BASE: Final[str] = "https://leszek-perf-dev.corp.goog"
+LESZEK_PERF_DEV_JOB_URL_TEMPLATE: Final[str] = (
+    f"{LESZEK_PERF_DEV_URL_BASE}/r/{{job_id}}")
 PINPOINT_JOB_URL_TEMPLATE: Final[str] = f"{PINPOINT_URL_BASE}/job/{{job_id}}"

@@ -18,10 +18,10 @@ from ordered_set import OrderedSet
 from tabulate import tabulate
 
 from crossbench.pinpoint import http_requests
-from crossbench.pinpoint.api import JOB_SHORTEN_URL_TEMPLATE, \
-    PINPOINT_JOBS_API_URL, USERINFO_API_URL
+from crossbench.pinpoint.api import PINPOINT_JOBS_API_URL, USERINFO_API_URL
 from crossbench.pinpoint.format_time import DATETIME_FORMAT, format_time
 from crossbench.pinpoint.helper import annotate
+from crossbench.pinpoint.job_info import UrlSource
 from crossbench.pinpoint.list_format import ListFormatEnum
 from crossbench.pinpoint.user import UserEnum
 
@@ -87,11 +87,14 @@ EXTRA_COLUMNS_DICT: Final[immutabledict[str, Column]] = immutabledict(
     {c.name: c for c in EXTRA_COLUMNS})
 
 
-def list_jobs(user: UserEnum | str,
-              number: int,
-              truncate: int | None,
-              output_format: ListFormatEnum,
-              extra_columns: list[str] | None = None) -> None:
+def list_jobs(
+    user: UserEnum | str,
+    number: int,
+    truncate: int | None,
+    output_format: ListFormatEnum,
+    extra_columns: list[str] | None = None,
+    url_source: UrlSource = UrlSource.LESZEK_PERF,
+) -> None:
   extra_columns = extra_columns or []
   emails_to_query = _fetch_user_emails(user)
 
@@ -108,7 +111,7 @@ def list_jobs(user: UserEnum | str,
     return
 
   _display_jobs(jobs[:number], output_format, user == UserEnum.ALL, truncate,
-                OrderedSet(extra_columns))
+                OrderedSet(extra_columns), url_source)
 
 
 def _fetch_user_emails(user: UserEnum | str) -> set[str | None]:
@@ -154,8 +157,11 @@ def _fetch_jobs(number: int, email: str | None = None) -> list[dict[str, Any]]:
 
 
 def _prepare_job_list_data(
-    jobs: list[dict[str, Any]], all_users: bool,
-    extra_columns: OrderedSet[str]) -> tuple[list[str], list[list[Any]]]:
+    jobs: list[dict[str, Any]],
+    all_users: bool,
+    extra_columns: OrderedSet[str],
+    url_source: UrlSource = UrlSource.LESZEK_PERF,
+) -> tuple[list[str], list[list[Any]]]:
   if all_users and "user" not in extra_columns:
     extra_columns = OrderedSet(["user", *extra_columns])
   headers = [
@@ -181,7 +187,7 @@ def _prepare_job_list_data(
         _extract_field(job, "comparison_mode"),
         *[_extract_field(job, _to_json_field(col)) for col in extra_columns],
         created_time,
-        JOB_SHORTEN_URL_TEMPLATE.format(job_id=_extract_field(job, "job_id")),
+        url_source.format_short_job_url(_extract_field(job, "job_id")),
         _extract_field(job, "status"),
     ]
     table_data.append(row)
@@ -201,26 +207,34 @@ def _extract_field(job: dict[str, Any], field_name: str) -> str:
   return str(job.get("arguments", {}).get(field_name, ""))
 
 
-def _display_jobs(jobs: list[dict[str, Any]], output_format: ListFormatEnum,
-                  all_users: bool, truncate: int | None,
-                  extra_columns: OrderedSet[str]) -> None:
+def _display_jobs(
+    jobs: list[dict[str, Any]],
+    output_format: ListFormatEnum,
+    all_users: bool,
+    truncate: int | None,
+    extra_columns: OrderedSet[str],
+    url_source: UrlSource = UrlSource.LESZEK_PERF,
+) -> None:
   match output_format:
     case ListFormatEnum.JSON:
       print(json.dumps(jobs, indent=2))
     case ListFormatEnum.YAML:
       print(yaml.dump(jobs))
     case ListFormatEnum.CSV:
-      headers, rows = _prepare_job_list_data(jobs, all_users, extra_columns)
+      headers, rows = _prepare_job_list_data(jobs, all_users, extra_columns,
+                                             url_source)
       writer = csv.writer(sys.stdout)
       writer.writerow(headers)
       writer.writerows(rows)
     case ListFormatEnum.TSV:
-      headers, rows = _prepare_job_list_data(jobs, all_users, extra_columns)
+      headers, rows = _prepare_job_list_data(jobs, all_users, extra_columns,
+                                             url_source)
       writer = csv.writer(sys.stdout, delimiter="\t")
       writer.writerow(headers)
       writer.writerows(rows)
     case ListFormatEnum.TABLE:
-      headers, rows = _prepare_job_list_data(jobs, all_users, extra_columns)
+      headers, rows = _prepare_job_list_data(jobs, all_users, extra_columns,
+                                             url_source)
       _display_jobs_as_table(headers, rows, truncate)
 
 

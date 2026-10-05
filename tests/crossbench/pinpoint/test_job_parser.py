@@ -20,6 +20,9 @@ class JobParserTest(unittest.TestCase):
     self.assertEqual(parse_job_id("go/j_/123456"), "123456")
     self.assertEqual(parse_job_id("http://go/j_/123456"), "123456")
     self.assertEqual(parse_job_id("j_/123abc"), "123abc")
+    self.assertEqual(parse_job_id("go/l_/r/123456"), "123456")
+    self.assertEqual(parse_job_id("http://go/l_/r/123456"), "123456")
+    self.assertEqual(parse_job_id("l_/r/123abc"), "123abc")
 
   def test_parse_job_id_invalid(self):
     with self.assertRaises(argparse.ArgumentTypeError):
@@ -36,13 +39,17 @@ class JobParserTest(unittest.TestCase):
       parse_job_id("go/j_/")
     with self.assertRaises(argparse.ArgumentTypeError):
       parse_job_id("go/j_/not_a_job_id")
+    with self.assertRaises(argparse.ArgumentTypeError):
+      parse_job_id("go/l_/r/")
+    with self.assertRaises(argparse.ArgumentTypeError):
+      parse_job_id("go/l_/r/not_a_job_id")
 
   def test_parse_job_ids_valid(self):
     self.assertEqual(parse_job_ids(["123456"]), ["123456"])
     self.assertEqual(parse_job_ids(["123abc", "456def"]), ["123abc", "456def"])
     self.assertEqual(parse_job_ids(["123abc, 456def"]), ["123abc", "456def"])
     self.assertEqual(
-        parse_job_ids(["go/j_/123abc", "456def,789abc"]),
+        parse_job_ids(["go/l_/r/123abc", "456def,789abc"]),
         ["123abc", "456def", "789abc"],
     )
 

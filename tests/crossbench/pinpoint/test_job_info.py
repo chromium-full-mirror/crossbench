@@ -9,7 +9,7 @@ import datetime as dt
 from typing import TYPE_CHECKING, Final
 
 from crossbench.pinpoint.job_info import ComparisonMode, JobStatus, \
-    PinpointJobInfo
+    PinpointJobInfo, UrlSource
 from tests import test_helper
 from tests.crossbench.base import BaseCrossbenchTestCase
 
@@ -98,7 +98,7 @@ class PinpointJobInfoTest(BaseCrossbenchTestCase):
     self.assertEqual(job_info.status_display, "Unknown")
     self.assertEqual(job_info.url,
                      "https://pinpoint-dot-chromeperf.appspot.com/job/")
-    self.assertEqual(job_info.short_url, "http://go/j_/")
+    self.assertEqual(job_info.short_url, "http://go/l_/r/")
 
   def test_from_json_full(self):
     job_info = PinpointJobInfo.from_json(_SAMPLE_JOB_DATA)
@@ -133,14 +133,33 @@ class PinpointJobInfoTest(BaseCrossbenchTestCase):
     self.assertEqual(job_info.cancel_reason, "User cancelled")
 
   def test_urls(self):
+    self.assertEqual(
+        UrlSource.all(),
+        (
+            UrlSource.LESZEK_PERF,
+            UrlSource.PINPOINT_CLASSIC,
+            UrlSource.LESZEK_PERF_DEV,
+        ),
+    )
     job_info = PinpointJobInfo(job_id="test-id", status=JobStatus.COMPLETED)
     self.assertEqual(
         job_info.url,
         "https://pinpoint-dot-chromeperf.appspot.com/job/test-id",
     )
-    self.assertEqual(job_info.short_url, "http://go/j_/test-id")
-    self.assertIn("https://pinpoint-dot-chromeperf.appspot.com/job/test-id",
-                  job_info.url_link)
+    self.assertEqual(job_info.short_url, "http://go/l_/r/test-id")
+    self.assertEqual(
+        UrlSource.PINPOINT_CLASSIC.format_short_job_url("test-id"),
+        "http://go/j_/test-id",
+    )
+    self.assertEqual(
+        UrlSource.LESZEK_PERF.format_short_job_url("test-id"),
+        "http://go/l_/r/test-id",
+    )
+    self.assertEqual(
+        UrlSource.LESZEK_PERF_DEV.format_short_job_url("test-id"),
+        "https://leszek-perf-dev.corp.goog/r/test-id",
+    )
+    self.assertIn("http://go/l_/r/test-id", job_info.short_url_link)
     self.assertEqual(job_info.formatted_results_url, "")
 
     job_with_results = PinpointJobInfo(
@@ -268,6 +287,7 @@ class PinpointJobInfoTest(BaseCrossbenchTestCase):
     entry_dict = dict(entries)
     self.assertEqual(entry_dict["Job ID"], "1234567890")
     self.assertEqual(entry_dict["Status"], "🏃 running")
+    self.assertIn("http://go/l_/r/1234567890", entry_dict["URL"])
     self.assertEqual(entry_dict["Type"], "try")
     self.assertEqual(entry_dict["Benchmark"], "speedometer3")
     self.assertEqual(entry_dict["Bot"], "linux-perf")
@@ -294,6 +314,7 @@ class PinpointJobInfoTest(BaseCrossbenchTestCase):
     entry_dict = dict(entries)
     self.assertEqual(entry_dict["Job ID"], "simple-123")
     self.assertEqual(entry_dict["Status"], "⌛ queued")
+    self.assertIn("http://go/l_/r/simple-123", entry_dict["URL"])
 
   def test_status_helpers(self):
     running_job = PinpointJobInfo.from_json({

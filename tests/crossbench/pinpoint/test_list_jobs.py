@@ -10,6 +10,7 @@ from unittest import mock
 
 from crossbench.pinpoint import http_requests
 from crossbench.pinpoint.api import USERINFO_API_URL
+from crossbench.pinpoint.job_info import UrlSource
 from crossbench.pinpoint.list_format import ListFormatEnum
 from crossbench.pinpoint.list_jobs import list_jobs, truncate
 from crossbench.pinpoint.user import UserEnum
@@ -95,8 +96,8 @@ class ListJobsTest(MockHttpRequestsMixin):
     output = self.stdout_mock.getvalue()
     self.assertIn("Benchmark,Config,Type,Start Time,Job URL,Status", output)
     self.assertIn(
-        "speedometer,config,performance,2024-01-01 00:00:00,http://go/j_/123,completed",
-        output)
+        "speedometer,config,performance,2024-01-01 00:00:00,"
+        "http://go/l_/r/123,completed", output)
 
   def test_list_jobs_table_format(self):
     job_data = {
@@ -119,8 +120,83 @@ class ListJobsTest(MockHttpRequestsMixin):
     self.assertIn("Benchmark", output)
     self.assertIn("speedometer", output)
     self.assertIn("✅", output)  # Completed status emoji
-    self.assertIn("http://go/j_/123", output)
+    self.assertIn("http://go/l_/r/123", output)
     self.assertIn("2024-Jan-01 00:00", output)
+
+  def test_list_jobs_url_source_pinpoint_classic(self):
+    job_data = {
+        "job_id": "123",
+        "configuration": "config",
+        "user": "user@example.com",
+        "created": "2024-01-01T00:00:00Z",
+        "status": "completed",
+        "arguments": {
+            "benchmark": "speedometer",
+        },
+        "comparison_mode": "performance",
+    }
+    self.mock_get.return_value.json.return_value = {"jobs": [job_data]}
+
+    list_jobs(
+        "user@example.com",
+        1,
+        None,
+        ListFormatEnum.TABLE,
+        url_source=UrlSource.PINPOINT_CLASSIC)
+
+    output = self.stdout_mock.getvalue()
+    self.assertIn("http://go/j_/123", output)
+    self.assertNotIn("http://go/l_/r/123", output)
+
+  def test_list_jobs_url_source_leszek_perf(self):
+    job_data = {
+        "job_id": "123",
+        "configuration": "config",
+        "user": "user@example.com",
+        "created": "2024-01-01T00:00:00Z",
+        "status": "completed",
+        "arguments": {
+            "benchmark": "speedometer",
+        },
+        "comparison_mode": "performance",
+    }
+    self.mock_get.return_value.json.return_value = {"jobs": [job_data]}
+
+    list_jobs(
+        "user@example.com",
+        1,
+        None,
+        ListFormatEnum.TABLE,
+        url_source=UrlSource.LESZEK_PERF)
+
+    output = self.stdout_mock.getvalue()
+    self.assertIn("http://go/l_/r/123", output)
+    self.assertNotIn("http://go/j_/123", output)
+
+  def test_list_jobs_url_source_leszek_perf_dev(self):
+    job_data = {
+        "job_id": "123",
+        "configuration": "config",
+        "user": "user@example.com",
+        "created": "2024-01-01T00:00:00Z",
+        "status": "completed",
+        "arguments": {
+            "benchmark": "speedometer",
+        },
+        "comparison_mode": "performance",
+    }
+    self.mock_get.return_value.json.return_value = {"jobs": [job_data]}
+
+    list_jobs(
+        "user@example.com",
+        1,
+        None,
+        ListFormatEnum.TABLE,
+        url_source=UrlSource.LESZEK_PERF_DEV)
+
+    output = self.stdout_mock.getvalue()
+    self.assertIn("https://leszek-perf-dev.corp.goog/r/123", output)
+    self.assertNotIn("http://go/j_/123", output)
 
   def test_list_jobs_pagination(self):
     # First page
@@ -170,7 +246,7 @@ class ListJobsTest(MockHttpRequestsMixin):
     self.assertIn("User",
                   output)  # "User" column should be present for ALL users
     self.assertIn("other@example.com", output)
-    self.assertIn("http://go/j_/123", output)
+    self.assertIn("http://go/l_/r/123", output)
     self.assertIn("2024-01-01 00:00:00", output)
 
   def test_list_jobs_truncate(self):
