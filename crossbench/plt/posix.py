@@ -181,8 +181,10 @@ class PosixPlatform(Platform, metaclass=abc.ABCMeta):
       r"(?:(?P<days>\d+)\s+days?,\s*)?"
       r"(?:"
       r"(?:(?P<hm_hours>\d+):(?P<hm_mins>\d+))|"
-      r"(?:(?P<mins_only>\d+)\s+min)"
-      r")")
+      r"(?:(?P<hours_only>\d+)\s+hrs?)|"
+      r"(?:(?P<mins_only>\d+)\s+mins?)|"
+      r"(?:(?P<secs_only>\d+)\s+secs?)"
+      r")?")
 
   @override
   def uptime(self) -> dt.timedelta:
@@ -197,13 +199,17 @@ class PosixPlatform(Platform, metaclass=abc.ABCMeta):
 
     groups = match.groupdict()
     days = int(groups.get("days") or 0)
-    hours = int(groups.get("hm_hours") or 0)
+    hours_hm = int(groups.get("hm_hours") or 0)
+    hours_only = int(groups.get("hours_only") or 0)
+    hours = hours_hm or hours_only
     minutes_hm = int(groups.get("hm_mins") or 0)
     minutes_only = int(groups.get("mins_only") or 0)
     minutes = minutes_hm or minutes_only
+    seconds = int(groups.get("secs_only") or 0)
 
     try:
-      delta = dt.timedelta(days=days, hours=hours, minutes=minutes)
+      delta = dt.timedelta(
+          days=days, hours=hours, minutes=minutes, seconds=seconds)
       return delta
     except ValueError:
       return dt.timedelta()

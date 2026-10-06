@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import gc
 import gzip
@@ -17,7 +18,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterator
 from unittest import mock
 
 from typing_extensions import override
@@ -524,36 +525,45 @@ class BaseNativePlatformTestCase(unittest.TestCase):
       self.platform.chmod(tmp_file, mode)
       self.assertEqual(tmp_file.stat()[stat.ST_MODE] & mode, mode)
 
+  @contextlib.contextmanager
+  def _mock_default_cache_dir(self) -> Iterator[pth.AnyPath]:
+    # Isolate DEFAULT_CACHE_DIR per test to avoid races in parallel runs.
+    old_cache_dir_root = self.platform._cache_dir_root
+    self.platform._cache_dir_root = None
+    try:
+      with self.platform.TemporaryDirectory() as tmp_dir:
+        default_cache_dir = tmp_dir / "cache"
+        with mock.patch("crossbench.plt.base.DEFAULT_CACHE_DIR",
+                        default_cache_dir):
+          yield default_cache_dir
+    finally:
+      self.platform._cache_dir_root = old_cache_dir_root
+
   def test_cache_dir(self):
-    with self.platform.TemporaryDirectory() as tmp_dir:
-      try:
-        self.platform.set_cache_dir(tmp_dir)
-        cache_dir = self.platform.cache_dir("test")
-        self.assertTrue(self.platform.is_dir(cache_dir))
-        self.assertEqual(cache_dir.parent, tmp_dir)
-      finally:
-        if self.platform.is_local:
-          self.platform.set_cache_dir(DEFAULT_CACHE_DIR)
+    with self._mock_default_cache_dir() as tmp_cache_dir:
+      self.platform.set_cache_dir(tmp_cache_dir)
+      cache_dir = self.platform.cache_dir("test")
+      self.assertTrue(self.platform.is_dir(cache_dir))
+      self.assertEqual(cache_dir.parent, tmp_cache_dir)
 
   def test_default_local_cache_dir(self):
     if self.platform.is_remote:
       return
-    cache_dir = self.platform.local_cache_dir()
-    try:
+    self.assertEqual(DEFAULT_CACHE_DIR, pth.ROOT_DIR / "cache")
+    with self._mock_default_cache_dir() as mock_default_cache_dir:
+      self.assertFalse(self.platform.exists(mock_default_cache_dir))
+      cache_dir = self.platform.local_cache_dir()
       self.assertTrue(self.platform.is_dir(cache_dir))
-      self.assertEqual(cache_dir, DEFAULT_CACHE_DIR)
-    finally:
-      self.platform.rm(cache_dir, dir=True, missing_ok=True)
+      self.assertEqual(cache_dir, mock_default_cache_dir)
 
   def test_local_cache_dir(self):
     if self.platform.is_remote:
       return
-    cache_dir = self.platform.local_cache_dir("test")
-    try:
+    with self._mock_default_cache_dir() as mock_default_cache_dir:
+      self.assertFalse(self.platform.exists(mock_default_cache_dir))
+      cache_dir = self.platform.local_cache_dir("test")
       self.assertTrue(self.platform.is_dir(cache_dir))
-      self.assertEqual(cache_dir.parent, DEFAULT_CACHE_DIR)
-    finally:
-      self.platform.rm(cache_dir, dir=True, missing_ok=True)
+      self.assertEqual(cache_dir.parent, mock_default_cache_dir)
 
   def test_has_display(self):
     self.assertIn(self.platform.has_display, (True, False))
@@ -759,11 +769,13 @@ class PosixNativePlatformTestCase(BaseNativePlatformTestCase):
     self.platform: PosixPlatform = plt.PLATFORM
 
   def test_sh(self):
-    ls = self.platform.sh_stdout("ls")
-    self.assertTrue(ls)
-    lsa = self.platform.sh_stdout("ls", "-a")
-    self.assertTrue(lsa)
-    self.assertNotEqual(ls, lsa)
+    with self.platform.TemporaryDirectory() as tmp_dir:
+      self.platform.touch(tmp_dir / "file")
+      ls = self.platform.sh_stdout("ls", tmp_dir)
+      self.assertEqual(ls, "file\n")
+      lsa = self.platform.sh_stdout("ls", "-a", tmp_dir)
+      self.assertTrue(lsa)
+      self.assertNotEqual(ls, lsa)
 
   def test_sh_input(self):
     hello_world = self.platform.sh_stdout("cat", input=b"hello world")
@@ -773,10 +785,13 @@ class PosixNativePlatformTestCase(BaseNativePlatformTestCase):
     self.assertEqual(hello_world_bytes, b"hello world bytes")
 
   def test_sh_bytes(self):
-    ls_bytes = self.platform.sh_stdout_bytes("ls")
-    self.assertIsInstance(ls_bytes, bytes)
-    ls_str = self.platform.sh_stdout("ls")
-    self.assertEqual(ls_str, ls_bytes.decode("utf-8"))
+    with self.platform.TemporaryDirectory() as tmp_dir:
+      self.platform.touch(tmp_dir / "file")
+      ls_bytes = self.platform.sh_stdout_bytes("ls", tmp_dir)
+      self.assertIsInstance(ls_bytes, bytes)
+      ls_str = self.platform.sh_stdout("ls", tmp_dir)
+      self.assertEqual(ls_str, ls_bytes.decode("utf-8"))
+      self.assertEqual(ls_str, "file\n")
 
   def test_which(self):
     ls_bin = self.platform.which("ls")

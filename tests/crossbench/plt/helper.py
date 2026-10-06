@@ -265,6 +265,21 @@ class BasePosixMockPlatformTestCase(BaseMockPlatformTestCase):
                 "load average: 1.62, 2.15, 2.07\n"))
     uptime = self.platform.uptime()
     self.assertEqual(uptime, dt.timedelta(days=5, hours=2, minutes=48))
+    self.expect_sh(
+        "uptime",
+        result="12:25  up 3 hrs, 2 users, load averages: 4.27 4.29 4.80\n")
+    uptime = self.platform.uptime()
+    self.assertEqual(uptime, dt.timedelta(hours=3))
+    self.expect_sh(
+        "uptime",
+        result="12:25  up 5 days, 1 hr, 2 users, load averages: 4.27 4.29\n")
+    uptime = self.platform.uptime()
+    self.assertEqual(uptime, dt.timedelta(days=5, hours=1))
+    self.expect_sh(
+        "uptime",
+        result="12:25  up 45 secs, 2 users, load averages: 4.27 4.29 4.80\n")
+    uptime = self.platform.uptime()
+    self.assertEqual(uptime, dt.timedelta(seconds=45))
 
 
 class PlatformClipboardTestCase(
