@@ -325,10 +325,26 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
     click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_selector(selector="div[]", required=True))
-    self.expect_action_setup(
-        found_element=True,
-        app_bounds=DisplayRectangle(Point(0, 0), 100, 100),
-        element_bounds=DisplayRectangle(Point(20, 40), 10, 10))
+    self.browser.expect_js(
+        expected_js=JsInvocation(
+            result=WindowPositions(
+                found_element=True,
+                pixel_ratio=1,
+                outer_width=1920,
+                outer_height=1080,
+                inner_width=1920,
+                inner_height=1080,
+                screen_width=1920,
+                screen_height=1080,
+                avail_width=1920,
+                avail_height=1080,
+                screen_x=0,
+                screen_y=0,
+                element_left=20,
+                element_top=40,
+                element_width=10,
+                element_height=10),
+            arguments=["div[]", False]))
     self.platform.expect_sh("input", "tap", "25", "45")
     self.run_action(click_action)
 
@@ -348,26 +364,6 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
           WaitEvent(dt.timedelta(milliseconds=50)),
           MouseButtonEvent(ButtonClick.LEFT, is_down=False),
       ])
-
-  def test_click_mouse_legacy_sdk_coordinates(self) -> None:
-    self.adb.mock_sdk_version = 36
-    click_action = ClickAction.create(
-        InputSource.MOUSE,
-        position=PositionConfig.from_coordinates(x=100, y=200))
-    self.platform.expect_sh("input", "mouse", "tap", "100", "200")
-    self.run_action(click_action)
-
-  def test_click_mouse_legacy_sdk_selector_success(self) -> None:
-    self.adb.mock_sdk_version = 36
-    click_action = ClickAction.create(
-        InputSource.MOUSE,
-        position=PositionConfig.from_selector(selector="div[]", required=True))
-    self.expect_action_setup(
-        found_element=True,
-        app_bounds=DisplayRectangle(Point(0, 0), 100, 100),
-        element_bounds=DisplayRectangle(Point(20, 40), 10, 10))
-    self.platform.expect_sh("input", "mouse", "tap", "25", "45")
-    self.run_action(click_action)
 
   def test_click_mouse_non_zero_duration(self) -> None:
     click_action = ClickAction.create(

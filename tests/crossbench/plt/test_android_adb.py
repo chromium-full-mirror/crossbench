@@ -6,11 +6,12 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import datetime as dt
 import io
 import pathlib
 import struct
 import zipfile
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any, Final
 from unittest import mock
 
 if TYPE_CHECKING:
@@ -20,7 +21,10 @@ from pyfakefs.fake_filesystem import OSType
 from typing_extensions import override
 
 from crossbench import path as pth
+from crossbench.action_runner.action.enums import ButtonClick
 from crossbench.action_runner.display_rectangle import DisplayRectangle
+from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
+    MouseButtonEvent, MouseMoveEvent, TouchEvent, WaitEvent
 from crossbench.action_runner.virtual_device.keyboard import \
     KeyboardVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.mouse import \
@@ -372,8 +376,17 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
         self.platform._get_evemu_device_cmd(VirtualDeviceType.KEYBOARD),
         ("uinput", "-"))
 
-  def test_sdk_version(self):
-    with mock.patch.object(self.adb, "getprop", return_value="37"):
+  @contextlib.contextmanager
+  def patch_getprop(
+      self,
+      return_value: Any = AndroidAdbPlatform.MIN_UINPUT_SDK_VERSION - 1,
+  ) -> Iterator[mock.MagicMock]:
+    with mock.patch.object(
+        self.adb, "getprop", return_value=str(return_value)) as mock_getprop:
+      yield mock_getprop
+
+  def test_sdk_version(self) -> None:
+    with self.patch_getprop(37):
       self.assertEqual(self.adb.sdk_version, 37)
 
   @contextlib.contextmanager
@@ -384,12 +397,12 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
     mock_proc = mock.MagicMock()
     mock_proc.poll.return_value = None
     mock_proc.stdin = mock.MagicMock()
-    with mock.patch.object(self.adb, "getprop", return_value=str(sdk_version)):
+    with self.patch_getprop(sdk_version):
       with mock.patch.object(
           self.platform, "popen", return_value=mock_proc) as mock_popen:
         yield mock_popen, mock_proc
 
-  def test_setup_virtual_devices(self):
+  def test_setup_virtual_devices(self) -> None:
     with self._patch_uinput_setup() as (mock_popen, mock_proc):
       self.platform.setup_virtual_devices(
           (KeyboardVirtualDeviceConfig(name="kb1"),))
@@ -399,7 +412,7 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
       mock_proc.stdin.write.assert_called_once()
       mock_proc.stdin.flush.assert_called_once()
 
-  def test_setup_virtual_devices_unsupported_sdk(self):
+  def test_setup_virtual_devices_unsupported_sdk(self) -> None:
     sdk_version = AndroidAdbPlatform.MIN_UINPUT_SDK_VERSION - 1
     with self._patch_uinput_setup(sdk_version=sdk_version) as (mock_popen, _):
       with self.assertLogs(level="WARNING") as cm:
@@ -468,53 +481,160 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
         self.assertIn("A: 35 0 1440 0 0 0", written_header)
         self.assertIn("A: 36 0 3120 0 0 0", written_header)
 
-  def test_setup_virtual_devices_unsupported(self):
+  def test_setup_virtual_devices_unsupported(self) -> None:
     unsupported_config = mock.MagicMock(spec=VirtualDeviceConfig)
     unsupported_config.device_type = "unsupported_device_type"
     unsupported_config.name = "touch1"
 
-    with mock.patch.object(
-        self.adb,
-        "getprop",
-        return_value=str(AndroidAdbPlatform.MIN_UINPUT_SDK_VERSION)):
+    with self.patch_getprop(AndroidAdbPlatform.MIN_UINPUT_SDK_VERSION):
       with self.assertRaisesRegex(ValueError,
                                   "Unsupported virtual device type"):
         self.platform.setup_virtual_devices((unsupported_config,))
 
-  def test_execute_evemu_script(self):
+  def test_execute_evemu_script(self) -> None:
     mock_proc = mock.MagicMock()
     mock_proc.poll.return_value = None
     mock_proc.stdin = mock.MagicMock()
     self.platform._virtual_devices["kb1"] = VirtualDeviceState(mock_proc)
 
-    with mock.patch.object(
-        self.adb,
-        "getprop",
-        return_value=str(AndroidAdbPlatform.MIN_UINPUT_SDK_VERSION)):
+    with self.patch_getprop(AndroidAdbPlatform.MIN_UINPUT_SDK_VERSION):
       self.platform._execute_evemu_script("kb1", "E: 0.000000 0001 001e 0001\n")
       mock_proc.stdin.write.assert_called_once_with(
           b"E: 0.000000 0001 001e 0001\n")
       mock_proc.stdin.flush.assert_called_once()
 
-  def test_execute_evemu_script_uninitialized(self):
-    with mock.patch.object(
-        self.adb,
-        "getprop",
-        return_value=str(AndroidAdbPlatform.MIN_UINPUT_SDK_VERSION)):
+  def test_execute_evemu_script_uninitialized(self) -> None:
+    with self.patch_getprop(AndroidAdbPlatform.MIN_UINPUT_SDK_VERSION):
       with self.assertRaisesRegex(
           RuntimeError, "Virtual device 'unknown' was not initialized"):
         self.platform._execute_evemu_script("unknown", "E: ...")
 
-  def test_execute_evemu_script_unsupported_sdk(self):
-    with mock.patch.object(
-        self.adb,
-        "getprop",
-        return_value=str(AndroidAdbPlatform.MIN_UINPUT_SDK_VERSION - 1)):
+  def test_execute_evemu_script_unsupported_sdk(self) -> None:
+    with self.patch_getprop():
       with self.assertRaisesRegex(
           NotImplementedError,
           f"Virtual device uinput injection is only supported on Android SDK "
           f"{AndroidAdbPlatform.MIN_UINPUT_SDK_VERSION}+"):
         self.platform._execute_evemu_script("kb1", "E: ...")
+
+  def test_inject_input_events_legacy_sdk_touch_tap(self) -> None:
+    self.expect_sh("input tap 100 200")
+    events = (
+        TouchEvent(Point(100, 200), is_down=True),
+        WaitEvent(dt.timedelta(milliseconds=50)),
+        TouchEvent(Point(100, 200), is_down=False),
+    )
+    with self.patch_getprop():
+      self.platform.inject_input_events("default_touchscreen", events)
+
+  def test_inject_input_events_legacy_sdk_touch_long_press_raises(self) -> None:
+    events = (
+        TouchEvent(Point(100, 200), is_down=True),
+        WaitEvent(dt.timedelta(milliseconds=500)),
+        TouchEvent(Point(100, 200), is_down=False),
+    )
+    with self.patch_getprop():
+      with self.assertRaisesRegex(
+          NotImplementedError,
+          "Non-zero click duration \\(long-press\\) is not supported"):
+        self.platform.inject_input_events("default_touchscreen", events)
+
+  def test_inject_input_events_legacy_sdk_touch_swipe(self) -> None:
+    self.expect_sh("input swipe 100 200 300 400 500")
+    events = (
+        TouchEvent(Point(100, 200), is_down=True),
+        WaitEvent(dt.timedelta(milliseconds=250)),
+        TouchEvent(Point(200, 300), is_down=True),
+        WaitEvent(dt.timedelta(milliseconds=250)),
+        TouchEvent(Point(300, 400), is_down=True),
+        TouchEvent(Point(300, 400), is_down=False),
+    )
+    with self.patch_getprop():
+      self.platform.inject_input_events("default_touchscreen", events)
+
+  def test_inject_input_events_legacy_sdk_mouse_raises(self) -> None:
+    with self.patch_getprop():
+      with self.assertRaisesRegex(NotImplementedError,
+                                  "Mouse input injection is not supported"):
+        self.platform.inject_input_events("default_mouse",
+                                          (MouseMoveEvent(Point(10, 20)),))
+      with self.assertRaisesRegex(NotImplementedError,
+                                  "Mouse input injection is not supported"):
+        self.platform.inject_input_events(
+            "default_mouse",
+            (MouseButtonEvent(ButtonClick.LEFT, is_down=True),))
+
+  def test_inject_input_events_legacy_sdk_keyboard_text(self) -> None:
+    self.expect_sh("input keyboard text Hi%s1")
+    events = (
+        KeyEvent("ShiftLeft", is_down=True),
+        KeyEvent("KeyH", is_down=True),
+        KeyEvent("KeyH", is_down=False),
+        KeyEvent("ShiftLeft", is_down=False),
+        KeyEvent("KeyI", is_down=True),
+        KeyEvent("KeyI", is_down=False),
+        KeyEvent("Space", is_down=True),
+        KeyEvent("Space", is_down=False),
+        KeyEvent("Digit1", is_down=True),
+        KeyEvent("Digit1", is_down=False),
+    )
+    with self.patch_getprop():
+      self.platform.inject_input_events("default_keyboard", events)
+
+  def test_inject_input_events_legacy_sdk_keyboard_text_flushes_on_keyevent(
+      self) -> None:
+    self.expect_sh("input keyboard text hi")
+    self.expect_sh("input keyevent KEYCODE_ENTER")
+    self.expect_sh("input keyboard text ok")
+    events = (
+        KeyEvent("KeyH", is_down=True),
+        KeyEvent("KeyH", is_down=False),
+        KeyEvent("KeyI", is_down=True),
+        KeyEvent("KeyI", is_down=False),
+        KeyEvent("Enter", is_down=True),
+        KeyEvent("Enter", is_down=False),
+        KeyEvent("KeyO", is_down=True),
+        KeyEvent("KeyO", is_down=False),
+        KeyEvent("KeyK", is_down=True),
+        KeyEvent("KeyK", is_down=False),
+    )
+    with self.patch_getprop():
+      self.platform.inject_input_events("default_keyboard", events)
+
+  def test_inject_input_events_legacy_sdk_keyboard_text_timed(self) -> None:
+    self.expect_sh("input keyboard text a")
+    self.expect_sh("input keyboard text %s")
+    events = (
+        KeyEvent("KeyA", is_down=True),
+        WaitEvent(dt.timedelta(milliseconds=200)),
+        KeyEvent("KeyA", is_down=False),
+        WaitEvent(dt.timedelta(milliseconds=300)),
+        KeyEvent("Space", is_down=True),
+        WaitEvent(dt.timedelta(milliseconds=200)),
+        KeyEvent("Space", is_down=False),
+        WaitEvent(dt.timedelta(milliseconds=300)),
+    )
+    with self.patch_getprop():
+      with mock.patch.object(self.platform, "sleep") as mock_sleep:
+        self.platform.inject_input_events("default_keyboard", events)
+        self.assertEqual(mock_sleep.call_count, 2)
+
+  def test_inject_input_events_legacy_sdk_keyevent(self) -> None:
+    self.expect_sh("input keyevent KEYCODE_ENTER")
+    self.expect_sh("input keyevent KEYCODE_BACK")
+    events = (
+        KeyEvent("Enter", is_down=True),
+        KeyEvent("Enter", is_down=False),
+        KeyEvent("KEYCODE_BACK", is_down=True),
+        KeyEvent("KEYCODE_BACK", is_down=False),
+    )
+    with self.patch_getprop():
+      self.platform.inject_input_events("default_keyboard", events)
+
+  def test_inject_input_events_legacy_sdk_unsupported_event(self) -> None:
+    with self.patch_getprop():
+      with self.assertRaisesRegex(ValueError, "Unsupported InputEvent type"):
+        self.platform.inject_input_events("default_keyboard", (InputEvent(),))
 
   def test_has_root(self):
     self.expect_sh("id", result="uid=2000(shell) gid=2000(shell)")

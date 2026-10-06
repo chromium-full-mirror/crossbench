@@ -9,9 +9,6 @@ import logging
 import re
 from typing import TYPE_CHECKING, Final, cast
 
-from immutabledict import immutabledict
-from typing_extensions import override
-
 from crossbench.action_runner.base import InputSourceNotImplementedError
 from crossbench.action_runner.display_rectangle import DisplayRectangle
 from crossbench.action_runner.element_not_found_error import \
@@ -28,69 +25,6 @@ if TYPE_CHECKING:
   from crossbench.browsers.attributes import BrowserAttributes
   from crossbench.plt.android_adb import AndroidAdbPlatform
   from crossbench.runner.actions import Actions
-
-W3C_TO_ANDROID_KEYCODE: Final[immutabledict[str, str]] = immutabledict({
-    "KeyA": "KEYCODE_A",
-    "KeyB": "KEYCODE_B",
-    "KeyC": "KEYCODE_C",
-    "KeyD": "KEYCODE_D",
-    "KeyE": "KEYCODE_E",
-    "KeyF": "KEYCODE_F",
-    "KeyG": "KEYCODE_G",
-    "KeyH": "KEYCODE_H",
-    "KeyI": "KEYCODE_I",
-    "KeyJ": "KEYCODE_J",
-    "KeyK": "KEYCODE_K",
-    "KeyL": "KEYCODE_L",
-    "KeyM": "KEYCODE_M",
-    "KeyN": "KEYCODE_N",
-    "KeyO": "KEYCODE_O",
-    "KeyP": "KEYCODE_P",
-    "KeyQ": "KEYCODE_Q",
-    "KeyR": "KEYCODE_R",
-    "KeyS": "KEYCODE_S",
-    "KeyT": "KEYCODE_T",
-    "KeyU": "KEYCODE_U",
-    "KeyV": "KEYCODE_V",
-    "KeyW": "KEYCODE_W",
-    "KeyX": "KEYCODE_X",
-    "KeyY": "KEYCODE_Y",
-    "KeyZ": "KEYCODE_Z",
-    "Digit1": "KEYCODE_1",
-    "Digit2": "KEYCODE_2",
-    "Digit3": "KEYCODE_3",
-    "Digit4": "KEYCODE_4",
-    "Digit5": "KEYCODE_5",
-    "Digit6": "KEYCODE_6",
-    "Digit7": "KEYCODE_7",
-    "Digit8": "KEYCODE_8",
-    "Digit9": "KEYCODE_9",
-    "Digit0": "KEYCODE_0",
-    "Enter": "KEYCODE_ENTER",
-    "Escape": "KEYCODE_ESCAPE",
-    "Backspace": "KEYCODE_DEL",
-    "Tab": "KEYCODE_TAB",
-    "Space": "KEYCODE_SPACE",
-    "Minus": "KEYCODE_MINUS",
-    "Equal": "KEYCODE_EQUALS",
-    "BracketLeft": "KEYCODE_LEFT_BRACKET",
-    "BracketRight": "KEYCODE_RIGHT_BRACKET",
-    "Backslash": "KEYCODE_BACKSLASH",
-    "Semicolon": "KEYCODE_SEMICOLON",
-    "Quote": "KEYCODE_APOSTROPHE",
-    "Backquote": "KEYCODE_GRAVE",
-    "Comma": "KEYCODE_COMMA",
-    "Period": "KEYCODE_PERIOD",
-    "Slash": "KEYCODE_SLASH",
-    "ShiftLeft": "KEYCODE_SHIFT_LEFT",
-    "ShiftRight": "KEYCODE_SHIFT_RIGHT",
-    "ControlLeft": "KEYCODE_CTRL_LEFT",
-    "ControlRight": "KEYCODE_CTRL_RIGHT",
-    "AltLeft": "KEYCODE_ALT_LEFT",
-    "AltRight": "KEYCODE_ALT_RIGHT",
-    "MetaLeft": "KEYCODE_META_LEFT",
-    "MetaRight": "KEYCODE_META_RIGHT",
-})
 
 
 class ViewportInfo:
@@ -224,19 +158,7 @@ return [
 
         remaining_distance -= current_distance
 
-  @property
-  def adb_platform(self) -> AndroidAdbPlatform:
-    return cast("AndroidAdbPlatform", self.browser_platform)
-
-  def _supports_uinput(self) -> bool:
-    adb_platform = self.adb_platform
-    return adb_platform.adb.sdk_version >= adb_platform.MIN_UINPUT_SDK_VERSION
-
-  @override
   def click_touch(self, action: i_action.ClickAction) -> None:
-    if not self._supports_uinput():
-      self._click_impl(action, False)
-      return
     if ui_selector := action.position.ui_selector:
       self._click_touch_selector(action, ui_selector)
       return
@@ -253,35 +175,16 @@ return [
             timeout=action.timeout,
             check_element_rect=True)
 
-  @override
-  def click_mouse(self, action: i_action.ClickAction) -> None:
-    if self._supports_uinput():
-      super().click_mouse(action)
-      return
-    self._click_impl(action, True)
-
-  @override
   def click_driver(self, action: i_action.ClickAction) -> None:
-    self._click_impl(action, False)
+    self._click_driver_impl(action)
 
-  @override
   def swipe(self, action: i_action.SwipeAction) -> None:
     with self.actions("SwipeAction", measure=False):
       self._swipe_impl(action.start_x, action.start_y, action.end_x,
                        action.end_y, action.duration)
 
-  @override
-  def text_input_keyboard(self, action: i_action.TextInputAction) -> None:
-    if self._supports_uinput():
-      super().text_input_keyboard(action)
-      return
-    if action.text:
-      self._rate_limit_keystrokes(action, self._type_characters)
-    elif keyevent := action.keyevent:
-      self._send_keyevent(keyevent)
 
-
-  def _click_impl(self, action: i_action.ClickAction, use_mouse: bool) -> None:
+  def _click_driver_impl(self, action: i_action.ClickAction) -> None:
     if action.duration > dt.timedelta():
       raise InputSourceNotImplementedError(self, action, action.input_source,
                                            "Non-zero duration not implemented")
@@ -324,11 +227,8 @@ return [
         assert coordinates, "missing coordinates"
         self.add_failure_screenshot_annotation(
             ScreenshotPointAnnotation(label="click", point=coordinates))
-        cmd: list[str] = ["input"]
-        if use_mouse:
-          cmd.append("mouse")
-        cmd.extend(["tap", str(coordinates.x), str(coordinates.y)])
-        self.browser_platform.sh(*cmd)
+        self.browser_platform.sh("input", "tap", str(coordinates.x),
+                                 str(coordinates.y))
 
       if action.verify:
         self.wait_for_element_impl(
@@ -399,19 +299,10 @@ return [
     return self.browser_platform.get_window_rect(browser_main_window_name)
 
 
-  def _type_characters(self, _: Actions, characters: str) -> None:
-    # The 'input text' command cannot handle spaces directly. Replace space
-    # characters with the encoding '%s'.
-    characters = characters.replace(" ", "%s")
-    self.browser_platform.sh("input", "keyboard", "text", characters)
-
-  def _send_keyevent(self, keyevent: str) -> None:
-    android_keyevent = W3C_TO_ANDROID_KEYCODE.get(keyevent, keyevent)
-    self.browser_platform.sh("input", "keyevent", android_keyevent)
-
   def _click_ui_selector(self, ui_selector: UiSelectorConfig,
                          timeout: dt.timedelta) -> None:
-    with self.adb_platform.uiautomator_device() as ad:
+    adb_platform = cast("AndroidAdbPlatform", self.browser_platform)
+    with adb_platform.uiautomator_device() as ad:
       selector_dict = ui_selector.to_json()
       ui_object = ad.ui(**ui_selector.to_json())
       # This verification step verifies if the element exists.

@@ -76,3 +76,49 @@ def _build_us_keyboard_layout() -> immutabledict[str, KeyMapping]:
 # specification: https://www.w3.org/TR/uievents-code/
 US_KEYBOARD_LAYOUT: Final[immutabledict[str, KeyMapping]] = (
     _build_us_keyboard_layout())
+
+
+def _build_reverse_us_keyboard_layout() -> immutabledict[tuple[str, bool], str]:
+  return immutabledict({
+      (mapping.code, mapping.has_shift): char
+      for char, mapping in US_KEYBOARD_LAYOUT.items()
+      if len(mapping.key) == 1
+  })
+
+
+# Maps (W3C KeyboardEvent.code, has_shift) pairs back to their original
+# character. UnifiedInputActionRunner translates text strings into low-level
+# KeyEvent sequences (using W3C key codes and ShiftLeft modifier events) before
+# passing them to Platform.inject_input_events(). On older Android devices
+# (SDK < 37) where uinput EVEMU injection is unsupported, AndroidAdbPlatform
+# falls back to `adb shell input keyboard text <str>` and needs this reverse
+# mapping to reconstruct the text string from the KeyEvent stream.
+REVERSE_US_KEYBOARD_LAYOUT: Final[immutabledict[tuple[str, bool], str]] = (
+    _build_reverse_us_keyboard_layout())
+
+# Maps non-character W3C KeyboardEvent.code values to Android keyevent names for
+# the legacy `adb shell input keyevent` fallback on Android SDK < 37.
+W3C_TO_ANDROID_KEYCODE: Final[immutabledict[str, str]] = immutabledict({
+    "Enter": "KEYCODE_ENTER",
+    "Tab": "KEYCODE_TAB",
+    "Space": "KEYCODE_SPACE",
+    "Backspace": "KEYCODE_DEL",
+    "Delete": "KEYCODE_FORWARD_DEL",
+    "Escape": "KEYCODE_ESCAPE",
+    "ArrowUp": "KEYCODE_DPAD_UP",
+    "ArrowDown": "KEYCODE_DPAD_DOWN",
+    "ArrowLeft": "KEYCODE_DPAD_LEFT",
+    "ArrowRight": "KEYCODE_DPAD_RIGHT",
+    "Home": "KEYCODE_MOVE_HOME",
+    "End": "KEYCODE_MOVE_END",
+    "PageUp": "KEYCODE_PAGE_UP",
+    "PageDown": "KEYCODE_PAGE_DOWN",
+    "ShiftLeft": "KEYCODE_SHIFT_LEFT",
+    "ShiftRight": "KEYCODE_SHIFT_RIGHT",
+    "ControlLeft": "KEYCODE_CTRL_LEFT",
+    "ControlRight": "KEYCODE_CTRL_RIGHT",
+    "AltLeft": "KEYCODE_ALT_LEFT",
+    "AltRight": "KEYCODE_ALT_RIGHT",
+    "MetaLeft": "KEYCODE_META_LEFT",
+    "MetaRight": "KEYCODE_META_RIGHT",
+})

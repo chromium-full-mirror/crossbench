@@ -15,7 +15,9 @@ import os
 import re
 import shlex
 import subprocess
-from typing import TYPE_CHECKING, Any, Final, Generator, Mapping
+import time
+from typing import TYPE_CHECKING, Any, Final, Generator, Iterable, Mapping, \
+    Sequence
 
 from mobly.controllers import android_device
 from snippet_uiautomator import uiautomator
@@ -23,6 +25,12 @@ from typing_extensions import override
 
 from crossbench import path as pth
 from crossbench.action_runner.display_rectangle import DisplayRectangle
+from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
+    MouseButtonEvent, MouseMoveEvent, TouchEvent, WaitEvent
+from crossbench.action_runner.keyboard_layout import \
+    REVERSE_US_KEYBOARD_LAYOUT, W3C_TO_ANDROID_KEYCODE
+from crossbench.action_runner.unified_input_action_runner import \
+    UnifiedInputActionRunner
 from crossbench.benchmarks.loading.point import Point
 from crossbench.browsers.chromium.devtools import DevToolsRemoteClient
 from crossbench.flags.base import Flags, FlagsData
@@ -823,6 +831,14 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
     return AndroidAdbPortManager(self, self._adb)
 
   MIN_UINPUT_SDK_VERSION: Final[int] = 37
+  _SHIFT_KEYS: Final[frozenset[str]] = frozenset(("ShiftLeft", "ShiftRight"))
+
+  def _uinput_unsupported_msg(self, context: str = "") -> str:
+    msg = (f"Virtual device uinput injection is only supported on Android SDK "
+           f"{self.MIN_UINPUT_SDK_VERSION}+ (got SDK {self.adb.sdk_version}).")
+    if context:
+      return f"{msg} {context}"
+    return msg
 
   @override
   def setup_virtual_devices(
@@ -831,18 +847,97 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
       return
     if self.adb.sdk_version < self.MIN_UINPUT_SDK_VERSION:
       logging.warning(
-          "Virtual device uinput injection is only supported on Android SDK "
-          "%d+ (got SDK %d). Inputs may not work as expected.",
-          self.MIN_UINPUT_SDK_VERSION, self.adb.sdk_version)
+          self._uinput_unsupported_msg(
+              "Falling back to legacy input injection."))
       return
     super().setup_virtual_devices(virtual_devices)
 
   @override
+  def inject_input_events(self, device_name: str,
+                          events: Iterable[InputEvent]) -> None:
+    if self.adb.sdk_version < self.MIN_UINPUT_SDK_VERSION:
+      self._legacy_inject_input_events(events)
+      return
+    super().inject_input_events(device_name, events)
+
+  def _legacy_inject_input_events(self, events: Iterable[InputEvent]) -> None:
+    text_buffer: list[str] = []
+    touch_events: list[TouchEvent] = []
+    shift_down: bool = False
+    total_wait: dt.timedelta = dt.timedelta()
+    for event in events:
+      if isinstance(event, WaitEvent):
+        total_wait += event.duration
+      elif isinstance(event, TouchEvent):
+        touch_events.append(event)
+      elif isinstance(event, (MouseButtonEvent, MouseMoveEvent)):
+        raise NotImplementedError(
+            self._uinput_unsupported_msg(
+                "Mouse input injection is not supported."))
+      elif isinstance(event, KeyEvent):
+        shift_down, total_wait = self._legacy_inject_key_event(
+            event, text_buffer, shift_down, total_wait)
+      else:
+        raise ValueError(f"Unsupported InputEvent type: {type(event)}")
+    if touch_events:
+      self._legacy_inject_touch_events(touch_events, total_wait)
+    if text_buffer:
+      self._legacy_type_text("".join(text_buffer), total_wait)
+
+  def _legacy_inject_key_event(
+      self, event: KeyEvent, text_buffer: list[str], shift_down: bool,
+      total_wait: dt.timedelta) -> tuple[bool, dt.timedelta]:
+    if event.key_code in self._SHIFT_KEYS:
+      return event.is_down, total_wait
+    if not event.is_down:
+      return shift_down, total_wait
+    if char := REVERSE_US_KEYBOARD_LAYOUT.get((event.key_code, shift_down)):
+      text_buffer.append(char)
+      return shift_down, total_wait
+    if text_buffer:
+      self._legacy_type_text("".join(text_buffer), total_wait)
+      text_buffer.clear()
+      total_wait = dt.timedelta()
+    keycode: str = W3C_TO_ANDROID_KEYCODE.get(event.key_code, event.key_code)
+    self.sh("input", "keyevent", keycode)
+    return shift_down, total_wait
+
+  def _legacy_inject_touch_events(self, touch_events: Sequence[TouchEvent],
+                                  duration: dt.timedelta) -> None:
+    start: Point = touch_events[0].position
+    end: Point = touch_events[-1].position
+    touch_down_count: int = sum(1 for e in touch_events if e.is_down)
+    if touch_down_count == 1 and start == end:
+      if duration > UnifiedInputActionRunner.DEFAULT_CLICK_DURATION:
+        raise NotImplementedError(
+            self._uinput_unsupported_msg(
+                "Non-zero click duration (long-press) is not supported."))
+      self.sh("input", "tap", str(start.x), str(start.y))
+      return
+    duration_millis: int = round(duration / dt.timedelta(milliseconds=1))
+    self.sh("input", "swipe", str(start.x), str(start.y), str(end.x),
+            str(end.y), str(duration_millis))
+
+  def _legacy_type_text(self, text: str, duration: dt.timedelta) -> None:
+    if duration <= dt.timedelta():
+      self._legacy_input_text(text)
+      return
+    character_delay_s: float = (duration / len(text)).total_seconds()
+    character_expected_end_time: float = time.time()
+    for char in text:
+      character_expected_end_time += character_delay_s
+      self._legacy_input_text(char)
+      expected_end_delta: float = character_expected_end_time - time.time()
+      if expected_end_delta > 0:
+        self.sleep(expected_end_delta)
+
+  def _legacy_input_text(self, text: str) -> None:
+    self.sh("input", "keyboard", "text", text.replace(" ", "%s"))
+
+  @override
   def _execute_evemu_script(self, device_name: str, script: str) -> None:
     if self.adb.sdk_version < self.MIN_UINPUT_SDK_VERSION:
-      raise NotImplementedError(
-          f"Virtual device uinput injection is only supported on Android SDK "
-          f"{self.MIN_UINPUT_SDK_VERSION}+ (got SDK {self.adb.sdk_version})")
+      raise NotImplementedError(self._uinput_unsupported_msg())
     super()._execute_evemu_script(device_name, script)
 
   @override
