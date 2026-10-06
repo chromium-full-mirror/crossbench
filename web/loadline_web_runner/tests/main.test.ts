@@ -416,11 +416,18 @@ describe('Page Unload Protection (beforeunload)', () => {
     expect(mockEvent.preventDefault).not.toHaveBeenCalled();
   });
 
-  it('prevents default and sets returnValue when benchmark is running',
+  it('prevents default, sets returnValue, and shows warning banner',
      async () => {
+       document.body.innerHTML = `
+      <div id="benchmark-running-warning" style="display: none;"></div>
+    `;
+       const warningEl = document.getElementById(
+                             'benchmark-running-warning',
+                             ) as HTMLElement;
        const {handleBeforeUnload, setBenchmarkRunning} =
            await import('../src/main');
        setBenchmarkRunning(true);
+       expect(warningEl.style.display).toBe('block');
 
        const mockEvent = {
          preventDefault: vi.fn(),
@@ -433,6 +440,7 @@ describe('Page Unload Protection (beforeunload)', () => {
        expect(mockEvent.returnValue).toBe('');
 
        setBenchmarkRunning(false);
+       expect(warningEl.style.display).toBe('none');
      });
 });
 
@@ -803,5 +811,427 @@ describe('Input Field Persistence Across Page Reloads', () => {
            .toBe('gs://custom-bucket/tablet_archive.wprgo');
        expect(reloadedCmdInput.value)
            .toBe('loadline2-tablet --browser cdp:chrome --repeat 3');
+     });
+});
+
+describe('Simple Mode & Developer Mode Interface', () => {
+  it('resolves archive URL automatically from Crossbench config', async () => {
+    const {getArchiveUrlForVariant, getTargetArchiveUrl, setRunnerMode} =
+        await import('../src/main');
+
+    expect(getArchiveUrlForVariant('loadline2-phone'))
+        .toBe('gs://chrome-partner-loadline/archive_phone_20260331.wprgo');
+    expect(getArchiveUrlForVariant('loadline2-tablet'))
+        .toBe('gs://chrome-partner-loadline/archive_tablet_20250918.wprgo');
+
+    document.body.innerHTML = `
+      <select id="simple-benchmark-variant">
+        <option value="loadline2-phone">loadline2-phone</option>
+        <option value="loadline2-tablet" selected>loadline2-tablet</option>
+      </select>
+      <input id="target-archive-input" value="gs://custom/override.wprgo" />
+    `;
+
+    setRunnerMode('simple');
+    expect(getTargetArchiveUrl())
+        .toBe('gs://chrome-partner-loadline/archive_tablet_20250918.wprgo');
+
+    setRunnerMode('developer');
+    expect(getTargetArchiveUrl()).toBe('gs://custom/override.wprgo');
+  });
+
+  it('toggles visibility between Simple Mode and Developer Mode sections',
+     async () => {
+       document.body.innerHTML = `
+      <button id="btn-mode-simple" class="mode-btn active"></button>
+      <button id="btn-mode-developer" class="mode-btn"></button>
+      <div id="simple-archive-section"></div>
+      <div id="dev-archive-section" style="display: none;"></div>
+      <div id="simple-benchmark-section"></div>
+      <div id="dev-benchmark-section" style="display: none;"></div>
+      <div id="simple-progress-card"></div>
+      <div id="dev-log-card" style="display: none;"></div>
+      <select id="simple-benchmark-variant">
+        <option value="loadline2-phone" selected>loadline2-phone</option>
+      </select>
+    `;
+
+       const {setRunnerMode, getRunnerMode} = await import('../src/main');
+
+       setRunnerMode('developer');
+       expect(getRunnerMode()).toBe('developer');
+       expect((document.getElementById('simple-archive-section') as HTMLElement)
+                  .style.display)
+           .toBe('none');
+       expect((document.getElementById('dev-archive-section') as HTMLElement)
+                  .style.display)
+           .toBe('block');
+       expect(
+           (document.getElementById('simple-benchmark-section') as HTMLElement)
+               .style.display)
+           .toBe('none');
+       expect((document.getElementById('dev-benchmark-section') as HTMLElement)
+                  .style.display)
+           .toBe('block');
+       expect((document.getElementById('simple-progress-card') as HTMLElement)
+                  .style.display)
+           .toBe('none');
+       expect((document.getElementById('dev-log-card') as HTMLElement)
+                  .style.display)
+           .toBe('block');
+
+       setRunnerMode('simple');
+       expect(getRunnerMode()).toBe('simple');
+       expect((document.getElementById('simple-archive-section') as HTMLElement)
+                  .style.display)
+           .toBe('block');
+       expect((document.getElementById('dev-archive-section') as HTMLElement)
+                  .style.display)
+           .toBe('none');
+       expect((document.getElementById('simple-progress-card') as HTMLElement)
+                  .style.display)
+           .toBe('block');
+       expect((document.getElementById('dev-log-card') as HTMLElement)
+                  .style.display)
+           .toBe('none');
+     });
+
+  it('shows "Archive ready" when cached and Download button when absent',
+     async () => {
+       document.body.innerHTML = `
+      <select id="simple-benchmark-variant">
+        <option value="loadline2-phone" selected>loadline2-phone</option>
+        <option value="loadline2-tablet">loadline2-tablet</option>
+      </select>
+      <div id="simple-archive-ready" style="display: none;">
+        <span id="simple-archive-ready-badge" class="status-badge connected">
+          ✓ Archive ready
+        </span>
+      </div>
+      <div id="simple-archive-missing">
+        <a id="simple-access-form-link" href="https://docs.google.com/forms/d/e/1FAIpQLSdCb1LYPlDEKuOd1lP21yZ9YDEvjq-9W0a5X9k7QxM_YjskzA/viewform?usp=header">form</a>
+        <button id="btn-simple-download-archive">Download</button>
+        <div id="simple-download-error" class="connection-error"
+          style="display: none;"></div>
+      </div>
+    `;
+
+       const gcsCache = await import('../src/gcs_cache');
+       const {gisAuthManager} = await import('../src/gis_auth');
+       const {
+         setRunnerMode,
+         setupAuthUIEventListeners,
+         updateGcsUI,
+       } = await import('../src/main');
+
+       setRunnerMode('simple');
+
+       const getCachedSpy =
+           vi.spyOn(gcsCache, 'getCachedGcsArchive').mockResolvedValue(null);
+
+       await updateGcsUI();
+       const readyEl =
+           document.getElementById('simple-archive-ready') as HTMLElement;
+       const missingEl =
+           document.getElementById('simple-archive-missing') as HTMLElement;
+       const downloadErrEl =
+           document.getElementById('simple-download-error') as HTMLElement;
+       expect(readyEl.style.display).toBe('none');
+       expect(missingEl.style.display).toBe('block');
+
+       // Clicking Download opens GIS authorization popup and then downloads
+       // archive
+       const signInSpy = vi.spyOn(gisAuthManager, 'signIn').mockResolvedValue({
+         accessToken: 'oauth-popup-token',
+         tokenType: 'Bearer',
+         scope: 'https://www.googleapis.com/auth/devstorage.read_only',
+         expiresAt: Date.now() + 3600_000,
+         userEmail: 'tester@google.com',
+       });
+       const cachedEntry = {
+         url: 'gs://chrome-partner-loadline/archive_phone_20260331.wprgo',
+         filename: 'archive_phone_20260331.wprgo',
+         md5Hash: 'abc',
+         size: 10 * 1024 * 1024,
+         downloadedAt: Date.now(),
+         data: new Uint8Array([1, 2, 3]),
+       };
+       const downloadSpy = vi.spyOn(gcsCache, 'downloadGcsArchive')
+                               .mockImplementation(async () => {
+                                 getCachedSpy.mockResolvedValue(cachedEntry);
+                                 return cachedEntry;
+                               });
+
+       setupAuthUIEventListeners();
+       const btnSimpleDownload = document.getElementById(
+                                     'btn-simple-download-archive',
+                                     ) as HTMLButtonElement;
+       btnSimpleDownload.click();
+       for (let i = 0; i < 6; i++) {
+         await Promise.resolve();
+       }
+
+       expect(signInSpy).toHaveBeenCalledTimes(1);
+       expect(downloadSpy)
+           .toHaveBeenCalledWith(
+               'gs://chrome-partner-loadline/archive_phone_20260331.wprgo',
+               'oauth-popup-token',
+               expect.any(Function),
+           );
+       expect(readyEl.style.display).toBe('block');
+       expect(missingEl.style.display).toBe('none');
+       expect(downloadErrEl.style.display).toBe('none');
+
+       // When already authenticated, clicking Download does not show the
+       // sign-in popup and downloads immediately
+       const {clearAuthSession, setStoredAuthSession} =
+           await import('../src/gis_auth');
+       setStoredAuthSession({
+         accessToken: 'existing-active-token',
+         tokenType: 'Bearer',
+         scope: 'https://www.googleapis.com/auth/devstorage.read_only',
+         expiresAt: Date.now() + 3600_000,
+         userEmail: 'tester@google.com',
+       });
+       signInSpy.mockClear();
+       downloadSpy.mockClear();
+       getCachedSpy.mockResolvedValue(null);
+       await updateGcsUI();
+
+       // Simulate a failed download first to verify error is shown next to
+       // button
+       downloadSpy.mockRejectedValueOnce(new Error('403 Forbidden'));
+       btnSimpleDownload.click();
+       for (let i = 0; i < 6; i++) {
+         await Promise.resolve();
+       }
+       expect(signInSpy).not.toHaveBeenCalled();
+       expect(downloadErrEl.style.display).toBe('block');
+       expect(downloadErrEl.innerText)
+           .toContain('Download failed: 403 Forbidden');
+
+       // Subsequent successful download clears the error
+       downloadSpy.mockImplementation(async () => {
+         getCachedSpy.mockResolvedValue(cachedEntry);
+         return cachedEntry;
+       });
+       btnSimpleDownload.click();
+       for (let i = 0; i < 6; i++) {
+         await Promise.resolve();
+       }
+
+       expect(signInSpy).not.toHaveBeenCalled();
+       expect(downloadSpy)
+           .toHaveBeenCalledWith(
+               'gs://chrome-partner-loadline/archive_phone_20260331.wprgo',
+               'existing-active-token',
+               expect.any(Function),
+           );
+       expect(downloadErrEl.style.display).toBe('none');
+       expect(downloadErrEl.innerText).toBe('');
+
+       clearAuthSession();
+       signInSpy.mockRestore();
+       downloadSpy.mockRestore();
+       getCachedSpy.mockRestore();
+     });
+
+  it('queries installed browsers and versions from the device via ADB',
+     async () => {
+       document.body.innerHTML = `
+      <select id="simple-browser-select" disabled>
+        <option value="">Connect a device to load browsers...</option>
+      </select>
+    `;
+
+       const {refreshDeviceBrowsers} = await import('../src/main');
+       const encode = (str: string) => new TextEncoder().encode(str);
+       const mockBridge = {
+         isConnected: true,
+         shell: vi.fn(async (cmd: string) => {
+           if (cmd === 'cmd package list packages') {
+             return encode([
+               'package:com.android.settings',
+               'package:com.android.chrome',
+               'package:com.chrome.canary',
+             ].join('\n'));
+           }
+           if (cmd === 'dumpsys package com.android.chrome') {
+             return encode(
+                 '  versionCode=12345\n  versionName=134.0.6998.35\n');
+           }
+           if (cmd === 'dumpsys package com.chrome.canary') {
+             return encode('  versionCode=67890\n  versionName=136.0.7052.2\n');
+           }
+           return encode('');
+         }),
+       } as any;
+
+       const browsers = await refreshDeviceBrowsers(mockBridge);
+       expect(browsers).toHaveLength(2);
+       expect(browsers[0]).toEqual({
+         packageName: 'com.android.chrome',
+         browserArg: 'cdp:chrome',
+         displayName: 'Chrome',
+         versionName: '134.0.6998.35',
+         label: 'Chrome (134.0.6998.35)',
+       });
+       expect(browsers[1]).toEqual({
+         packageName: 'com.chrome.canary',
+         browserArg: 'cdp:chrome-canary',
+         displayName: 'Chrome Canary',
+         versionName: '136.0.7052.2',
+         label: 'Chrome Canary (136.0.7052.2)',
+       });
+
+       const select = document.getElementById(
+                          'simple-browser-select',
+                          ) as HTMLSelectElement;
+       expect(select.disabled).toBe(false);
+       expect(select.options).toHaveLength(2);
+       expect(select.options[0].value).toBe('cdp:chrome');
+       expect(select.options[0].textContent).toBe('Chrome (134.0.6998.35)');
+       expect(select.options[1].value).toBe('cdp:chrome-canary');
+       expect(select.options[1].textContent)
+           .toBe('Chrome Canary (136.0.7052.2)');
+     });
+
+  it('updates repetition progress bar and renders benchmark_score.csv table',
+     async () => {
+       document.body.innerHTML = `
+      <span id="simple-progress-status">Ready to run</span>
+      <span id="simple-progress-percentage">0%</span>
+      <div id="simple-progress-bar" style="width: 0%;"></div>
+      <div id="simple-score-container" style="display: none;">
+        <div id="simple-score-table-wrapper"></div>
+      </div>
+    `;
+
+       const {
+         handleBenchmarkLogProgress,
+         renderBenchmarkScoreTable,
+       } = await import('../src/main');
+
+       handleBenchmarkLogProgress('INFO: RUN 1/50');
+       const statusEl =
+           document.getElementById('simple-progress-status') as HTMLElement;
+       const pctEl =
+           document.getElementById('simple-progress-percentage') as HTMLElement;
+       const barEl =
+           document.getElementById('simple-progress-bar') as HTMLElement;
+
+       expect(statusEl.innerText).toBe('Running repetition 1 of 50...');
+       expect(pctEl.innerText).toBe('0 / 50 (0%)');
+       expect(barEl.style.width).toBe('0%');
+
+       handleBenchmarkLogProgress('INFO: RUN 26/50');
+       expect(statusEl.innerText).toBe('Running repetition 26 of 50...');
+       expect(pctEl.innerText).toBe('25 / 50 (50%)');
+       expect(barEl.style.width).toBe('50%');
+
+       handleBenchmarkLogProgress('INFO: RUNS COMPLETED');
+       expect(statusEl.innerText)
+           .toBe('Analyzing traces & computing scores...');
+       expect(pctEl.innerText).toBe('50 / 50 (100%)');
+       expect(barEl.style.width).toBe('100%');
+
+       const sampleCsv = [
+         'benchmark,score',
+         'TOTAL_SCORE,92.45',
+         'amazon_product,88.10',
+         'cnn_article,96.80',
+       ].join('\n');
+
+       renderBenchmarkScoreTable(sampleCsv);
+
+       const container =
+           document.getElementById('simple-score-container') as HTMLElement;
+       const table = document.getElementById(
+                         'benchmark-score-table',
+                         ) as HTMLTableElement;
+       expect(container.style.display).toBe('block');
+       expect(table).not.toBeNull();
+
+       const headers = Array.from(table.querySelectorAll('thead th'))
+                           .map((th) => th.textContent);
+       expect(headers).toEqual(['benchmark', 'score']);
+
+       const bodyRows = Array.from(table.querySelectorAll('tbody tr'));
+       expect(bodyRows).toHaveLength(3);
+       expect(bodyRows[0].className).toBe('score-total-row');
+       expect(Array.from(bodyRows[0].querySelectorAll('td'))
+                  .map((td) => td.textContent))
+           .toEqual(['TOTAL_SCORE', '92.45']);
+       expect(Array.from(bodyRows[1].querySelectorAll('td'))
+                  .map((td) => td.textContent))
+           .toEqual(['amazon_product', '88.10']);
+     });
+
+  it('synchronizes Standard Mode selections into Manual Mode inputs',
+     async () => {
+       document.body.innerHTML = `
+      <select id="simple-benchmark-variant">
+        <option value="loadline2-phone" selected>loadline2-phone</option>
+        <option value="loadline2-tablet">loadline2-tablet</option>
+      </select>
+      <select id="simple-browser-select">
+        <option value="cdp:chrome" selected>Chrome (134.0)</option>
+        <option value="cdp:chrome-beta">Chrome Beta (135.0)</option>
+      </select>
+      <select id="simple-repetitions-select">
+        <option value="50" selected>50</option>
+        <option value="10">10 (lower confidence)</option>
+      </select>
+      <input
+        id="target-archive-input"
+        value="gs://chrome-partner-loadline/archive_phone_20260331.wprgo" />
+      <input
+        id="benchmark-cmd"
+        value="loadline2-phone --browser cdp:chrome --repeat 50" />
+      <button id="btn-run-benchmark">Clear Data and Run Benchmark</button>
+    `;
+
+       const {
+         setupAuthUIEventListeners,
+         setupBenchmarkEventListeners,
+       } = await import('../src/main');
+       const mockBridge = {isConnected: false, serial: null} as any;
+
+       setupAuthUIEventListeners();
+       setupBenchmarkEventListeners(mockBridge);
+
+       const variantSelect = document.getElementById(
+                                 'simple-benchmark-variant',
+                                 ) as HTMLSelectElement;
+       const browserSelect = document.getElementById(
+                                 'simple-browser-select',
+                                 ) as HTMLSelectElement;
+       const repetitionsSelect = document.getElementById(
+                                     'simple-repetitions-select',
+                                     ) as HTMLSelectElement;
+       const archiveInput =
+           document.getElementById('target-archive-input') as HTMLInputElement;
+       const cmdInput =
+           document.getElementById('benchmark-cmd') as HTMLInputElement;
+
+       // Change variant to tablet
+       variantSelect.value = 'loadline2-tablet';
+       variantSelect.dispatchEvent(new Event('change'));
+       expect(archiveInput.value)
+           .toBe('gs://chrome-partner-loadline/archive_tablet_20250918.wprgo');
+       expect(cmdInput.value)
+           .toBe('loadline2-tablet --browser cdp:chrome --repeat 50');
+
+       // Change browser to Chrome Beta
+       browserSelect.value = 'cdp:chrome-beta';
+       browserSelect.dispatchEvent(new Event('change'));
+       expect(cmdInput.value)
+           .toBe('loadline2-tablet --browser cdp:chrome-beta --repeat 50');
+
+       // Change repetitions to 10
+       repetitionsSelect.value = '10';
+       repetitionsSelect.dispatchEvent(new Event('change'));
+       expect(cmdInput.value)
+           .toBe('loadline2-tablet --browser cdp:chrome-beta --repeat 10');
      });
 });

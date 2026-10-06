@@ -227,6 +227,33 @@ describe('PyodideWorkerClient', () => {
        expect(zip).toEqual(expectedBytes);
      });
 
+  it('fetches benchmark_score.csv via worker request and returns string',
+     async () => {
+       const mockWorker = {
+         postMessage: vi.fn(),
+         addEventListener: vi.fn(),
+         removeEventListener: vi.fn(),
+         onmessage: null as any,
+       };
+       const client = new PyodideWorkerClient(mockWorker as any, vi.fn());
+       const expectedCsv = 'benchmark,score\nTOTAL_SCORE,95.2\n';
+
+       mockWorker.postMessage = vi.fn().mockImplementation((req: any) => {
+         if (req.type === 'GET_BENCHMARK_SCORE_CSV') {
+           mockWorker.onmessage({
+             data: {
+               type: 'GET_BENCHMARK_SCORE_CSV_DONE',
+               id: req.id,
+               result: expectedCsv,
+             },
+           });
+         }
+       });
+
+       const csv = await client.getBenchmarkScoreCsv('/results/run1');
+       expect(csv).toBe(expectedCsv);
+     });
+
   it('throws error in exportResultsZip when response is invalid', async () => {
     const mockWorker = {
       postMessage: vi.fn(),

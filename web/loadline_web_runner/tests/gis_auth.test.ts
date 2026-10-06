@@ -350,6 +350,77 @@ describe('Google Identity Services (GIS) OAuth 2.0 Auth', () => {
             );
         expect(mockPopup.close).toHaveBeenCalled();
       });
+
+      it('reuses existing valid session without opening popup', async () => {
+        const existingSession: GisAuthSession = {
+          accessToken: 'mock_token_already_authenticated',
+          tokenType: 'Bearer',
+          expiresAt: Date.now() + 3600 * 1000,
+          scope: DEFAULT_GCS_READONLY_SCOPE,
+          userEmail: 'existing@google.com',
+        };
+        setStoredAuthSession(existingSession);
+        const openSpy = vi.spyOn(window, 'open');
+
+        const session = await authManager.signIn();
+        expect(session.accessToken).toBe('mock_token_already_authenticated');
+        expect(openSpy).not.toHaveBeenCalled();
+      });
+
+      it('waits for BroadcastChannel completion when COOP severs popup',
+         async () => {
+           const originalIsolated = window.crossOriginIsolated;
+           Object.defineProperty(window, 'crossOriginIsolated', {
+             value: true,
+             configurable: true,
+             writable: true,
+           });
+
+           // Simulate COOP severing the popup reference immediately (closed =
+           // true)
+           const mockPopup = {
+             closed: true,
+             close: vi.fn(),
+           } as any;
+           vi.spyOn(window, 'open').mockReturnValue(mockPopup);
+
+           const mockSession: GisAuthSession = {
+             accessToken: 'mock_token_coop_isolated_success',
+             tokenType: 'Bearer',
+             expiresAt: Date.now() + 3600 * 1000,
+             scope: DEFAULT_GCS_READONLY_SCOPE,
+             userEmail: 'coop@google.com',
+           };
+
+           vi.useFakeTimers();
+           try {
+             const signInPromise = authManager.signIn();
+
+             // Advance past the old 1.1s premature close timeout; promise must
+             // still be pending while user completes sign-in in the popup.
+             await vi.advanceTimersByTimeAsync(2500);
+
+             const channel = new BroadcastChannel('crossbench_gis_auth');
+             channel.postMessage({
+               type: 'GIS_AUTH_SUCCESS',
+               session: mockSession,
+             });
+             channel.close();
+
+             const session = await signInPromise;
+             expect(session.accessToken)
+                 .toBe('mock_token_coop_isolated_success');
+             expect(getStoredAuthSession()?.accessToken)
+                 .toBe('mock_token_coop_isolated_success');
+           } finally {
+             vi.useRealTimers();
+             Object.defineProperty(window, 'crossOriginIsolated', {
+               value: originalIsolated,
+               configurable: true,
+               writable: true,
+             });
+           }
+         });
     });
 
     it('signs out and revokes active token', async () => {

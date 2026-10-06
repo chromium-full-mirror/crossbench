@@ -17,7 +17,7 @@ export type LogHandler = (message: string, level?: LogLevel) => void;
 
 export interface PyodideWorkerRequest {
   type:|'INIT'|'MOUNT_FILES'|'MOUNT_BINARY_FILE'|'RUN_SCRIPT'|'RUN_BENCHMARK'|
-      'EXPORT_RESULTS_ZIP'|'SET_INTERRUPT_BUFFER';
+      'EXPORT_RESULTS_ZIP'|'GET_BENCHMARK_SCORE_CSV'|'SET_INTERRUPT_BUFFER';
   id?: number;
   files?: Record<string, string>;
   binaryPath?: string;
@@ -31,8 +31,8 @@ export interface PyodideWorkerRequest {
 
 export interface PyodideWorkerResponse {
   type:|'INIT_DONE'|'MOUNT_DONE'|'MOUNT_BINARY_FILE_DONE'|'SCRIPT_DONE'|
-      'BENCHMARK_DONE'|'EXPORT_RESULTS_ZIP_DONE'|'INTERRUPT_DONE'|'ERROR'|'LOG'|
-      'ADB_CALL'|'SYNC_RPC_REQUEST';
+      'BENCHMARK_DONE'|'EXPORT_RESULTS_ZIP_DONE'|'GET_BENCHMARK_SCORE_CSV_DONE'|
+      'INTERRUPT_DONE'|'ERROR'|'LOG'|'ADB_CALL'|'SYNC_RPC_REQUEST';
   id?: number;
   result?: any;
   zipBytes?: Uint8Array;
@@ -478,6 +478,43 @@ _cb_zip_results(${escapedRunDir})
     }
     throw new Error(
         `Failed to export results zip: unexpected result type ${typeof res}`);
+  }
+
+  async getBenchmarkScoreCsv(runDir?: string): Promise<string> {
+    if (!this.pyodide) {
+      throw new Error('Pyodide not initialized');
+    }
+    const escapedRunDir = runDir ? JSON.stringify(runDir) : 'None';
+    const pyScript = `
+import os
+
+def _cb_get_score_csv(target_dir):
+    if not target_dir or target_dir == "None":
+        if not os.path.exists("/results"):
+            return ""
+        entries = [os.path.join("/results", d) for d in os.listdir("/results")]
+        dirs = [d for d in entries if os.path.isdir(d)]
+        if dirs:
+            target_dir = max(dirs, key=os.path.getmtime)
+        else:
+            target_dir = "/results"
+    if not os.path.exists(target_dir):
+        return ""
+    direct_path = os.path.join(target_dir, "benchmark_score.csv")
+    if os.path.isfile(direct_path):
+        with open(direct_path, "r", encoding="utf-8") as f:
+            return f.read()
+    for root, _, files in os.walk(target_dir):
+        if "benchmark_score.csv" in files:
+            full_path = os.path.join(root, "benchmark_score.csv")
+            with open(full_path, "r", encoding="utf-8") as f:
+                return f.read()
+    return ""
+
+_cb_get_score_csv(${escapedRunDir})
+`;
+    const res = await this.pyodide.runPythonAsync(pyScript);
+    return typeof res === 'string' ? res : String(res ?? '');
   }
 
   getFS(): any {

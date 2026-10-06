@@ -176,6 +176,11 @@ export class PyodideWorkerClient {
         `got ${typeof res}`);
   }
 
+  async getBenchmarkScoreCsv(runDir?: string): Promise<string> {
+    const res = await this.sendRequest('GET_BENCHMARK_SCORE_CSV', {runDir});
+    return typeof res === 'string' ? res : '';
+  }
+
   async mountBinaryFile(path: string, data: Uint8Array): Promise<void> {
     await this.sendRequest('MOUNT_BINARY_FILE', {
       binaryPath: path,

@@ -7,14 +7,14 @@
  * Point.
  */
 
-import {setupAuthUIEventListeners, startGcsUpdateInterval, updateGcsUI,} from './auth_ui';
-import {setupBenchmarkEventListeners} from './benchmark_controller';
+import {setupAuthUIEventListeners, startGcsUpdateInterval, syncSimpleChoicesToDevInputs, updateGcsUI,} from './auth_ui';
+import {refreshDeviceBrowsers, setupBenchmarkEventListeners,} from './benchmark_controller';
 import {isTestEnvironment, log, setInitializing, setupUIEventListeners, updateUI,} from './ui_state';
 import {isWebUsbSupported, WebAdbBridge} from './webadb_bridge';
 
 export * from './ui_state';
 export * from './benchmark_controller';
-export {type Logger, type LogLevel, getTargetArchiveUrl, setupAuthUIEventListeners, setAuthLogger, startGcsUpdateInterval, stopGcsUpdateInterval, updateGcsUI,} from './auth_ui';
+export {type Logger, type LogLevel, getArchiveUrlForVariant, getTargetArchiveUrl, setDownloadError, setupAuthUIEventListeners, setAuthLogger, SIMPLE_VARIANT_STORAGE_KEY, startGcsUpdateInterval, stopGcsUpdateInterval, syncSimpleChoicesToDevInputs, updateGcsUI,} from './auth_ui';
 
 // Global state instance
 export const webAdbBridge = new WebAdbBridge();
@@ -50,6 +50,7 @@ export function setupDeviceEventListeners(): void {
         log(`Successfully connected to Android device (${webAdbBridge.serial})`,
             'success');
         updateUI(true, webAdbBridge.serial);
+        await refreshDeviceBrowsers(webAdbBridge);
       } catch (err: any) {
         const errorMsg = `Connection failed: ${err?.message || err}. `;
         log(errorMsg, 'error');
@@ -79,7 +80,12 @@ export async function initApp(): Promise<void> {
     setupDeviceEventListeners();
     setupAuthUIEventListeners();
     setupBenchmarkEventListeners(webAdbBridge);
-    setupUIEventListeners();
+    setupUIEventListeners((mode) => {
+      if (mode === 'developer') {
+        syncSimpleChoicesToDevInputs();
+      }
+      updateGcsUI();
+    });
 
     await updateGcsUI();
     if (isWebUsbSupported()) {
@@ -97,6 +103,9 @@ export async function initApp(): Promise<void> {
   } finally {
     setInitializing(false);
     updateUI(webAdbBridge.isConnected, webAdbBridge.serial);
+    if (webAdbBridge.isConnected) {
+      await refreshDeviceBrowsers(webAdbBridge);
+    }
   }
 }
 

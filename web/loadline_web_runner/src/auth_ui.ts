@@ -8,10 +8,20 @@
 
 import {type CachedGcsArchive, clearStoredAccessToken, deleteCachedGcsArchive, downloadGcsArchive, getCachedGcsArchive, getManualAccessToken, getStoredAccessToken, setStoredAccessToken, TARGET_GCS_ARCHIVE_URL,} from './gcs_cache';
 import {getStoredAuthSession, gisAuthManager, isSessionExpired,} from './gis_auth';
-import {log as uiLog} from './ui_state';
+import {getRunnerMode, log as uiLog, updateDownloadProgressBar} from './ui_state';
+
+const loadlineNetworkConfigs =
+    import.meta.glob(
+        '../../../config/benchmark/loadline2/network_config_*.hjson', {
+          query: '?raw',
+          import: 'default',
+          eager: true,
+        }) as Record<string, string>;
 
 export type LogLevel = 'info'|'warn'|'error'|'success';
 export type Logger = (message: string, level?: LogLevel) => void;
+
+export const SIMPLE_VARIANT_STORAGE_KEY = 'crossbench_simple_variant';
 
 let authLogger: Logger|null = null;
 
@@ -38,7 +48,105 @@ export function log(message: string, level: LogLevel = 'info'): void {
   }
 }
 
+export function setDownloadError(errorMessage: string|null): void {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  const errorIds = ['simple-download-error', 'download-error'];
+  for (const id of errorIds) {
+    const el = document.getElementById(id) as HTMLElement | null;
+    if (!el) {
+      continue;
+    }
+    if (errorMessage) {
+      el.innerText = errorMessage;
+      el.style.display = 'block';
+    } else {
+      el.innerText = '';
+      el.style.display = 'none';
+    }
+  }
+}
+
+export function getArchiveUrlForVariant(variant: string): string {
+  const suffix = variant === 'loadline2-tablet' ?
+      'network_config_tablet.hjson' :
+      'network_config_phone.hjson';
+  for (const [path, content] of Object.entries(loadlineNetworkConfigs)) {
+    if (path.endsWith(suffix)) {
+      const match = content.match(/"url"\s*:\s*"(gs:\/\/[^"]+)"/);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    }
+  }
+  return TARGET_GCS_ARCHIVE_URL;
+}
+
+export function syncSimpleChoicesToDevInputs(): void {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  const simpleVariantSelect = document.getElementById(
+                                  'simple-benchmark-variant',
+                                  ) as HTMLSelectElement |
+      null;
+  const simpleBrowserSelect = document.getElementById(
+                                  'simple-browser-select',
+                                  ) as HTMLSelectElement |
+      null;
+  const simpleRepetitionsSelect = document.getElementById(
+                                      'simple-repetitions-select',
+                                      ) as HTMLSelectElement |
+      null;
+  if (!simpleVariantSelect && !simpleBrowserSelect &&
+      !simpleRepetitionsSelect) {
+    return;
+  }
+
+  const variant = simpleVariantSelect?.value || 'loadline2-phone';
+  const browser = simpleBrowserSelect?.value || 'cdp:chrome';
+  const repetitions = simpleRepetitionsSelect?.value || '50';
+
+  const targetArchiveInput = document.getElementById(
+                                 'target-archive-input',
+                                 ) as HTMLInputElement |
+      null;
+  if (targetArchiveInput && simpleVariantSelect) {
+    const archiveUrl = getArchiveUrlForVariant(variant);
+    targetArchiveInput.value = archiveUrl;
+    try {
+      localStorage.setItem('crossbench_target_archive_url', archiveUrl);
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  const benchmarkCmdInput = document.getElementById(
+                                'benchmark-cmd',
+                                ) as HTMLInputElement |
+      null;
+  if (benchmarkCmdInput) {
+    const cmd = `${variant} --browser ${browser} --repeat ${repetitions}`;
+    benchmarkCmdInput.value = cmd;
+    try {
+      localStorage.setItem('crossbench_benchmark_cmd', cmd);
+    } catch {
+      // Ignore storage errors
+    }
+  }
+}
+
 export function getTargetArchiveUrl(): string {
+  if (getRunnerMode() === 'simple') {
+    const variantSelect = document.getElementById(
+                              'simple-benchmark-variant',
+                              ) as HTMLSelectElement |
+        null;
+    if (variantSelect && variantSelect.value) {
+      return getArchiveUrlForVariant(variantSelect.value);
+    }
+  }
   const input = document.getElementById(
                     'target-archive-input',
                     ) as HTMLInputElement |
@@ -117,6 +225,23 @@ export async function updateGcsUI(): Promise<CachedGcsArchive|null> {
 
   const targetUrl = getTargetArchiveUrl();
   const cached = await getCachedGcsArchive(targetUrl);
+  const isCached = Boolean(cached && cached.data && cached.data.length > 0);
+
+  const simpleArchiveReady = document.getElementById(
+                                 'simple-archive-ready',
+                                 ) as HTMLElement |
+      null;
+  const simpleArchiveMissing = document.getElementById(
+                                   'simple-archive-missing',
+                                   ) as HTMLElement |
+      null;
+  if (simpleArchiveReady) {
+    simpleArchiveReady.style.display = isCached ? 'block' : 'none';
+  }
+  if (simpleArchiveMissing) {
+    simpleArchiveMissing.style.display = isCached ? 'none' : 'block';
+  }
+
   const cacheBadge = document.getElementById(
                          'cache-status',
                          ) as HTMLElement |
@@ -131,7 +256,7 @@ export async function updateGcsUI(): Promise<CachedGcsArchive|null> {
       null;
 
   if (cacheBadge) {
-    if (cached && cached.data && cached.data.length > 0) {
+    if (isCached && cached) {
       const mb = (cached.size / (1024 * 1024)).toFixed(1);
       cacheBadge.innerText = `Cached (${mb} MB)`;
       cacheBadge.className = 'status-badge connected';
@@ -200,13 +325,46 @@ export function setupAuthUIEventListeners(): void {
     });
   }
 
+  const simpleVariantSelect = document.getElementById(
+                                  'simple-benchmark-variant',
+                                  ) as HTMLSelectElement |
+      null;
+  if (simpleVariantSelect) {
+    try {
+      const savedVariant = localStorage.getItem(SIMPLE_VARIANT_STORAGE_KEY);
+      if (savedVariant === 'loadline2-phone' ||
+          savedVariant === 'loadline2-tablet') {
+        simpleVariantSelect.value = savedVariant;
+      }
+    } catch {
+      // Ignore storage errors
+    }
+    simpleVariantSelect.addEventListener('change', () => {
+      try {
+        localStorage.setItem(
+            SIMPLE_VARIANT_STORAGE_KEY, simpleVariantSelect.value);
+      } catch {
+        // Ignore storage errors
+      }
+      setDownloadError(null);
+      syncSimpleChoicesToDevInputs();
+      updateGcsUI();
+    });
+  }
+
   const targetArchiveInput = document.getElementById(
                                  'target-archive-input',
                                  ) as HTMLInputElement |
       null;
   if (targetArchiveInput) {
-    targetArchiveInput.addEventListener('input', () => updateGcsUI());
-    targetArchiveInput.addEventListener('change', () => updateGcsUI());
+    targetArchiveInput.addEventListener('input', () => {
+      setDownloadError(null);
+      updateGcsUI();
+    });
+    targetArchiveInput.addEventListener('change', () => {
+      setDownloadError(null);
+      updateGcsUI();
+    });
   }
 
   const btnGisSignIn = document.getElementById(
@@ -326,6 +484,10 @@ export function setupAuthUIEventListeners(): void {
                                  'btn-download-archive',
                                  ) as HTMLButtonElement |
       null;
+  const btnSimpleDownloadArchive = document.getElementById(
+                                       'btn-simple-download-archive',
+                                       ) as HTMLButtonElement |
+      null;
   const downloadProgressContainer = document.getElementById(
                                         'download-progress-container',
                                         ) as HTMLElement |
@@ -334,17 +496,91 @@ export function setupAuthUIEventListeners(): void {
                                  'download-status-text',
                                  ) as HTMLElement |
       null;
-  const downloadPercentage = document.getElementById(
-                                 'download-percentage',
-                                 ) as HTMLElement |
-      null;
-  const downloadProgressBar = document.getElementById(
-                                  'download-progress-bar',
-                                  ) as HTMLElement |
-      null;
+
+  const runArchiveDownload = async (
+      targetUrl: string, token: string, triggerBtn: HTMLButtonElement) => {
+    setDownloadError(null);
+    triggerBtn.disabled = true;
+    if (btnSaveToken) {
+      btnSaveToken.disabled = true;
+    }
+    if (downloadProgressContainer) {
+      downloadProgressContainer.style.display = 'block';
+    }
+
+    try {
+      log(`[GCS] Fetching metadata for ${targetUrl}...`);
+      if (downloadStatusText) {
+        downloadStatusText.innerText = 'Connecting to GCS...';
+      }
+
+      const cached =
+          await downloadGcsArchive(targetUrl, token, (loaded, total) => {
+            updateDownloadProgressBar(loaded, total, 'Downloading');
+          });
+
+      const mb = (cached.size / (1024 * 1024)).toFixed(1);
+      log(
+          `[GCS] Successfully downloaded and cached ${cached.filename} (${
+              mb} MB).`,
+          'success',
+      );
+      setDownloadError(null);
+      await updateGcsUI();
+    } catch (err: any) {
+      const errDetail = err?.message || String(err);
+      log(`[GCS Error] Download failed: ${errDetail}`, 'error');
+      let uiErrorMsg = `Download failed: ${errDetail}`;
+      const session = getStoredAuthSession();
+      if (session && isSessionExpired(session)) {
+        const expiredNote =
+            'Your OAuth token has expired. Click "Renew Session" or ' +
+            '"Sign in with Google" to refresh.';
+        log(expiredNote, 'warn');
+        uiErrorMsg += ` ${expiredNote}`;
+      }
+      setDownloadError(uiErrorMsg);
+    } finally {
+      triggerBtn.disabled = false;
+      if (btnSaveToken) {
+        btnSaveToken.disabled = false;
+      }
+      setTimeout(() => {
+        if (downloadProgressContainer) {
+          downloadProgressContainer.style.display = 'none';
+        }
+      }, 3000);
+    }
+  };
+
+  if (btnSimpleDownloadArchive) {
+    btnSimpleDownloadArchive.addEventListener('click', async () => {
+      setDownloadError(null);
+      const targetUrl = getTargetArchiveUrl();
+      let token = (gcsTokenInput?.value || getStoredAccessToken()).trim();
+      if (!token) {
+        btnSimpleDownloadArchive.disabled = true;
+        try {
+          log('Prompting for Google authorization to download archive...');
+          const session = await gisAuthManager.signIn();
+          token = session.accessToken;
+          await updateGcsUI();
+        } catch (authErr: any) {
+          const errDetail =
+              authErr?.message || 'Authorization cancelled or failed.';
+          log(`Cannot download archive: ${errDetail}`, 'error');
+          setDownloadError(`Download failed: ${errDetail}`);
+          btnSimpleDownloadArchive.disabled = false;
+          return;
+        }
+      }
+      await runArchiveDownload(targetUrl, token, btnSimpleDownloadArchive);
+    });
+  }
 
   if (btnDownloadArchive) {
     btnDownloadArchive.addEventListener('click', async () => {
+      setDownloadError(null);
       const targetUrl = getTargetArchiveUrl();
       let token = (gcsTokenInput?.value || getStoredAccessToken()).trim();
       if (!token) {
@@ -354,80 +590,14 @@ export function setupAuthUIEventListeners(): void {
           token = session.accessToken;
           await updateGcsUI();
         } catch (authErr: any) {
-          log(
-              `Cannot download archive: ${
-                  authErr?.message || 'No GCP access token provided.'}`,
-              'error',
-          );
+          const errDetail = authErr?.message || 'No GCP access token provided.';
+          log(`Cannot download archive: ${errDetail}`, 'error');
+          setDownloadError(`Download failed: ${errDetail}`);
           gcsTokenInput?.focus();
           return;
         }
       }
-
-      btnDownloadArchive.disabled = true;
-      if (btnSaveToken)
-        btnSaveToken.disabled = true;
-      if (downloadProgressContainer) {
-        downloadProgressContainer.style.display = 'block';
-      }
-
-      try {
-        log(`[GCS] Fetching metadata for ${targetUrl}...`);
-        if (downloadStatusText) {
-          downloadStatusText.innerText = 'Connecting to GCS...';
-        }
-
-        const cached =
-            await downloadGcsArchive(targetUrl, token, (loaded, total) => {
-              if (total > 0) {
-                const pct = Math.min(100, Math.round((loaded / total) * 100));
-                const loadedMb = (loaded / (1024 * 1024)).toFixed(1);
-                const totalMb = (total / (1024 * 1024)).toFixed(1);
-                if (downloadStatusText) {
-                  downloadStatusText.innerText =
-                      `Downloading: ${loadedMb} MB / ${totalMb} MB (${pct}%)`;
-                }
-                if (downloadPercentage)
-                  downloadPercentage.innerText = `${pct}%`;
-                if (downloadProgressBar) {
-                  downloadProgressBar.style.width = `${pct}%`;
-                }
-              } else {
-                const loadedMb = (loaded / (1024 * 1024)).toFixed(1);
-                if (downloadStatusText) {
-                  downloadStatusText.innerText =
-                      `Downloading: ${loadedMb} MB...`;
-                }
-              }
-            });
-
-        const mb = (cached.size / (1024 * 1024)).toFixed(1);
-        log(
-            `[GCS] Successfully downloaded and cached ${cached.filename} (${
-                mb} MB).`,
-            'success',
-        );
-        await updateGcsUI();
-      } catch (err: any) {
-        log(`[GCS Error] Download failed: ${err?.message || err}`, 'error');
-        const session = getStoredAuthSession();
-        if (session && isSessionExpired(session)) {
-          log(
-              'Your OAuth token has expired. Click "Renew Session" or ' +
-                  '"Sign in with Google" to refresh.',
-              'warn',
-          );
-        }
-      } finally {
-        btnDownloadArchive.disabled = false;
-        if (btnSaveToken)
-          btnSaveToken.disabled = false;
-        setTimeout(() => {
-          if (downloadProgressContainer) {
-            downloadProgressContainer.style.display = 'none';
-          }
-        }, 3000);
-      }
+      await runArchiveDownload(targetUrl, token, btnDownloadArchive);
     });
   }
 

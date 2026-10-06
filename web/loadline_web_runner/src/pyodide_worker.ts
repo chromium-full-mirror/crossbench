@@ -95,6 +95,13 @@ if (typeof self !== 'undefined' && typeof Window === 'undefined' &&
           result: zipBytes,
           zipBytes,
         } satisfies PyodideWorkerResponse);
+      } else if (type === 'GET_BENCHMARK_SCORE_CSV') {
+        const csvText = await runner.getBenchmarkScoreCsv(runDir);
+        self.postMessage({
+          type: 'GET_BENCHMARK_SCORE_CSV_DONE',
+          id,
+          result: csvText,
+        } satisfies PyodideWorkerResponse);
       } else {
         throw new Error(`Unknown worker request type: ${type}`);
       }

@@ -119,6 +119,7 @@
       const btnSignin = document.getElementById('btn-signin');
 
       let tokenClient = null;
+      let authCompleted = false;
 
       function getBroadcastChannel() {
         try {
@@ -131,7 +132,52 @@
         return null;
       }
 
+      const lifecycleChannel = getBroadcastChannel();
+      if (lifecycleChannel) {
+        lifecycleChannel.onmessage = (event) => {
+          if (event.data?.type === 'GIS_AUTH_CLOSE_POPUP') {
+            authCompleted = true;
+            window.close();
+          }
+        };
+      }
+
+      function notifyPopupOpened() {
+        try {
+          localStorage.setItem('crossbench_gis_auth_broadcast', JSON.stringify({
+            type: 'GIS_AUTH_POPUP_OPENED',
+            timestamp: Date.now(),
+          }));
+        } catch (e) {}
+        if (lifecycleChannel) {
+          try {
+            lifecycleChannel.postMessage({ type: 'GIS_AUTH_POPUP_OPENED' });
+          } catch (e) {}
+        }
+      }
+
+      function notifyWindowClosed() {
+        if (authCompleted) return;
+        try {
+          localStorage.setItem('crossbench_gis_auth_broadcast', JSON.stringify({
+            type: 'GIS_AUTH_WINDOW_CLOSED',
+            timestamp: Date.now(),
+          }));
+        } catch (e) {}
+        if (lifecycleChannel) {
+          try {
+            lifecycleChannel.postMessage({ type: 'GIS_AUTH_WINDOW_CLOSED' });
+            lifecycleChannel.close();
+          } catch (e) {}
+        }
+      }
+
+      notifyPopupOpened();
+      window.addEventListener('pagehide', notifyWindowClosed);
+      window.addEventListener('beforeunload', notifyWindowClosed);
+
       function notifySuccess(session) {
+        authCompleted = true;
         // 1. Save directly to localStorage for cross-tab sharing
         try {
           localStorage.setItem(GIS_SESSION_STORAGE_KEY, JSON.stringify(session));
@@ -145,7 +191,7 @@
         }
 
         // 2. Broadcast via BroadcastChannel
-        const channel = getBroadcastChannel();
+        const channel = lifecycleChannel || getBroadcastChannel();
         if (channel) {
           try {
             channel.postMessage({ type: 'GIS_AUTH_SUCCESS', session });

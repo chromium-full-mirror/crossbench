@@ -301,6 +301,13 @@ export class GisAuthManager {
   public async signIn(
       options?: {prompt?: string; hint?: string; direct?: boolean;}):
       Promise<GisAuthSession> {
+    if (!options?.prompt && !options?.direct) {
+      const existingSession = getStoredAuthSession();
+      if (existingSession && !isSessionExpired(existingSession)) {
+        return existingSession;
+      }
+    }
+
     const isBrowser = typeof window !== 'undefined' &&
         typeof window.open === 'function' &&
         typeof window.location !== 'undefined' && Boolean(window.location.href);
@@ -313,6 +320,20 @@ export class GisAuthManager {
         let pollTimer: ReturnType<typeof setInterval>|null = null;
         let closedTimer: ReturnType<typeof setTimeout>|null = null;
         let broadcastChannel: BroadcastChannel|null = null;
+        let popupReportedOpen = Boolean(window.crossOriginIsolated);
+        const initialSession = getStoredAuthSession();
+
+        const isNewOrUpdatedSession =
+            (session: GisAuthSession|null): session is GisAuthSession => {
+              if (!session || isSessionExpired(session)) {
+                return false;
+              }
+              if (!initialSession) {
+                return true;
+              }
+              return session.accessToken !== initialSession.accessToken ||
+                  session.expiresAt !== initialSession.expiresAt;
+            };
 
         const cleanup = () => {
           if (timer) {
@@ -329,6 +350,7 @@ export class GisAuthManager {
           }
           if (broadcastChannel) {
             try {
+              broadcastChannel.postMessage({type: 'GIS_AUTH_CLOSE_POPUP'});
               broadcastChannel.close();
             } catch (err) {
               console.warn('Failed to close BroadcastChannel:', err);
@@ -368,6 +390,34 @@ export class GisAuthManager {
           reject(new Error(`Google Sign-In failed: ${errMsg}`));
         };
 
+        const scheduleWindowClosedCheck = () => {
+          if (closedTimer) {
+            clearTimeout(closedTimer);
+          }
+          closedTimer = setTimeout(() => {
+            if (!isResolved) {
+              const storedSession = getStoredAuthSession();
+              if (isNewOrUpdatedSession(storedSession)) {
+                handleSuccess(storedSession);
+              } else {
+                handleError('Sign-in window was closed by user.');
+              }
+            }
+          }, 600);
+        };
+
+        const markPopupOpen = () => {
+          popupReportedOpen = true;
+          if (timer) {
+            clearInterval(timer);
+            timer = null;
+          }
+          if (closedTimer) {
+            clearTimeout(closedTimer);
+            closedTimer = null;
+          }
+        };
+
         if (typeof BroadcastChannel !== 'undefined') {
           try {
             broadcastChannel = new BroadcastChannel('crossbench_gis_auth');
@@ -375,6 +425,10 @@ export class GisAuthManager {
               if (event.data?.type === 'GIS_AUTH_SUCCESS' &&
                   event.data.session) {
                 handleSuccess(event.data.session);
+              } else if (event.data?.type === 'GIS_AUTH_POPUP_OPENED') {
+                markPopupOpen();
+              } else if (event.data?.type === 'GIS_AUTH_WINDOW_CLOSED') {
+                scheduleWindowClosedCheck();
               }
             };
           } catch (err) {
@@ -393,6 +447,10 @@ export class GisAuthManager {
               const data = JSON.parse(e.newValue);
               if (data?.type === 'GIS_AUTH_SUCCESS' && data.session) {
                 handleSuccess(data.session);
+              } else if (data?.type === 'GIS_AUTH_POPUP_OPENED') {
+                markPopupOpen();
+              } else if (data?.type === 'GIS_AUTH_WINDOW_CLOSED') {
+                scheduleWindowClosedCheck();
               } else if (data?.accessToken && data?.expiresAt) {
                 handleSuccess(data as GisAuthSession);
               }
@@ -405,7 +463,7 @@ export class GisAuthManager {
 
         pollTimer = setInterval(() => {
           const session = getStoredAuthSession();
-          if (session && !isSessionExpired(session)) {
+          if (isNewOrUpdatedSession(session)) {
             handleSuccess(session);
           }
         }, 400);
@@ -441,22 +499,20 @@ export class GisAuthManager {
           );
         }
 
-        timer = setInterval(() => {
-          if (authWindow && authWindow.closed) {
-            clearInterval(timer!);
-            timer = null;
-            closedTimer = setTimeout(() => {
-              if (!isResolved) {
-                const storedSession = getStoredAuthSession();
-                if (storedSession && !isSessionExpired(storedSession)) {
-                  handleSuccess(storedSession);
-                } else {
-                  handleError('Sign-in window was closed by user.');
-                }
-              }
-            }, 600);
-          }
-        }, 500);
+        if (!popupReportedOpen) {
+          timer = setInterval(() => {
+            if (popupReportedOpen) {
+              clearInterval(timer!);
+              timer = null;
+              return;
+            }
+            if (authWindow && authWindow.closed) {
+              clearInterval(timer!);
+              timer = null;
+              scheduleWindowClosedCheck();
+            }
+          }, 500);
+        }
       });
     }
 

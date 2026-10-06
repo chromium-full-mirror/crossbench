@@ -7,11 +7,11 @@
  * proxy.
  */
 
-import {getTargetArchiveUrl, updateGcsUI} from './auth_ui';
+import {getTargetArchiveUrl, syncSimpleChoicesToDevInputs, updateGcsUI,} from './auth_ui';
 import {CdpClient} from './cdp_client';
 import {downloadGcsArchive, fetchGcsMetadata, getCachedGcsArchive, getStoredAccessToken, parseGcsUrl,} from './gcs_cache';
 import {PyodideWorkerClient} from './pyodide_worker';
-import {log, setBenchmarkRunning, updateDownloadProgressBar, updateUI,} from './ui_state';
+import {clearBenchmarkScoreTable, getRunnerMode, log, renderBenchmarkScoreTable, setBenchmarkRunning, updateBenchmarkProgressBar, updateDownloadProgressBar, updateUI,} from './ui_state';
 import {getBrowserUpgradePath, WebAdbBridge} from './webadb_bridge';
 
 const crossbenchPyFiles = import.meta.glob(
@@ -94,11 +94,197 @@ export function parseCommandLine(cmdStr: string): string[] {
   return tokens;
 }
 
+export interface DeviceBrowserInfo {
+  packageName: string;
+  browserArg: string;
+  displayName: string;
+  versionName: string;
+  label: string;
+}
+
+export const KNOWN_ANDROID_BROWSERS: ReadonlyArray<
+    {packageName: string; browserArg: string; displayName: string;}> =
+    [
+      {
+        packageName: 'com.android.chrome',
+        browserArg: 'cdp:chrome',
+        displayName: 'Chrome',
+      },
+      {
+        packageName: 'com.chrome.beta',
+        browserArg: 'cdp:chrome-beta',
+        displayName: 'Chrome Beta',
+      },
+      {
+        packageName: 'com.chrome.dev',
+        browserArg: 'cdp:chrome-dev',
+        displayName: 'Chrome Dev',
+      },
+      {
+        packageName: 'com.chrome.canary',
+        browserArg: 'cdp:chrome-canary',
+        displayName: 'Chrome Canary',
+      },
+      {
+        packageName: 'com.google.android.apps.chrome',
+        browserArg: 'cdp:chrome-app',
+        displayName: 'Chrome App',
+      },
+      {
+        packageName: 'org.chromium.chrome',
+        browserArg: 'cdp:chromium',
+        displayName: 'Chromium',
+      },
+    ];
+
+function decodeShellOutput(raw: Uint8Array|string): string {
+  return typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+}
+
+export async function fetchDeviceBrowsers(webAdbBridge: WebAdbBridge):
+    Promise<DeviceBrowserInfo[]> {
+  if (!webAdbBridge.isConnected) {
+    return [];
+  }
+  const packagesRaw =
+      decodeShellOutput(await webAdbBridge.shell('cmd package list packages'));
+  const installedPackages = new Set<string>();
+  for (const line of packagesRaw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('package:')) {
+      installedPackages.add(trimmed.slice('package:'.length).trim());
+    }
+  }
+
+  const browsers: DeviceBrowserInfo[] = [];
+  for (const candidate of KNOWN_ANDROID_BROWSERS) {
+    if (!installedPackages.has(candidate.packageName)) {
+      continue;
+    }
+    let versionName = '';
+    try {
+      const dumpsysOut = decodeShellOutput(
+          await webAdbBridge.shell(`dumpsys package ${candidate.packageName}`));
+      const match = dumpsysOut.match(/versionName=([^\s\r\n]+)/);
+      if (match && match[1]) {
+        versionName = match[1].trim();
+      }
+    } catch {
+      // Fall back to empty versionName if dumpsys fails
+    }
+    const label = versionName ? `${candidate.displayName} (${versionName})` :
+                                candidate.displayName;
+    browsers.push({
+      ...candidate,
+      versionName,
+      label,
+    });
+  }
+  return browsers;
+}
+
+export async function refreshDeviceBrowsers(webAdbBridge: WebAdbBridge):
+    Promise<DeviceBrowserInfo[]> {
+  const select =
+      document.getElementById('simple-browser-select') as HTMLSelectElement |
+      null;
+  if (!webAdbBridge.isConnected) {
+    if (select) {
+      select.innerHTML =
+          '<option value="">Connect a device to load browsers...</option>';
+      select.disabled = true;
+    }
+    return [];
+  }
+
+  if (select) {
+    select.innerHTML =
+        '<option value="">Detecting installed browsers...</option>';
+    select.disabled = true;
+  }
+
+  try {
+    const browsers = await fetchDeviceBrowsers(webAdbBridge);
+    if (select) {
+      select.innerHTML = '';
+      if (browsers.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No supported browsers found on device';
+        select.appendChild(opt);
+        select.disabled = true;
+      } else {
+        for (const b of browsers) {
+          const opt = document.createElement('option');
+          opt.value = b.browserArg;
+          opt.textContent = b.label;
+          select.appendChild(opt);
+        }
+        select.disabled = false;
+        syncSimpleChoicesToDevInputs();
+      }
+    }
+    return browsers;
+  } catch (err: any) {
+    log(`Failed to query installed browsers: ${err?.message || err}`, 'warn');
+    if (select) {
+      select.innerHTML =
+          '<option value="">Failed to query browsers on device</option>';
+      select.disabled = true;
+    }
+    return [];
+  }
+}
+
+export function extractTotalRepetitions(benchmarkArgs: string[]): number {
+  for (let i = 0; i < benchmarkArgs.length; i++) {
+    const arg = benchmarkArgs[i];
+    if ((arg === '--repeat' || arg === '-r') && i + 1 < benchmarkArgs.length) {
+      const parsed = Number.parseInt(benchmarkArgs[i + 1], 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+      }
+    } else if (arg.startsWith('--repeat=')) {
+      const parsed = Number.parseInt(arg.slice('--repeat='.length), 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+  }
+  return 50;
+}
+
 let activeCdpClient: CdpClient|null = null;
 let workerClient: PyodideWorkerClient|null = null;
 let isWorkerInitialized = false;
 let latestResultsZip: Uint8Array|null = null;
 let interruptAttempt = 0;
+let activeTotalRepetitions = 50;
+let completedRepetitions = 0;
+
+export function handleBenchmarkLogProgress(pythonMessage: string): void {
+  const runMatch = pythonMessage.match(/\bRUN\s+(\d+)\/(\d+)\b/);
+  if (runMatch) {
+    const currentRun = Number.parseInt(runMatch[1], 10);
+    const totalRuns = Number.parseInt(runMatch[2], 10);
+    if (Number.isFinite(currentRun) && Number.isFinite(totalRuns) &&
+        totalRuns > 0) {
+      activeTotalRepetitions = totalRuns;
+      completedRepetitions = Math.max(0, currentRun - 1);
+      updateBenchmarkProgressBar(
+          completedRepetitions, activeTotalRepetitions,
+          `Running repetition ${currentRun} of ${totalRuns}...`);
+      return;
+    }
+  }
+  if (pythonMessage.includes('RUNS COMPLETED') ||
+      pythonMessage.includes('MERGING PROBE DATA')) {
+    completedRepetitions = activeTotalRepetitions;
+    updateBenchmarkProgressBar(
+        completedRepetitions, activeTotalRepetitions,
+        'Analyzing traces & computing scores...');
+  }
+}
 
 export function getOrCreateWorkerClient(webAdbBridge: WebAdbBridge):
     PyodideWorkerClient {
@@ -288,6 +474,7 @@ export function getOrCreateWorkerClient(webAdbBridge: WebAdbBridge):
         return '';
       },
       (pythonMessage, level) => {
+        handleBenchmarkLogProgress(pythonMessage);
         const formatted = pythonMessage.startsWith('[Python]') ?
             pythonMessage :
             `[Python] ${pythonMessage}`;
@@ -316,6 +503,16 @@ export function setupBenchmarkEventListeners(webAdbBridge: WebAdbBridge): void {
       null;
   const benchmarkCmdInput =
       document.getElementById('benchmark-cmd') as HTMLInputElement | null;
+  const simpleVariantSelect =
+      document.getElementById('simple-benchmark-variant') as HTMLSelectElement |
+      null;
+  const simpleBrowserSelect =
+      document.getElementById('simple-browser-select') as HTMLSelectElement |
+      null;
+  const simpleRepetitionsSelect =
+      document.getElementById('simple-repetitions-select') as
+          HTMLSelectElement |
+      null;
   const statusBadge =
       document.getElementById('connection-status') as HTMLElement | null;
   const gcsTokenInput =
@@ -337,8 +534,27 @@ export function setupBenchmarkEventListeners(webAdbBridge: WebAdbBridge): void {
     }
   }
 
+  if (simpleVariantSelect) {
+    simpleVariantSelect.addEventListener('change', () => {
+      syncSimpleChoicesToDevInputs();
+    });
+  }
+  if (simpleBrowserSelect) {
+    simpleBrowserSelect.addEventListener('change', () => {
+      syncSimpleChoicesToDevInputs();
+    });
+  }
+  if (simpleRepetitionsSelect) {
+    simpleRepetitionsSelect.addEventListener('change', () => {
+      syncSimpleChoicesToDevInputs();
+    });
+  }
+
   if (btnRunBenchmark) {
     btnRunBenchmark.addEventListener('click', async () => {
+      if (getRunnerMode() === 'simple') {
+        syncSimpleChoicesToDevInputs();
+      }
       if (targetArchiveInput && targetArchiveInput.value.trim()) {
         localStorage.setItem(
             TARGET_ARCHIVE_STORAGE_KEY, targetArchiveInput.value.trim());
@@ -352,12 +568,33 @@ export function setupBenchmarkEventListeners(webAdbBridge: WebAdbBridge): void {
         return;
       }
 
-      const rawCmd = benchmarkCmdInput ? benchmarkCmdInput.value.trim() : '';
-      const benchmarkArgs = parseCommandLine(rawCmd);
-      if (benchmarkArgs.length === 0) {
-        log('Cannot run benchmark: No benchmark arguments provided.', 'error');
-        return;
+      let benchmarkArgs: string[] = [];
+      if (getRunnerMode() === 'simple') {
+        const variant = simpleVariantSelect?.value || 'loadline2-phone';
+        const browser = simpleBrowserSelect?.value || '';
+        const repetitions = simpleRepetitionsSelect?.value || '50';
+        if (!browser) {
+          log('Cannot run benchmark: No browser selected on the device.',
+              'error');
+          return;
+        }
+        benchmarkArgs =
+            [variant, '--browser', browser, '--repeat', repetitions];
+      } else {
+        const rawCmd = benchmarkCmdInput ? benchmarkCmdInput.value.trim() : '';
+        benchmarkArgs = parseCommandLine(rawCmd);
+        if (benchmarkArgs.length === 0) {
+          log('Cannot run benchmark: No benchmark arguments provided.',
+              'error');
+          return;
+        }
       }
+
+      activeTotalRepetitions = extractTotalRepetitions(benchmarkArgs);
+      completedRepetitions = 0;
+      clearBenchmarkScoreTable();
+      updateBenchmarkProgressBar(
+          0, activeTotalRepetitions, 'Preparing benchmark environment...');
 
       btnRunBenchmark.style.display = 'inline-block';
       btnRunBenchmark.disabled = true;
@@ -372,6 +609,12 @@ export function setupBenchmarkEventListeners(webAdbBridge: WebAdbBridge): void {
         btnDownloadResults.style.display = 'none';
       if (benchmarkCmdInput)
         benchmarkCmdInput.disabled = true;
+      if (simpleVariantSelect)
+        simpleVariantSelect.disabled = true;
+      if (simpleBrowserSelect)
+        simpleBrowserSelect.disabled = true;
+      if (simpleRepetitionsSelect)
+        simpleRepetitionsSelect.disabled = true;
       if (statusBadge) {
         statusBadge.innerText = 'Benchmark in Progress...';
         statusBadge.className = 'status-badge tracing';
@@ -494,21 +737,44 @@ export function setupBenchmarkEventListeners(webAdbBridge: WebAdbBridge): void {
 
         log(`Executing Crossbench CLI command: cb.py ${
             benchmarkArgs.join(' ')}`);
+        updateBenchmarkProgressBar(
+            0, activeTotalRepetitions,
+            `Starting benchmark (${activeTotalRepetitions} repetitions)...`);
         const result = await client.sendRequest('RUN_BENCHMARK', {
           benchmarkArgs,
         });
         if (result === 'INTERRUPTED') {
           log('Benchmark execution was stopped / interrupted by user.', 'warn');
+          updateBenchmarkProgressBar(
+              completedRepetitions, activeTotalRepetitions,
+              'Benchmark execution interrupted.');
         } else {
           log('Benchmark execution completed successfully!', 'success');
+          completedRepetitions = activeTotalRepetitions;
+          updateBenchmarkProgressBar(
+              activeTotalRepetitions, activeTotalRepetitions,
+              'Benchmark completed!');
         }
       } catch (err: any) {
         log(`Benchmark execution error: ${err?.message || err}`, 'error');
+        updateBenchmarkProgressBar(
+            completedRepetitions, activeTotalRepetitions,
+            `Benchmark error: ${err?.message || err}`);
       } finally {
         if (client) {
           client.clearInterrupt();
         }
         if (isWorkerInitialized && client) {
+          try {
+            const scoreCsv = await client.getBenchmarkScoreCsv();
+            if (scoreCsv && scoreCsv.trim()) {
+              renderBenchmarkScoreTable(scoreCsv);
+            }
+          } catch (csvErr: any) {
+            log(`Failed to read benchmark_score.csv: ${
+                    csvErr?.message || csvErr}`,
+                'warn');
+          }
           try {
             log('Packaging benchmark results into zip archive...');
             const zipBytes = await client.exportResultsZip();
@@ -540,9 +806,11 @@ export function setupBenchmarkEventListeners(webAdbBridge: WebAdbBridge): void {
         }
         btnRunBenchmark.style.display = 'inline-block';
         btnRunBenchmark.disabled = false;
-        btnRunBenchmark.innerText = 'Run Benchmark';
+        btnRunBenchmark.innerText = 'Clear Data and Run Benchmark';
         if (benchmarkCmdInput)
           benchmarkCmdInput.disabled = false;
+        if (simpleVariantSelect)
+          simpleVariantSelect.disabled = false;
         updateUI(true, webAdbBridge.serial);
       }
     });
