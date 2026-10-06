@@ -21,7 +21,6 @@ from crossbench.action_runner.virtual_device.touchscreen import \
     TouchscreenVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.virtual_device_config import \
     VirtualDeviceConfig
-from crossbench.benchmarks.loading.input_source import InputSource
 from crossbench.benchmarks.loading.point import Point
 from crossbench.plt.evemu_platform_mixin import _INPUT_DRAIN_BUFFER, \
     _INPUT_LEAD_BUFFER, EvemuPlatformMixin
@@ -168,20 +167,6 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
 
     with self.assertRaisesRegex(ValueError, "Unsupported virtual device type"):
       platform.setup_virtual_devices((unsupported_config,))
-
-  def test_get_default_device(self) -> None:
-    platform = MockEvemuPlatform()
-    self.assertIsNone(platform.get_default_device(InputSource.KEYBOARD))
-    self.assertIsNone(platform.get_default_device(InputSource.TOUCH))
-    self.assertIsNone(platform.get_default_device(InputSource.MOUSE))
-    platform.setup_virtual_devices((
-        KeyboardVirtualDeviceConfig(name="kb1"),
-        TouchscreenVirtualDeviceConfig(name="touch1", width=1080, height=2400),
-        MouseVirtualDeviceConfig(name="mouse1", width=1080, height=2400),
-    ))
-    self.assertEqual(platform.get_default_device(InputSource.KEYBOARD), "kb1")
-    self.assertEqual(platform.get_default_device(InputSource.TOUCH), "touch1")
-    self.assertEqual(platform.get_default_device(InputSource.MOUSE), "mouse1")
 
   def test_execute_evemu_script(self) -> None:
     self.platform._execute_evemu_script("test_kb",
@@ -429,6 +414,70 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
     with self.assertRaisesRegex(ValueError,
                                 "Unsupported event type: InputEvent"):
       self.platform.inject_input_events("test_kb", [InputEvent()])
+
+  def test_lazy_init_keyboard_on_demand(self) -> None:
+    platform = MockEvemuPlatform()
+    self.assertEqual(platform._virtual_devices, {})
+
+    with mock.patch("time.monotonic", side_effect=[100.0, 100.5, 101.0]):
+      with self.assertLogs(level="WARNING") as cm:
+        platform.inject_input_events("default_keyboard",
+                                     [KeyEvent("KeyA", is_down=True)])
+      self.assertIn("ActionRunnerConfig", cm.output[0])
+      self.assertIn("default_keyboard", platform._virtual_devices)
+      self.assertEqual(len(platform.popen_calls), 1)
+      platform.mock_proc.stdin.write.assert_called_with(
+          b"E: 0.200000 0001 001e 0001\nE: 0.200000 0000 0000 0000\n")
+
+      # Subsequent injection reuses the initialized default_keyboard.
+      platform.inject_input_events("default_keyboard",
+                                   [KeyEvent("KeyA", is_down=False)])
+      self.assertEqual(len(platform.popen_calls), 1)
+
+  def test_lazy_init_touchscreen_on_demand(self) -> None:
+    platform = MockEvemuPlatform()
+    self.assertEqual(platform._virtual_devices, {})
+
+    platform.inject_input_events("default_touchscreen",
+                                 [TouchEvent(Point(100, 200), is_down=True)])
+    self.assertIn("default_touchscreen", platform._virtual_devices)
+    self.assertEqual(len(platform.popen_calls), 1)
+
+  def test_lazy_init_mouse_on_demand(self) -> None:
+    platform = MockEvemuPlatform()
+    self.assertEqual(platform._virtual_devices, {})
+
+    platform.inject_input_events("default_mouse",
+                                 [MouseMoveEvent(Point(100, 200))])
+    self.assertIn("default_mouse", platform._virtual_devices)
+    self.assertEqual(len(platform.popen_calls), 1)
+
+  def test_lazy_init_missing_device_when_others_configured(self) -> None:
+    platform = MockEvemuPlatform()
+    platform.setup_virtual_devices(
+        (KeyboardVirtualDeviceConfig(name="custom_kb"),))
+    self.assertEqual(list(platform._virtual_devices.keys()), ["custom_kb"])
+
+    # Keyboard events on custom_kb reuse the already-initialized custom_kb.
+    platform.inject_input_events("custom_kb", [KeyEvent("KeyA", is_down=True)])
+    self.assertEqual(list(platform._virtual_devices.keys()), ["custom_kb"])
+    self.assertEqual(len(platform.popen_calls), 1)
+
+    # Touch events on default_touchscreen lazily initialize it from
+    # DEFAULT_VIRTUAL_DEVICES.
+    platform.inject_input_events("default_touchscreen",
+                                 [TouchEvent(Point(100, 200), is_down=True)])
+    self.assertEqual(
+        list(platform._virtual_devices.keys()),
+        ["custom_kb", "default_touchscreen"])
+    self.assertEqual(len(platform.popen_calls), 2)
+
+  def test_inject_uninitialized_custom_device_raises(self) -> None:
+    platform = MockEvemuPlatform()
+    with self.assertRaisesRegex(
+        RuntimeError, "Virtual device 'unknown_device' was not initialized"):
+      platform.inject_input_events("unknown_device",
+                                   [KeyEvent("KeyA", is_down=True)])
 
 
 if __name__ == "__main__":

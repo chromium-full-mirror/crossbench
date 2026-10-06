@@ -98,12 +98,21 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
   def run_action(self, action) -> None:
     action.run_with(self.action_runner)
 
-  def assert_input_events_injected(self,
-                                   expected_events: list[InputEvent],
-                                   expected_device_name: str = "") -> None:
+  def assert_input_events_injected(
+      self,
+      expected_events: list[InputEvent],
+      expected_device_name: str | None = None,
+  ) -> None:
     self.inject_events_mock.assert_called_once()
     actual_device_name = self.inject_events_mock.call_args[0][0]
     actual_events = self.inject_events_mock.call_args[0][1]
+    if expected_device_name is None:
+      if isinstance(expected_events[0], KeyEvent):
+        expected_device_name = "default_keyboard"
+      elif isinstance(expected_events[0], TouchEvent):
+        expected_device_name = "default_touchscreen"
+      else:
+        expected_device_name = "default_mouse"
     self.assertEqual(actual_device_name, expected_device_name)
     self.assertSequenceEqual(actual_events, expected_events)
 
@@ -207,7 +216,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
         expected_device_name="my_custom_keyboard")
 
   def test_click_touch_coordinates_default_duration(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.TOUCH, position=PositionConfig.from_coordinates(x=50, y=60))
     self.run_action(click_action)
 
@@ -218,7 +227,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     ])
 
   def test_click_touch_coordinates_with_duration(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_coordinates(x=50, y=60),
         duration=dt.timedelta(milliseconds=150))
@@ -231,7 +240,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     ])
 
   def test_click_touch_coordinates_with_source_device(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_coordinates(x=50, y=60),
         source_device="my_touch_device")
@@ -245,7 +254,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
                                       expected_device_name="my_touch_device")
 
   def test_click_touch_selector_success(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_selector(
             selector="div#submit", required=True))
@@ -259,7 +268,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     ])
 
   def test_click_touch_selector_with_wait(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_selector(
             selector="div#submit", required=True, wait=True))
@@ -274,7 +283,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     ])
 
   def test_click_touch_selector_non_existent_required_raises(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_selector(
             selector="div#missing", required=True))
@@ -286,7 +295,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     self.inject_events_mock.assert_not_called()
 
   def test_click_touch_selector_non_required_success(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_selector(
             selector="div#missing", required=False))
@@ -296,7 +305,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     self.inject_events_mock.assert_not_called()
 
   def test_click_touch_with_verify(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_coordinates(x=10, y=20),
         verify="#success")
@@ -310,7 +319,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     ])
 
   def test_click_mouse_coordinates_default_duration(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.MOUSE, position=PositionConfig.from_coordinates(x=50, y=60))
     self.run_action(click_action)
 
@@ -322,7 +331,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     ])
 
   def test_click_mouse_coordinates_with_duration(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.MOUSE,
         position=PositionConfig.from_coordinates(x=50, y=60),
         duration=dt.timedelta(milliseconds=150))
@@ -336,7 +345,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     ])
 
   def test_click_mouse_coordinates_with_source_device(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.MOUSE,
         position=PositionConfig.from_coordinates(x=50, y=60),
         source_device="my_mouse_device")
@@ -351,7 +360,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
                                       expected_device_name="my_mouse_device")
 
   def test_click_mouse_selector_success(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.MOUSE,
         position=PositionConfig.from_selector(
             selector="div#submit", required=True))
@@ -366,7 +375,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     ])
 
   def test_click_mouse_selector_with_wait(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.MOUSE,
         position=PositionConfig.from_selector(
             selector="div#submit", required=True, wait=True))
@@ -382,7 +391,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     ])
 
   def test_click_mouse_selector_non_existent_required_raises(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.MOUSE,
         position=PositionConfig.from_selector(
             selector="div#missing", required=True))
@@ -394,7 +403,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     self.inject_events_mock.assert_not_called()
 
   def test_click_mouse_selector_non_required_success(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.MOUSE,
         position=PositionConfig.from_selector(
             selector="div#missing", required=False))
@@ -404,7 +413,7 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     self.inject_events_mock.assert_not_called()
 
   def test_click_mouse_with_verify(self) -> None:
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.MOUSE,
         position=PositionConfig.from_coordinates(x=10, y=20),
         verify="#success")

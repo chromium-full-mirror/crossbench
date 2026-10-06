@@ -194,7 +194,7 @@ class LoadLine2CombinedPage(CombinedPage):
         if block.label == "load" and run.browser_platform.is_android:
           # Trigger a scheduling boost on devices that boost performance on
           # user input.
-          action = ClickAction(
+          action = ClickAction.create(
               source=InputSource.TOUCH,
               position=PositionConfig.from_coordinates(0, 0))
           action_runner.click_touch(action)

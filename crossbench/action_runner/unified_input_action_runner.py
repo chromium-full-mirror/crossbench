@@ -20,13 +20,10 @@ from crossbench.action_runner.keyboard_layout import US_KEYBOARD_LAYOUT
 from crossbench.action_runner.screenshot_annotation import \
     ScreenshotPointAnnotation, ScreenshotRectAnnotation
 from crossbench.action_runner.viewport_info import ViewportInfo
-from crossbench.benchmarks.loading.input_source import InputSource
 from crossbench.benchmarks.loading.point import Point
 
 if TYPE_CHECKING:
   from crossbench.action_runner.action import all as i_action
-  from crossbench.action_runner.action.base_input_source import \
-      InputSourceAction
   from crossbench.action_runner.action.position import SelectorConfig
   from crossbench.runner.actions import Actions
 
@@ -85,11 +82,6 @@ class UnifiedInputActionRunner(ActionRunner):
   def _get_window_positions_script(self) -> str:
     return (SCRIPTS_DIR / "get_window_positions.js").read_text()
 
-  def action_device_name(self, action: InputSourceAction,
-                         input_source: InputSource) -> str:
-    return (action.source_device or
-            self.browser_platform.get_default_device(input_source) or "")
-
   def click_touch(self, action: i_action.ClickAction) -> None:
     self._inject_click(action, self._get_touch_click_events)
 
@@ -124,8 +116,8 @@ class UnifiedInputActionRunner(ActionRunner):
       duration = action.duration or self.DEFAULT_CLICK_DURATION
       events = events_fn(click_location, duration)
 
-      device_name = self.action_device_name(action, action.input_source)
-      self.browser_platform.inject_input_events(device_name, events)
+      assert action.source_device
+      self.browser_platform.inject_input_events(action.source_device, events)
 
       if action.verify:
         self.wait_for_element_impl(
@@ -255,11 +247,12 @@ class UnifiedInputActionRunner(ActionRunner):
     if not events_with_weights:
       return
 
-    device_name = self.action_device_name(action, InputSource.KEYBOARD)
+    assert action.source_device
 
     if not action.duration:
       input_events = [e for e in events_with_weights if isinstance(e, KeyEvent)]
-      self.browser_platform.inject_input_events(device_name, input_events)
+      self.browser_platform.inject_input_events(action.source_device,
+                                                input_events)
       return
 
     total_weight = sum(w for w in events_with_weights if isinstance(w, int))
@@ -281,4 +274,5 @@ class UnifiedInputActionRunner(ActionRunner):
           timed_events.append(
               WaitEvent(duration=dt.timedelta(microseconds=wait_us)))
 
-    self.browser_platform.inject_input_events(device_name, timed_events)
+    self.browser_platform.inject_input_events(action.source_device,
+                                              timed_events)

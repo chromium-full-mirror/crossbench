@@ -285,14 +285,14 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
   def test_text_input_legacy_sdk_keyevent_w3c(self) -> None:
     self.adb.mock_sdk_version = 36
     self.platform.expect_sh("input", "keyevent", "KEYCODE_ENTER")
-    text_input_action = TextInputAction(
+    text_input_action = TextInputAction.create(
         InputSource.KEYBOARD, keyevent="Enter", duration=dt.timedelta())
     self.run_action(text_input_action)
 
   def test_text_input_legacy_sdk_keyevent_android(self) -> None:
     self.adb.mock_sdk_version = 36
     self.platform.expect_sh("input", "keyevent", "KEYCODE_BACK")
-    text_input_action = TextInputAction(
+    text_input_action = TextInputAction.create(
         InputSource.KEYBOARD, keyevent="KEYCODE_BACK", duration=dt.timedelta())
     self.run_action(text_input_action)
 
@@ -729,7 +729,7 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
     self.run_action(scroll_action)
 
   def test_click_ui_selector_required_element_not_found_raises(self):
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_ui_selector(
             text="mock_target", required=True))
@@ -751,7 +751,7 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
       mock_ui_object.click.assert_not_called()
 
   def test_click_ui_selector_non_required_element_not_found_success(self):
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_ui_selector(
             text="mock_target", required=False))
@@ -770,7 +770,7 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
       mock_ui_object.click.assert_not_called()
 
   def test_click_ui_selector_required_element_found_clicks(self):
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_ui_selector(res="mock_res", required=True))
 
@@ -788,7 +788,7 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
       mock_ui_object.click.assert_called_once()
 
   def test_click_ui_selector_non_required_element_found_clicks(self):
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_ui_selector(
             clazz="mock_clazz", required=False))
@@ -807,7 +807,7 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
       mock_ui_object.click.assert_called_once()
 
   def test_click_ui_selector_pkg_and_text(self):
-    click_action = ClickAction(
+    click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_ui_selector(
             pkg="com.android.systemui", text="Chrome", required=True))

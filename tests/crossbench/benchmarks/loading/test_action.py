@@ -370,6 +370,7 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
     self.assertEqual(action.TYPE, ActionType.CLICK)
     self.assertEqual(action.timeout, ACTION_TIMEOUT)
     self.assertEqual(action.input_source, InputSource.TOUCH)
+    self.assertEqual(action.source_device, "default_touchscreen")
     self.assertIsNone(action.position.selector)
     self.assertEqual(action.position.coordinates.x, 1)
     self.assertEqual(action.position.coordinates.y, 2)
@@ -571,6 +572,7 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
     action = TextInputAction.parse_dict(config_dict)
 
     self.assertEqual(action.input_source, InputSource.KEYBOARD)
+    self.assertEqual(action.source_device, "default_keyboard")
 
   def test_parse_text_input_invalid_source(self):
     with self.assertRaises(ValueError) as cm:

@@ -5,20 +5,15 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, Final, Self
+from typing import TYPE_CHECKING, Self
 
 from crossbench.action_runner.android_input_action_runner import \
     AndroidInputActionRunner
 from crossbench.action_runner.base import ActionRunner
 from crossbench.action_runner.chromeos_input_action_runner import \
     ChromeOSInputActionRunner
-from crossbench.action_runner.virtual_device.all import VIRTUAL_DEVICES_TUPLE
-from crossbench.action_runner.virtual_device.keyboard import \
-    KeyboardVirtualDeviceConfig
-from crossbench.action_runner.virtual_device.mouse import \
-    MouseVirtualDeviceConfig
-from crossbench.action_runner.virtual_device.touchscreen import \
-    TouchscreenVirtualDeviceConfig
+from crossbench.action_runner.virtual_device.all import \
+    DEFAULT_VIRTUAL_DEVICES, VIRTUAL_DEVICES_TUPLE
 from crossbench.action_runner.virtual_device.virtual_device_config import \
     VIRTUAL_DEVICES, VirtualDeviceConfig
 from crossbench.action_runner.virtual_device.virtual_device_type import \
@@ -34,12 +29,6 @@ __all__ = [
     "VirtualDeviceConfig",
     "VirtualDeviceType",
 ]
-
-DEFAULT_VIRTUAL_DEVICES: Final[tuple[VirtualDeviceConfig, ...]] = (
-    KeyboardVirtualDeviceConfig(name="default_keyboard"),
-    TouchscreenVirtualDeviceConfig(name="default_touchscreen"),
-    MouseVirtualDeviceConfig(name="default_mouse"),
-)
 
 if TYPE_CHECKING:
   from crossbench.plt.base import Platform
@@ -58,7 +47,7 @@ class ActionRunnerType(ConfigEnum):
 @dataclasses.dataclass(frozen=True)
 class ActionRunnerConfig(ConfigObject):
   type: ActionRunnerType = ActionRunnerType.AUTO
-  virtual_devices: tuple[VirtualDeviceConfig, ...] = DEFAULT_VIRTUAL_DEVICES
+  virtual_devices: tuple[VirtualDeviceConfig, ...] = ()
 
   @classmethod
   def parse_str(cls, value: str) -> Self:
@@ -71,10 +60,7 @@ class ActionRunnerConfig(ConfigObject):
     parser.add_argument(
         "type", type=ActionRunnerType, default=ActionRunnerType.AUTO)
     parser.add_argument(
-        "virtual_devices",
-        type=VirtualDeviceConfig,
-        is_list=True,
-        default=DEFAULT_VIRTUAL_DEVICES)
+        "virtual_devices", type=VirtualDeviceConfig, is_list=True, default=())
     return parser
 
   def instantiate(self,

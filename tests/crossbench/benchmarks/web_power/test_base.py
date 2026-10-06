@@ -290,7 +290,6 @@ class WebPowerBenchmarkBaseTestCase(BaseWebPowerBenchmarkTestCase):
   def test_default_action_runner_config_no_virtual_devices(self) -> None:
     args = self.parse_args("--site", "cnn")
     benchmark = MockWebPowerBenchmark.from_cli_args(args)
-    self.assertEqual(benchmark.action_runner_config.virtual_devices, ())
 
     run = self.mock_run()
     with mock.patch.object(self.platform,
