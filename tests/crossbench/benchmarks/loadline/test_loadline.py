@@ -12,6 +12,7 @@ from typing_extensions import override
 
 from crossbench.action_runner.base import ActionRunner
 from crossbench.benchmarks.loading.tab_controller import TabController
+from crossbench.cli.parser import CBArgumentParser
 from crossbench.benchmarks.loadline import LoadLine1PhoneBenchmark, \
     LoadLine1PhoneDebugBenchmark, LoadLine1PhoneFastBenchmark, \
     LoadLine1TabletBenchmark, LoadLine1TabletDebugBenchmark, \
@@ -111,6 +112,12 @@ class LoadLine1BenchmarkCliTestCase(BaseCliTestCase):
       self.run_cli("loadline-phone", "--help")
     with self.assertRaises(SysExitTestException):
       self.run_cli("loadline-tablet", "--help")
+
+  def test_separate_default(self) -> None:
+    parser = CBArgumentParser()
+    LoadLine1PhoneBenchmark.add_cli_arguments(parser)
+    args = parser.parse_args([])
+    self.assertTrue(args.separate)
 
   def test_run_default_phone(self) -> None:
     with self._patch_get_browser(), mock.patch.object(

@@ -258,13 +258,14 @@ class StoryFilter(Generic[StoryT], metaclass=abc.ABCMeta):
     group.add_argument(
         "--combined",
         dest="separate",
-        default=False,
         action="store_false",
         help="Run each story in the same session. (default)")
     group.add_argument(
         "--separate",
         action="store_true",
         help="Run each story in a fresh browser.")
+    # Mutually exclusive flags default to combined stories unless overridden.
+    group.set_defaults(separate=False)
 
   @classmethod
   def kwargs_from_cli(cls, args: argparse.Namespace) -> dict[str, Any]:

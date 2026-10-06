@@ -13,7 +13,7 @@ from typing_extensions import override
 
 from crossbench.cli.parser import CBArgumentParser
 from crossbench.cli.subcommand.base import CrossbenchSubcommand
-from crossbench.parse import NumberParser, PathParser
+from crossbench.parse import NumberParser, ObjectParser, PathParser
 from crossbench.pinpoint.benchmarks import pinpoint_benchmark_name
 from crossbench.pinpoint.cancel_job import cancel_jobs
 from crossbench.pinpoint.config import PinpointBisectJobConfig, \
@@ -651,7 +651,7 @@ class PinpointBaseFilteredListSubcommand(PinpointBaseSubcommand):
     parser = self.create_parser()
     parser.add_argument(
         "--filter",
-        type=str,
+        type=ObjectParser.any_str,
         default=None,
         help=("Filter results by a case-insensitive substring match. "
               "Only items containing the filter string will be shown."))

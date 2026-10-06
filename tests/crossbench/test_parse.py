@@ -370,6 +370,28 @@ class ObjectParserTestCase(CrossbenchFakeFsTestCase):
     self.assertEqual(NumberParser.any_int("123456"), 123456)
     self.assertEqual(NumberParser.any_int(123456), 123456)
 
+  def test_parse_negative_int(self):
+    self.assertEqual(NumberParser.negative_int("-1"), -1)
+    self.assertEqual(NumberParser.negative_int(-1), -1)
+    self.assertEqual(NumberParser.negative_int(float(-1)), -1)
+    self.assertEqual(NumberParser.negative_int("-123"), -123)
+    self.assertEqual(NumberParser.negative_int(-123), -123)
+    self.assertEqual(NumberParser.negative_int(float(-123)), -123)
+    for invalid in ("", "0", 0, "1", 1, "1.2", 1.2, "-1.2", -1.2):
+      with self.assertRaises(argparse.ArgumentTypeError):
+        _ = NumberParser.negative_int(invalid)
+
+  def test_parse_negative_zero_int(self):
+    self.assertEqual(NumberParser.negative_zero_int("0"), 0)
+    self.assertEqual(NumberParser.negative_zero_int(0), 0)
+    self.assertEqual(NumberParser.negative_zero_int(float(0)), 0)
+    self.assertEqual(NumberParser.negative_zero_int("-1"), -1)
+    self.assertEqual(NumberParser.negative_zero_int(-1), -1)
+    self.assertEqual(NumberParser.negative_zero_int(float(-1)), -1)
+    for invalid in ("", "1", 1, "1.2", 1.2, "-1.2", -1.2):
+      with self.assertRaises(argparse.ArgumentTypeError):
+        _ = NumberParser.negative_zero_int(invalid)
+
   def test_parse_any_int_strict(self):
     self.assertEqual(NumberParser.any_int(float(0), parse_str=False), 0)
     self.assertEqual(NumberParser.any_int(1, parse_str=False), 1)

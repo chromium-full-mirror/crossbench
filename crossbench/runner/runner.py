@@ -183,7 +183,6 @@ class Runner:
         "--nosymlinks",
         dest="create_symlinks",
         action="store_false",
-        default=not plt.PLATFORM.is_win,
         help=("Do not create symlinks in the output directory. "
               "Disabled by defauly on windows."))
     symlink_group.add_argument(
@@ -191,6 +190,8 @@ class Runner:
         dest="create_symlinks",
         action="store_true",
         help="Allow create symlinks in the output directory.")
+    # Dynamic default avoids passing invalid default=False to action=store_false.
+    symlink_group.set_defaults(create_symlinks=not plt.PLATFORM.is_win)
 
     out_dir_xor_group = out_dir_group.add_mutually_exclusive_group()
     out_dir_xor_group.add_argument(

@@ -513,7 +513,7 @@ class WebPowerBenchmarkBaseTestCase(BaseWebPowerBenchmarkTestCase):
     parser = MockWebPowerBenchmark.add_cli_arguments(CBArgumentParser())
     parser.add_argument(
         "--probe-config",
-        type=pathlib.Path,
+        type=pth.LocalPath,
         default=MockWebPowerBenchmark.default_probe_config_path(),
     )
     # Add necessary arguments that would have been added by parent CLI commands.

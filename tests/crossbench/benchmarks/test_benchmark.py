@@ -12,6 +12,7 @@ from typing_extensions import override
 
 from crossbench.benchmarks.base import PressBenchmarkStoryFilter, \
     RangePatternError, RegexFilter, TagsFilter
+from crossbench.cli.parser import CBArgumentParser
 from crossbench.stories.press_benchmark import PressBenchmarkStory
 from tests import test_helper
 
@@ -307,6 +308,19 @@ class TagsFilterTestCase(unittest.TestCase):
     tags_filter = TagsFilter(story_tags, ["story1"])
     with self.assertRaisesRegex(ValueError, "No stories left after filtering"):
       tags_filter.process_all(["-tag1", "-tag2"])
+
+
+class StoryFilterTestCase(unittest.TestCase):
+
+  def test_story_grouping_defaults(self):
+    parser = CBArgumentParser()
+    PressBenchmarkStoryFilter.add_cli_arguments(parser)
+    args = parser.parse_args([])
+    self.assertFalse(args.separate)
+    args = parser.parse_args(["--separate"])
+    self.assertTrue(args.separate)
+    args = parser.parse_args(["--combined"])
+    self.assertFalse(args.separate)
 
 
 if __name__ == "__main__":

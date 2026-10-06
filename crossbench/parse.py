@@ -805,6 +805,24 @@ class NumberParser:
     return value_i
 
   @classmethod
+  def negative_int(cls,
+                   value: Any,
+                   name: str = "value",
+                   parse_str: bool = True) -> int:
+    value_i = cls.any_int(value, name, parse_str)
+    if not math.isfinite(value_i) or value_i >= 0:
+      raise argparse.ArgumentTypeError(
+          f"Expected integer {name} < 0, but got: {value_i}")
+    return value_i
+
+  @classmethod
+  def negative_zero_int(cls,
+                        value: Any,
+                        name: str = "value",
+                        parse_str: bool = True) -> int:
+    return cls.int_range(-math.inf, 0.0, name=name, parse_str=parse_str)(value)
+
+  @classmethod
   def int_range(cls,
                 min: float = 0.0,
                 max: float = math.inf,

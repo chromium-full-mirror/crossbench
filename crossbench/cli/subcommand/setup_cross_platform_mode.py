@@ -16,6 +16,7 @@ from typing_extensions import override
 from crossbench.cli.subcommand.base import CrossbenchSubcommand
 from crossbench.cli.ui import ui
 from crossbench.helper import wait
+from crossbench.parse import ObjectParser
 from crossbench.plt import PLATFORM
 from crossbench.plt.android_adb import adb_devices
 from crossbench.plt.ios import ios_devices
@@ -71,7 +72,7 @@ class SetupCrossPlatformModeSubcommand(CrossbenchSubcommand):
   def add_cli_arguments(self, parser: CBArgumentParser) -> CBArgumentParser:
     parser.add_argument(
         "--interface",
-        type=str,
+        type=ObjectParser.non_empty_str,
         required=True,
         help="Network interface to use.")
     self.cli.add_debugging_arguments(parser)

@@ -135,7 +135,8 @@ class LoadLinePageFilter(LoadingPageFilter):
     # Loadline always needs separate substories for metrics calculation.
     group.add_argument(
         "--separate",
-        action="store_true",
+        action="store_const",
+        const=True,
         default=True,
         help="Run each story in a fresh browser (enabled by default).")
 

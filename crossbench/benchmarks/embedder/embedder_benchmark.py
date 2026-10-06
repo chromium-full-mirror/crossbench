@@ -161,7 +161,7 @@ class EmbedderBenchmark(SubStoryBenchmark):
         help="Name of the embedder process.")
     parser.add_argument(
         "--embedder-push-files",
-        type=str,
+        type=ObjectParser.non_empty_str,
         action="append",
         default=[],
         help="Files to push from host to device, provide one pair of paths "
@@ -182,13 +182,13 @@ class EmbedderBenchmark(SubStoryBenchmark):
     parser.add_argument(
         "--android-action",
         default="GOOGLE_SEARCH",
-        type=str,
+        type=ObjectParser.any_str,
         help=("The Android action in setup that is passed to the adb intent\n"
               "`am start -a` option. Pass empty string if not applicable."))
     parser.add_argument(
         "--android-activity",
         default="SearchActivity",
-        type=str,
+        type=ObjectParser.non_empty_str,
         help=("The Android activity name in setup that is passed to the adb\n"
               "intent `am start -n` option."))
     return parser

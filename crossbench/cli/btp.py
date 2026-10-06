@@ -15,7 +15,7 @@ from perfetto.trace_uri_resolver.resolver import TraceUriResolver
 from crossbench import path as pth
 from crossbench.cli.config.probe_list import ProbeListConfig
 from crossbench.cli.parser import CBArgumentParser
-from crossbench.parse import PathParser
+from crossbench.parse import ObjectParser, PathParser
 from crossbench.probes.trace_processor.constants import QUERIES_DIR
 from crossbench.probes.trace_processor.helper import \
     CBBatchTraceProcessorConfig
@@ -75,7 +75,7 @@ class BTPUtil:
         help="Path to the directory where output files will be placed.")
     self.parser.add_argument(
         "--extra-query",
-        type=str,
+        type=ObjectParser.non_empty_str,
         default=[],
         action="append",
         help=("Name of the query to compute (the query must be present in the "

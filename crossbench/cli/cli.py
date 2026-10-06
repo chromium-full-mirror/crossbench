@@ -275,8 +275,9 @@ class CrossBenchCLI:
         "--no-color",
         dest="color",
         action="store_false",
-        default=has_color,
         help="Disable colored output")
+    # Dynamic default avoids passing invalid default=False to action=store_false.
+    parser.set_defaults(color=has_color)
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {__version__}")
 
