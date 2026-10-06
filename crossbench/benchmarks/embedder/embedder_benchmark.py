@@ -43,8 +43,7 @@ class EmbedderStory(Story, metaclass=abc.ABCMeta):
     run_benchmark = cast(EmbedderBenchmark, run.benchmark)
     if run_benchmark.embedder_drop_caches:
       run.browser_platform.sh("am", "kill-all")
-      run.browser_platform.sh(  # noqa: S604
-          "echo 3 > /proc/sys/vm/drop_caches", shell=True)
+      run.browser_platform.clear_memory_page_cache()
     run_browser = cast("WebviewEmbedder", run.browser)
     cmd: TupleCmdArgs = (
         "am", "start", "-S", "-W", "-n",

@@ -831,6 +831,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
     return AndroidAdbPortManager(self, self._adb)
 
   MIN_UINPUT_SDK_VERSION: Final[int] = 37
+  MIN_DROP_CACHES_SDK_VERSION: Final[int] = 31
   _SHIFT_KEYS: Final[frozenset[str]] = frozenset(("ShiftLeft", "ShiftRight"))
 
   def _uinput_unsupported_msg(self, context: str = "") -> str:
@@ -959,6 +960,16 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
   @override
   def os_name(self) -> str:
     return "android"
+
+  @override
+  def clear_memory_page_cache(self) -> None:
+    if self.adb.sdk_version < self.MIN_DROP_CACHES_SDK_VERSION:
+      logging.error(
+          "Cannot clear memory page cache on Android SDK < %d (got SDK %d).",
+          self.MIN_DROP_CACHES_SDK_VERSION, self.adb.sdk_version)
+      return
+    self.sh("sync")
+    self.sh("setprop", "perf.drop_caches", "3")
 
   @functools.cached_property
   @override

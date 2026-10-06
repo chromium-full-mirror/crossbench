@@ -105,6 +105,13 @@ class MacOSPlatform(PosixPlatform):
     return "macos"
 
   @override
+  def clear_memory_page_cache(self) -> None:
+    # Requires sudo privileges to run 'purge', which may fail or prompt if run
+    # unprivileged.
+    self.sh("sync")
+    self.sh("sudo", "purge")
+
+  @override
   def _mktemp_sh(self,
                  is_dir: bool,
                  suffix: str | None = None,

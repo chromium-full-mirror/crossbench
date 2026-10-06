@@ -49,6 +49,17 @@ class _LinuxMockPlatformTestCase(BasePosixMockPlatformTestCase):
   def test_is_linux(self):
     self.assertTrue(self.platform.is_linux)
 
+  def test_clear_memory_page_cache(self):
+    self.expect_sh("sync")
+    self.expect_sh("tee", "/proc/sys/vm/drop_caches")
+    with mock.patch.object(
+        self.platform, "sh", wraps=self.platform.sh) as mock_sh:
+      self.platform.clear_memory_page_cache()
+    mock_sh.assert_has_calls([
+        mock.call("sync"),
+        mock.call("tee", "/proc/sys/vm/drop_caches", input=b"3\n"),
+    ])
+
   def test_version(self):
     self.platform.mock_version_str = None
     self.expect_sh("uname", "-r", result="5.4.0-104-generic")

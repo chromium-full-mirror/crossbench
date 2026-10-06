@@ -1176,6 +1176,11 @@ class Platform(abc.ABC):
         cwd=cwd,
         encoding=encoding)
 
+  def clear_memory_page_cache(self) -> None:
+    """Drop clean page caches, dentries, and inodes to free memory."""
+    raise NotImplementedError(
+        f"clear_memory_page_cache is not implemented on {self}")
+
   def sh(self,
          *args: CmdArg,
          shell: bool = False,

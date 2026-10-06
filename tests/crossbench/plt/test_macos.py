@@ -43,6 +43,17 @@ class MacOsMockPlatformTestCase(BaseLocalMockPlatformTestMixin,
   def test_is_macos(self):
     self.assertTrue(self.platform.is_macos)
 
+  def test_clear_memory_page_cache(self):
+    self.expect_sh("sync")
+    self.expect_sh("sudo", "purge")
+    with mock.patch.object(
+        self.platform, "sh", wraps=self.platform.sh) as mock_sh:
+      self.platform.clear_memory_page_cache()
+    mock_sh.assert_has_calls([
+        mock.call("sync"),
+        mock.call("sudo", "purge"),
+    ])
+
   def test_is_apple(self):
     self.assertTrue(self.platform.is_apple)
 

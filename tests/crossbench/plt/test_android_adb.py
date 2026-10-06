@@ -184,6 +184,30 @@ class BaseAndroidAdbMockPlatformTestCase(BasePosixMockPlatformTestCase):
   def test_is_android(self):
     self.assertTrue(self.platform.is_android)
 
+  def test_clear_memory_page_cache(self):
+    self.expect_sh("getprop ro.build.version.sdk", result="37")
+    self.expect_sh("sync")
+    self.expect_sh("setprop perf.drop_caches 3")
+    with mock.patch.object(
+        self.platform, "sh", wraps=self.platform.sh) as mock_sh:
+      self.platform.clear_memory_page_cache()
+    mock_sh.assert_has_calls([
+        mock.call("sync"),
+        mock.call("setprop", "perf.drop_caches", "3"),
+    ])
+
+  def test_clear_memory_page_cache_unsupported_sdk(self):
+    with mock.patch.object(
+        self.adb,
+        "getprop",
+        return_value=str(AndroidAdbPlatform.MIN_DROP_CACHES_SDK_VERSION - 1)):
+      with self.assertLogs(level="ERROR") as cm:
+        with mock.patch.object(self.platform, "sh") as mock_sh:
+          self.platform.clear_memory_page_cache()
+          mock_sh.assert_not_called()
+          self.assertIn("Cannot clear memory page cache on Android SDK",
+                        cm.output[0])
+
   def test_name(self):
     self.assertEqual(self.platform.name, "android")
 

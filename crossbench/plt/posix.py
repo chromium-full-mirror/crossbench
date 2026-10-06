@@ -524,6 +524,11 @@ class PosixPlatform(Platform, metaclass=abc.ABCMeta):
     # Get seconds since epoch
     return float(self.sh_stdout("stat", "-c", "%Y", self.path(path)))
 
+  @override
+  def clear_memory_page_cache(self) -> None:
+    self.sh("sync")
+    self.sh("tee", "/proc/sys/vm/drop_caches", input=b"3\n")
+
 
 class RemotePosixEnviron(Environ):
 
