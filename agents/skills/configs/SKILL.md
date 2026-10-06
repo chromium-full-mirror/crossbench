@@ -1,6 +1,6 @@
 ---
-name: config-objects
-description: Ensures inputs use crossbench.parse and complex options use immutable ConfigObjects with unit tests.
+name: configs
+description: Guidelines for crossbench ConfigObjects
 ---
 
 # Crossbench ConfigObjects & Input Parsing
@@ -11,9 +11,10 @@ structures across Crossbench.
 ## Early Input Validation
 
 - All user input and CLI/HJSON arguments must pass through validation helpers in
-  `crossbench.parse`.
+  `crossbench.parse` or directly with a `ConfigObject`.
+- config parser or argparse input choices values can be enums as well
 - Perform input validation early at the parsing boundary (config parser or
-  argument parsing).
+  argument parsing) to give good CLI experience.
 - Any new parser helper method in `crossbench.parse` **must** have a dedicated
   unit test.
 
@@ -28,6 +29,9 @@ structures across Crossbench.
   1. Short-form string parsing (e.g. `--probe=v8.log:all`).
   2. Full dictionary/HJSON parsing (e.g.
      `--probe=v8.log:{categories: ['all']}`).
+  3. An example config.hjson file if it's has a dedicated command line flag
+- Every `ConfigObject` that is directly used in a config must be public as it is
+  exposed through the `cb.py describe configs` for documentation.
 
 ## ConfigParser & `add_default_argument`
 

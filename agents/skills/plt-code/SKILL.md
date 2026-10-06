@@ -1,6 +1,6 @@
 ---
-name: platform-code
-description: Enforces usage of Platform helpers, path abstractions (LocalPath vs AnyPath), and bans raw shell commands or shell=True.
+name: plt-code
+description: Guidelines for crossbench plt / Platform code
 ---
 
 # Crossbench Platform & Path Abstractions
@@ -47,21 +47,32 @@ always go through `Platform` objects.
   # GOOD: high-level platform helper that works on any platform
   self.host_platform.symlink_or_copy(src, dest)
   ```
+- Add common path helpers on Platform base classes if required to maximize
+  portability.
+
+## New Platform Methods
+
 - New platform methods should be implemented in the most abstract platform class
   (`Platform`) rather than ad-hoc in platform-specific subclasses.
+- Aim for maximum cross-platform compatibility so we can easily change platforms
+  for benchmarks and probes without negative side-effects.
+- New platform methods must be tested in mock platform tests using the most
+  abstract base test class possible
+- New platform methods should have a native platform tests as well if it can be
+  easily achieved without side-effects.
 
 ## Binary Lookups
 
 - Never hardcode non-standard binary paths.
 - Prefer binaries provided with a chromium checkout.
-- Use `crossbench.path_finder.BasePathFinder` subclasses to implement robust
-  binary lookups across systems.
+- Add entries to `crossbench.plt.bin.Binaries` with alternative lookups to
+  provide easily configurable and platform independent binaries
 
 ```python
 # BAD: hardcoded non-standard binary path
-self.platform.sh("path/to/custom/binary", "--test=foo")
+self.platform.sh("path/to/custom/test_bin", "--test=foo")
 
 # GOOD: abstract path finder
-binary = CustomBinaryFinder(self.platform).local_path
+binary = Binaries.TEST_BIN.resolve(self.platform)
 self.platform.sh(binary, "--test=foo")
 ```

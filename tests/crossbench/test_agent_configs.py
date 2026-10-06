@@ -124,7 +124,7 @@ def validate_skill_reference(
 
   errors: list[str] = []
   fm_id = str(frontmatter.get("id") or frontmatter.get("name", "")).strip()
-  if agent_id != fm_id and agent_id != f"crossbench-{fm_id}":
+  if agent_id not in (fm_id, f"cb-{fm_id}"):
     errors.append(f"Agent id '{agent_id}' does not match frontmatter id/name "
                   f"'{fm_id}' in '{skill_ref}'.")
 

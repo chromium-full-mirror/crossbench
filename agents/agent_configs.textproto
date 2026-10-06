@@ -1,10 +1,10 @@
 # proto-file: google3/google/corp/android/engprod/codereviewagentconfiguration/v1/agent.proto
 
 configs {
-  id: "crossbench-python-style"
-  display_name: "Crossbench Python Style"
-  description: "Enforces Google Python style, 80-character line limit, typing, and bans on getattr/hasattr."
-  skills: "agents/skills/python-style/SKILL.md"
+  id: "cb-style"
+  display_name: "Python Style"
+  description: "Generic crossbench python coding style guide"
+  skills: "agents/skills/style/SKILL.md"
   include_filters {
     project: "crossbench"
     path_regex: ".*\\.py$"
@@ -16,10 +16,10 @@ configs {
 }
 
 configs {
-  id: "crossbench-platform-code"
-  display_name: "Crossbench Platform Abstractions"
-  description: "Enforces usage of Platform helpers, path abstractions (LocalPath vs AnyPath), and bans raw shell commands or shell=True."
-  skills: "agents/skills/platform-code/SKILL.md"
+  id: "cb-plt-code"
+  display_name: "Platform Abstractions"
+  description: "Guidelines for crossbench plt / Platform code"
+  skills: "agents/skills/plt-code/SKILL.md"
   include_filters {
     project: "crossbench"
     path_regex: "crossbench/.*\\.py$"
@@ -28,10 +28,10 @@ configs {
 }
 
 configs {
-  id: "crossbench-config-objects"
-  display_name: "Crossbench Config & Input Parsing"
-  description: "Ensures inputs use crossbench.parse and complex options use immutable ConfigObjects with unit tests."
-  skills: "agents/skills/config-objects/SKILL.md"
+  id: "cb-configs"
+  display_name: "Config & Input Parsing"
+  description: "Guidelines for crossbench ConfigObjects"
+  skills: "agents/skills/configs/SKILL.md"
   include_filters {
     project: "crossbench"
     path_regex: ".*\\.py$"
