@@ -23,6 +23,8 @@ dependencies = [
   'hjson==3.1.0',
   'requests==2.34.2',
   'pandas==2.2.3',
+  'pytz==2026.1.post1',
+  'tzdata==2025.2',
   'numpy==1.23.5+chromium.4',
   'perfetto==0.16.0',
   'protobuf==7.36.0',

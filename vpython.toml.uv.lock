@@ -479,7 +479,7 @@ python-multipart==0.0.20 ; python_full_version < '3.12' \
     --hash=sha256:8a62d3a8335e06589fe01f2a3e178cdcc632f3fbe0d492ad9ee0ec35aab1f104 \
     --hash=sha256:99087ff3f8f0f3b8f37bec5111c1446c70a74c28fcf24c3e937c7819f4dd27dc
     # via mcp
-pytz==2026.1.post1 ; (python_full_version < '3.12' and platform_machine == 'arm64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') \
+pytz==2026.1.post1 ; python_full_version < '3.12' \
     --hash=sha256:9d4dd968003f0a02967c1380f80a80c7d8b2073dd8bd6143260db1eef7fc8d54 \
     --hash=sha256:f2fd16142fda348286a75e1a524be810bb05d444e5a081f37f7affc635035f7a
     # via pandas
@@ -621,7 +621,7 @@ typing-inspection==0.4.4 ; python_full_version < '3.12' \
     # via
     #   pydantic
     #   pydantic-settings
-tzdata==2025.2 ; (python_full_version < '3.12' and platform_machine == 'arm64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') \
+tzdata==2025.2 ; python_full_version < '3.12' \
     --hash=sha256:1a403fada01ff9221ca8044d701868fa132215d84beb92242d9acd2147f667a8 \
     --hash=sha256:259d0754e270da739e95ad473d5adbcff926c9657914b325cc64f5048cfbe39d
     # via pandas
