@@ -25,6 +25,7 @@ from crossbench.probes.cb_perfetto.context.chromeos import \
     ChromeOsPerfettoProbeContext
 from crossbench.probes.cb_perfetto.context.desktop import \
     DesktopPerfettoProbeContext
+from crossbench.probes.cb_perfetto.context.macos import MacPerfettoProbeContext
 from crossbench.probes.cb_perfetto.context.windows import \
     WindowsPerfettoProbeContext
 from crossbench.probes.cb_perfetto.start_tracing_sequence import \
@@ -421,11 +422,12 @@ class PerfettoProbe(Probe):
 
   @override
   def create_context(self, run: Run) -> PerfettoProbeContext:
-    # TODO: support more platforms
     if run.browser_platform.is_chromeos:
       return ChromeOsPerfettoProbeContext(self, run)
     if run.browser_platform.is_android:
       return AndroidPerfettoProbeContext(self, run)
+    if run.browser_platform.is_macos:
+      return MacPerfettoProbeContext(self, run)
     if run.browser_platform.is_win:
       return WindowsPerfettoProbeContext(self, run)
     return DesktopPerfettoProbeContext(self, run)

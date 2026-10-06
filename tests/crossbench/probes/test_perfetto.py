@@ -23,6 +23,9 @@ from crossbench.probes.cb_perfetto.context.chromeos import \
     ChromeOsPerfettoProbeContext
 from crossbench.probes.cb_perfetto.context.desktop import \
     DesktopPerfettoProbeContext
+from crossbench.probes.cb_perfetto.context.macos import MacPerfettoProbeContext
+from crossbench.probes.cb_perfetto.context.windows import \
+    WindowsPerfettoProbeContext
 from crossbench.probes.cb_perfetto.downloader import PerfettoToolDownloader
 from crossbench.probes.cb_perfetto.perfetto import TraceConfig
 from tests import test_helper
@@ -324,6 +327,22 @@ class PerfettoProbeFunctionalTestCase(CrossbenchConfigTestMixin,
     run_linux.browser_platform = host_platform
     context = probe.create_context(run_linux)
     self.assertIsInstance(context, DesktopPerfettoProbeContext)
+
+  def test_create_context_macos(self) -> None:
+    probe = PerfettoProbe.parse_str("v8")
+    run_macos = mock.Mock()
+    run_macos.out_dir = pth.LocalPath("/tmp")
+    run_macos.browser_platform = MacOsMockPlatform()
+    context = probe.create_context(run_macos)
+    self.assertIsInstance(context, MacPerfettoProbeContext)
+
+  def test_create_context_win(self) -> None:
+    probe = PerfettoProbe.parse_str("v8")
+    run_win = mock.Mock()
+    run_win.out_dir = pth.LocalPath("/tmp")
+    run_win.browser_platform = WinMockPlatform()
+    context = probe.create_context(run_win)
+    self.assertIsInstance(context, WindowsPerfettoProbeContext)
 
   def test_create_context_android(self):
     probe = PerfettoProbe.parse_str("v8")

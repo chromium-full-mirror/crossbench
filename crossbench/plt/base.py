@@ -738,6 +738,10 @@ class Platform(abc.ABC):
     except proc_helper.PROCESS_NOT_FOUND_EXCEPTIONS:
       return None
 
+  def is_process_running(self, process: ProcessLike) -> bool:
+    info = self.process_info(process)
+    return bool(info and info.get("status") != psutil.STATUS_ZOMBIE)
+
   def process_meminfo(self, process_name: str,
                       timeout: dt.timedelta) -> list[ProcessMeminfo]:
     del process_name, timeout

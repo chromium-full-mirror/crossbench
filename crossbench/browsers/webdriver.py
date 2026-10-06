@@ -8,6 +8,7 @@ import abc
 import atexit
 import logging
 import os
+import subprocess
 import time
 import traceback
 from contextlib import contextmanager
@@ -393,6 +394,11 @@ class WebDriverBrowser(Browser, metaclass=abc.ABCMeta):
               selenium.common.exceptions.WebDriverException,
               urllib3.exceptions.HTTPError) as e:
         logging.debug("Could not close browser window during quit: %s", e)
+      if self.platform.is_macos:
+        try:
+          self.force_quit_apple_script()
+        except subprocess.SubprocessError as e:
+          logging.debug("Could not quit browser via AppleScript: %s", e)
       self._wait_for_browser_quit()
     finally:
       super().quit()
@@ -429,7 +435,7 @@ class WebDriverBrowser(Browser, metaclass=abc.ABCMeta):
       return
     # Sometimes a second quit is needed, ignore any warnings there
     if (self._driver_pid and self.host_platform.is_local and
-        not self.host_platform.process_info(self._driver_pid)):
+        not self.host_platform.is_process_running(self._driver_pid)):
       return
     try:
       driver.quit()
@@ -445,7 +451,7 @@ class WebDriverBrowser(Browser, metaclass=abc.ABCMeta):
       return
     try:
       for _ in wait.WaitRange(min=0.1, timeout=30).wait_with_backoff():
-        if not self.platform.process_info(self._pid):
+        if not self.platform.is_process_running(self._pid):
           self._pid = 0
           return
     except TimeoutError:

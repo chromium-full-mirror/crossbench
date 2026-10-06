@@ -21,6 +21,7 @@ from crossbench.browsers.chromium_based import helper
 from crossbench.browsers.chromium_based.webdriver import ChromiumBasedWebDriver
 from crossbench.browsers.settings import Settings
 from crossbench.browsers.viewport import Viewport
+from crossbench.plt.base import Platform
 from tests import test_helper
 from tests.crossbench import mock_browser
 from tests.crossbench.base import BaseCrossbenchTestCase
@@ -135,6 +136,10 @@ class MockChromiumBasedWebDriver(ChromiumBaseMixin, ChromiumBasedWebDriver):
   def __init__(self, label, driver) -> None:
     mock_platform = mock.MagicMock(name="Mock Platform")
     mock_platform.app_version.side_effect = [mock_browser.MockChromium.VERSION]
+    mock_platform.is_process_running.side_effect = (
+        lambda p: Platform.is_process_running(mock_platform, p))
+    mock_platform.host_platform.is_process_running.side_effect = (
+        lambda p: Platform.is_process_running(mock_platform.host_platform, p))
     self._private_driver = driver
     super().__init__(
         label=label, path=None, settings=Settings(platform=mock_platform))
@@ -293,6 +298,37 @@ class ChromiumBasedWebDriverTestCase(unittest.TestCase):
             "params": {},
         })
     mock_driver.close.assert_not_called()
+    self.assertEqual(browser.platform.process_info.call_count, 2)
+    browser.platform.terminate.assert_not_called()
+    self.assertIsNone(browser._pid)
+    mock_driver.quit.assert_called_once_with()
+
+  def test_quit_macos_and_zombie_process(self) -> None:
+    mock_driver = mock.MagicMock(name="Mock Driver")
+    browser = MockChromiumBasedWebDriver("test-driver", mock_driver)
+    browser._is_running = True
+    browser._pid = 2222
+    browser._driver_pid = 1111
+    browser.platform.is_local = True
+    browser.platform.is_android = False
+    browser.platform.is_macos = True
+    browser.platform.host_platform.is_local = True
+    browser.platform.process_info.side_effect = [
+        {"pid": 2222, "status": "running"},
+        {"pid": 2222, "status": "zombie"},
+    ]
+    browser.platform.host_platform.process_info.return_value = {
+        "pid": 1111,
+        "status": "zombie",
+    }
+
+    with mock.patch.object(browser, "close_all_tabs") as mock_close_all_tabs, \
+         mock.patch.object(
+             browser, "force_quit_apple_script") as mock_apple_script:
+      browser.quit()
+      mock_close_all_tabs.assert_called_once_with()
+      self.assertGreaterEqual(mock_apple_script.call_count, 1)
+
     self.assertEqual(browser.platform.process_info.call_count, 2)
     browser.platform.terminate.assert_not_called()
     self.assertIsNone(browser._pid)
