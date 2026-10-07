@@ -325,6 +325,17 @@ class ObjectParserTestCase(CrossbenchFakeFsTestCase):
       ObjectParser.non_empty_str("")
     self.assertIn("empty", str(cm.exception))
 
+  def test_parse_optional_str(self):
+    self.assertIsNone(ObjectParser.optional_str(None))
+    self.assertIsNone(ObjectParser.optional_str(""))
+    self.assertEqual(ObjectParser.optional_str("a string"), "a string")
+
+  def test_parse_optional_str_invalid(self):
+    invalid: Any
+    for invalid in (1, [], {}, [1], ["a"], {"a": "a"}):
+      with self.assertRaises(argparse.ArgumentTypeError):
+        ObjectParser.optional_str(invalid)
+
   def test_parse_str_or_file_contents(self):
     with self.assertRaisesRegex(argparse.ArgumentTypeError,
                                 r"(?i)non-empty string"):
@@ -429,6 +440,22 @@ class ObjectParserTestCase(CrossbenchFakeFsTestCase):
       with self.assertRaises(
           argparse.ArgumentTypeError, msg=f"invalid={invalid!r}"):
         _ = NumberParser.optional_int(invalid)
+
+  def test_parse_optional_positive_int(self):
+    self.assertIsNone(NumberParser.optional_positive_int(None))
+    self.assertIsNone(NumberParser.optional_positive_int(""))
+    self.assertEqual(NumberParser.optional_positive_int("1"), 1)
+    self.assertEqual(NumberParser.optional_positive_int(1), 1)
+    self.assertEqual(NumberParser.optional_positive_int("123"), 123)
+    self.assertEqual(NumberParser.optional_positive_int(123), 123)
+
+  def test_parse_optional_positive_int_invalid(self):
+    invalid: Any
+    for invalid in ("0", 0, "-1", -1, "-1.2", -1.2, "1.2", 1.2, "Nan",
+                    math.nan, "inf", math.inf, "-inf", -math.inf, "invalid"):
+      with self.assertRaises(
+          argparse.ArgumentTypeError, msg=f"invalid={invalid!r}"):
+        _ = NumberParser.optional_positive_int(invalid)
 
   def test_parse_positive_int(self):
     self.assertEqual(NumberParser.positive_int("1"), 1)
@@ -755,8 +782,12 @@ class ObjectParserTestCase(CrossbenchFakeFsTestCase):
     self.assertEqual(file, PathParser.existing_file_path(file))
 
   def test_parse_path(self):
-    with self.assertRaises(argparse.ArgumentTypeError):
+    with self.assertRaisesRegex(argparse.ArgumentTypeError, "empty"):
       PathParser.path("")
+    for invalid in (0, [], {}, 123):
+      with self.assertRaisesRegex(argparse.ArgumentTypeError,
+                                  "expected str or PathLike"):
+        PathParser.path(invalid)
     folder = pathlib.Path("folder")
     folder.mkdir()
     self.assertEqual(folder, PathParser.path(folder))

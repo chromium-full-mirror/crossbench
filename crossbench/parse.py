@@ -31,7 +31,7 @@ if TYPE_CHECKING:
   PyDict = dict
 
 
-def type_str(value: Any) -> str:
+def type_str(value: object) -> str:
   return type(value).__name__
 
 
@@ -44,21 +44,22 @@ PROTOBUF_ALL_SUFFIX: Final[tuple[str, ...]] = (
 
 class PathParser:
 
-  PATH_PREFIX: Final[re.Pattern] = re.compile(r"^(?:"
-                                              r"(?:\.\.?|~)?|"
-                                              r"[a-zA-Z]:"
-                                              r")(\\|/)[^\\/]")
+  PATH_PREFIX: Final[re.Pattern[str]] = re.compile(r"^(?:"
+                                                   r"(?:\.\.?|~)?|"
+                                                   r"[a-zA-Z]:"
+                                                   r")(\\|/)[^\\/]")
 
   @classmethod
   def value_has_path_prefix(cls, value: str) -> bool:
     return cls.PATH_PREFIX.match(value) is not None
 
   @classmethod
-  def path(cls,
-           value: pth.AnyPathLike | None,
-           name: str = "value") -> pth.LocalPath:
-    path_value: pth.AnyPathLike = ObjectParser.not_none(value,
-                                                        "path")  # type: ignore
+  def path(cls, value: object, name: str = "value") -> pth.LocalPath:
+    path_value = ObjectParser.not_none(value, "path")
+    if not isinstance(path_value, pth.AnyPathLike):
+      raise argparse.ArgumentTypeError(
+          f"Invalid Path {name}, expected str or PathLike, "
+          f"but got {type_str(path_value)}: {value!r}")
     if not path_value:
       raise argparse.ArgumentTypeError("Invalid empty path.")
     try:
@@ -70,7 +71,7 @@ class PathParser:
 
   @classmethod
   def existing_file_path(cls,
-                         value: pth.AnyPathLike,
+                         value: object,
                          name: str = "value") -> pth.LocalPath:
     path = cls.existing_path(value, name)
     if not path.is_file():
@@ -79,7 +80,7 @@ class PathParser:
 
   @classmethod
   def non_empty_file_path(cls,
-                          value: pth.AnyPathLike,
+                          value: object,
                           name: str = "value") -> pth.LocalPath:
     path: pth.LocalPath = cls.existing_file_path(value, name)
     if path.stat().st_size == 0:
@@ -88,15 +89,11 @@ class PathParser:
     return path
 
   @classmethod
-  def file_path(cls,
-                value: pth.AnyPathLike,
-                name: str = "value") -> pth.LocalPath:
+  def file_path(cls, value: object, name: str = "value") -> pth.LocalPath:
     return cls.non_empty_file_path(value, name)
 
   @classmethod
-  def dir_path(cls,
-               value: pth.AnyPathLike,
-               name: str = "value") -> pth.LocalPath:
+  def dir_path(cls, value: object, name: str = "value") -> pth.LocalPath:
     path = cls.existing_path(value, name)
     if not path.is_dir():
       raise argparse.ArgumentTypeError(f"{name} is not a folder: {str(path)!r}")
@@ -104,7 +101,7 @@ class PathParser:
 
   @classmethod
   def non_empty_dir_path(cls,
-                         value: pth.AnyPathLike,
+                         value: object,
                          name: str = "value") -> pth.LocalPath:
     dir_path = cls.dir_path(value, name)
     for _ in dir_path.iterdir():
@@ -113,9 +110,7 @@ class PathParser:
         f"{name} dir must be non empty: {str(dir_path)!r}")
 
   @classmethod
-  def existing_path(cls,
-                    value: pth.AnyPathLike,
-                    name: str = "value") -> pth.LocalPath:
+  def existing_path(cls, value: object, name: str = "value") -> pth.LocalPath:
     path = cls.path(value)
     if not path.exists():
       raise argparse.ArgumentTypeError(
@@ -124,7 +119,7 @@ class PathParser:
 
   @classmethod
   def not_existing_path(cls,
-                        value: pth.AnyPathLike,
+                        value: object,
                         name: str = "value") -> pth.LocalPath:
     path = cls.path(value)
     if path.exists():
@@ -172,7 +167,7 @@ class PathParser:
     return cast(pth.LocalPath, cls.binary_path(value, platform, name))
 
   @classmethod
-  def json_file_path(cls, value: pth.AnyPathLike) -> pth.LocalPath:
+  def json_file_path(cls, value: object) -> pth.LocalPath:
     path = cls.file_path(value)
     with path.open(encoding="utf-8") as f:
       try:
@@ -184,7 +179,7 @@ class PathParser:
     return path
 
   @classmethod
-  def hjson_file_path(cls, value: pth.AnyPathLike) -> pth.LocalPath:
+  def hjson_file_path(cls, value: object) -> pth.LocalPath:
     path = cls.file_path(value)
     with path.open(encoding="utf-8") as f:
       try:
@@ -207,7 +202,7 @@ class ObjectParser:
   @classmethod
   def str_tuple(
       cls,
-      value: Any,
+      value: object,
       name: str = "tuple",
       error_cls: type[Exception] = argparse.ArgumentTypeError,
   ) -> tuple[str, ...]:
@@ -216,13 +211,16 @@ class ObjectParser:
   @classmethod
   def str_list(
       cls,
-      value: Any,
+      value: object,
       name: str = "list",
       error_cls: type[Exception] = argparse.ArgumentTypeError) -> list[str]:
     if not value:
       return []
     if isinstance(value, str):
       return [x.strip() for x in value.split(",")]
+    if not isinstance(value, Iterable):
+      raise error_cls(f"Expected iterable for {name}, "
+                      f"but got {type_str(value)}: {value!r}")
     try:
       list_value = list(value)
     except Exception as e:
@@ -232,7 +230,7 @@ class ObjectParser:
     return str_list_value
 
   @classmethod
-  def enum(cls, label: str, enum_cls: type[EnumT], data: Any,
+  def enum(cls, label: str, enum_cls: type[EnumT], data: object,
            choices: type[EnumT] | Iterable[EnumT]) -> EnumT:
     try:
       # Try direct conversion, relying on the Enum._missing_ hook:
@@ -256,7 +254,7 @@ class ObjectParser:
       cls,
       label: str,
       enum_cls: type[EnumT],
-      data: Any,
+      data: object,
       choices: type[EnumT] | Iterable[EnumT] | None = None,
   ) -> list[EnumT]:
     if choices is None:
@@ -276,7 +274,7 @@ class ObjectParser:
     return value[0] == "{" and value[-1] == "}"
 
   @classmethod
-  def inline_hjson(cls, value: Any) -> Any:
+  def inline_hjson(cls, value: object) -> Any:
     value_str = cls.non_empty_str(value, "hjson")
     if not cls.is_hjson_like(value_str):
       raise argparse.ArgumentTypeError(
@@ -291,7 +289,7 @@ class ObjectParser:
       raise argparse.ArgumentTypeError(message) from e
 
   @classmethod
-  def json_file(cls, value: pth.AnyPathLike) -> Any:
+  def json_file(cls, value: object) -> Any:
     path = PathParser.file_path(value)
     with path.open(encoding="utf-8") as f:
       try:
@@ -302,7 +300,7 @@ class ObjectParser:
         raise argparse.ArgumentTypeError(message) from e
 
   @classmethod
-  def hjson_file(cls, value: pth.AnyPathLike) -> Any:
+  def hjson_file(cls, value: object) -> Any:
     path = PathParser.file_path(value)
     with path.open(encoding="utf-8") as f:
       try:
@@ -313,7 +311,7 @@ class ObjectParser:
         raise argparse.ArgumentTypeError(message) from e
 
   @classmethod
-  def non_empty_hjson_file(cls, value: pth.AnyPathLike) -> Any:
+  def non_empty_hjson_file(cls, value: object) -> Any:
     data = cls.hjson_file(value)
     if not data:
       raise argparse.ArgumentTypeError(
@@ -322,7 +320,7 @@ class ObjectParser:
     return data
 
   @classmethod
-  def dict_hjson_file(cls, value: pth.AnyPathLike) -> Any:
+  def dict_hjson_file(cls, value: object) -> dict[str, Any]:
     data = cls.non_empty_hjson_file(value)
     if not isinstance(data, dict):
       raise argparse.ArgumentTypeError(
@@ -331,14 +329,14 @@ class ObjectParser:
     return data
 
   @classmethod
-  def dict(cls, value: Any, name: str = "value") -> PyDict:
+  def dict(cls, value: object, name: str = "value") -> PyDict:
     if isinstance(value, dict):
       return value
     raise argparse.ArgumentTypeError(
         f"Expected dict, but {name} is {type_str(value)}: {value!r}")
 
   @classmethod
-  def non_empty_dict(cls, value: Any, name: str = "value") -> PyDict:
+  def non_empty_dict(cls, value: object, name: str = "value") -> PyDict:
     dict_value = cls.dict(value)
     if not dict_value:
       raise argparse.ArgumentTypeError(
@@ -346,14 +344,14 @@ class ObjectParser:
     return dict_value
 
   @classmethod
-  def sequence(cls, value: Any, name: str = "value") -> Sequence[Any]:
+  def sequence(cls, value: object, name: str = "value") -> Sequence[Any]:
     if isinstance(value, (list, tuple)):
       return value
     raise argparse.ArgumentTypeError(
         f"Expected sequence, but {name} is {type_str(value)}: {value!r}")
 
   @classmethod
-  def iterable(cls, value: Any, name: str = "value") -> Iterable[Any]:
+  def iterable(cls, value: object, name: str = "value") -> Iterable[Any]:
     if isinstance(value, str):
       raise argparse.ArgumentTypeError(
           f"Expected iterable {name}, but got string: {value!r}")
@@ -363,7 +361,9 @@ class ObjectParser:
         f"Expected iterable, but {name} is {type_str(value)}: {value!r}")
 
   @classmethod
-  def non_empty_sequence(cls, value: Any, name: str = "value") -> Sequence[Any]:
+  def non_empty_sequence(cls,
+                         value: object,
+                         name: str = "value") -> Sequence[Any]:
     sequence_value = cls.sequence(value, name)
     if not sequence_value:
       raise argparse.ArgumentTypeError(
@@ -371,7 +371,7 @@ class ObjectParser:
     return sequence_value
 
   @classmethod
-  def any_str(cls, value: Any, name: str = "value") -> str:
+  def any_str(cls, value: object, name: str = "value") -> str:
     value = cls.not_none(value, name)
     if isinstance(value, str):
       return value
@@ -379,17 +379,20 @@ class ObjectParser:
         f"Expected str, but got {type_str(value)}: {value}")
 
   @classmethod
-  def non_empty_str(cls, value: Any, name: str = "value") -> str:
+  def non_empty_str(cls, value: object, name: str = "value") -> str:
     value = cls.any_str(value, name)
-    if not isinstance(value, str):
-      raise argparse.ArgumentTypeError(f"Expected non-empty string {name}, "
-                                       f"but got {type_str(value)}: {value!r}")
     if not value:
       raise argparse.ArgumentTypeError(f"Non-empty string {name} expected.")
     return value
 
   @classmethod
-  def str_or_file_contents(cls, value: Any, name: str = "value") -> str:
+  def optional_str(cls, value: object, name: str = "value") -> str | None:
+    if value is None or value == "":
+      return None
+    return cls.non_empty_str(value, name)
+
+  @classmethod
+  def str_or_file_contents(cls, value: object, name: str = "value") -> str:
     if isinstance(value, str):
       str_value: str = cls.non_empty_str(value, name=name)
       if not PathParser.value_has_path_prefix(str_value):
@@ -398,7 +401,7 @@ class ObjectParser:
     return cls.non_empty_str(path.read_text(encoding="utf-8"), name=name)
 
   @classmethod
-  def bytes_or_file_contents(cls, value: Any, name: str = "value") -> bytes:
+  def bytes_or_file_contents(cls, value: object, name: str = "value") -> bytes:
     if isinstance(value, str):
       str_value: str = cls.non_empty_str(value, name=name)
       if not PathParser.value_has_path_prefix(str_value):
@@ -408,9 +411,9 @@ class ObjectParser:
 
   @classmethod
   def proto_or_file(
-      cls, proto_cls: type[ProtoClassT]) -> Callable[[Any], ProtoClassT]:
+      cls, proto_cls: type[ProtoClassT]) -> Callable[[object], ProtoClassT]:
 
-    def parser(value: Any) -> ProtoClassT:
+    def parser(value: object) -> ProtoClassT:
       data: bytes = ObjectParser.bytes_or_file_contents(value)
       proto_instance = proto_cls()
       return cls.parse_text_or_binary_proto(proto_instance, data)
@@ -422,7 +425,7 @@ class ObjectParser:
 
   @classmethod
   def parse_text_or_binary_proto_file(cls, proto_instance: ProtoClassT,
-                                      value: Any) -> ProtoClassT:
+                                      value: object) -> ProtoClassT:
     data: bytes = ObjectParser.bytes_or_file_contents(value)
     return cls.parse_text_or_binary_proto(proto_instance, data)
 
@@ -467,33 +470,32 @@ class ObjectParser:
 
   @classmethod
   def url_str(cls,
-              value: str,
+              value: object,
               name: str = "url",
               schemes: Sequence[str] | None = None) -> str:
-    cls.url(value, name, schemes)
-    return value
+    parsed = cls.url(value, name, schemes)
+    return urlparse.urlunparse(parsed)
 
   @classmethod
-  def httpx_url_str(cls, value: Any, name: str = "url") -> str:
-    cls.url(value, name, schemes=("http", "https"))
-    return value
+  def httpx_url_str(cls, value: object, name: str = "url") -> str:
+    return cls.url_str(value, name, schemes=("http", "https"))
 
   @classmethod
-  def base_url(cls, value: str, name: str = "url") -> urlparse.ParseResult:
+  def base_url(cls, value: object, name: str = "url") -> urlparse.ParseResult:
     url_str: str = cls.non_empty_str(value, name)
     try:
       return urlparse.urlparse(url_str)
     except ValueError as e:
       raise argparse.ArgumentTypeError(f"Invalid {name}: {value!r}, {e}") from e
 
-  PORT_URL_PATH_RE: Final[re.Pattern] = re.compile(r"^[0-9]+(?:/|$)")
-  INVALID_FUZZY_URL_RE: Final[re.Pattern] = re.compile(r"[^./]+(?:/.+)?")
+  PORT_URL_PATH_RE: Final[re.Pattern[str]] = re.compile(r"^[0-9]+(?:/|$)")
+  INVALID_FUZZY_URL_RE: Final[re.Pattern[str]] = re.compile(r"[^./]+(?:/.+)?")
   COMMON_URL_SCHEMES: Final[tuple[str, ...]] = ("http", "https", "about",
                                                 "file", "data", "chrome")
 
   @classmethod
   def fuzzy_url_str(cls,
-                    value: str,
+                    value: object,
                     name: str = "url",
                     schemes: Sequence[str] = COMMON_URL_SCHEMES,
                     default_scheme: str = "https") -> str:
@@ -502,7 +504,7 @@ class ObjectParser:
 
   @classmethod
   def fuzzy_url(cls,
-                value: str,
+                value: object,
                 name: str = "url",
                 schemes: Sequence[str] = COMMON_URL_SCHEMES,
                 default_scheme: str = "https") -> urlparse.ParseResult:
@@ -531,7 +533,7 @@ class ObjectParser:
 
   @classmethod
   def url(cls,
-          value: str,
+          value: object,
           name: str = "url",
           schemes: Sequence[str] | None = None) -> urlparse.ParseResult:
     parsed = cls.base_url(value)
@@ -560,7 +562,7 @@ class ObjectParser:
 
   @classmethod
   def optional_bool(cls,
-                    value: Any,
+                    value: object,
                     name: str = "value",
                     strict: bool = False) -> bool | None:
     if value is None or value == "":
@@ -568,7 +570,10 @@ class ObjectParser:
     return cls.bool(value, name, strict)
 
   @classmethod
-  def bool(cls, value: Any, name: str = "value", strict: bool = False) -> bool:
+  def bool(cls,
+           value: object,
+           name: str = "value",
+           strict: bool = False) -> bool:
     if isinstance(value, bool):
       return value
     value = str(value).lower()
@@ -582,14 +587,14 @@ class ObjectParser:
 
   @classmethod
   def optional_datetime(cls,
-                        value: Any,
+                        value: object,
                         name: str = "datetime") -> dt.datetime | None:
     if value is None or value == "":
       return None
     return cls.datetime(value, name)
 
   @classmethod
-  def datetime(cls, value: Any, name: str = "datetime") -> dt.datetime:
+  def datetime(cls, value: object, name: str = "datetime") -> dt.datetime:
     if isinstance(value, dt.datetime):
       return value
     if isinstance(value, dt.date):
@@ -610,7 +615,7 @@ class ObjectParser:
     return value
 
   @classmethod
-  def sh_cmd(cls, value: Any) -> list[str]:
+  def sh_cmd(cls, value: object) -> list[str]:
     value = cls.not_none(value, "shell cmd")
     if not value:
       raise argparse.ArgumentTypeError(
@@ -645,18 +650,18 @@ class ObjectParser:
     raise error_cls(f"Unexpected duplicates in {name}: {duplicates!r}")
 
   @classmethod
-  def regexp(cls, value: Any, name: str = "regexp") -> re.Pattern:
+  def regexp(cls, value: object, name: str = "regexp") -> re.Pattern[str]:
     try:
       return re.compile(cls.any_str(value, name))
     except re.error as e:
       raise argparse.ArgumentTypeError(f"Invalid regexp {name}: {value}") from e
 
   @classmethod
-  def safe_filename(cls, value: Any, name: str = "safe filename") -> str:
+  def safe_filename(cls, value: object, name: str = "safe filename") -> str:
     return pth.safe_filename(cls.non_empty_str(value, name))
 
   @classmethod
-  def md5_hash(cls, value: Any) -> bytes:
+  def md5_hash(cls, value: object) -> bytes:
     if not value:
       return b""
     if isinstance(value, bytes):
@@ -718,14 +723,16 @@ def _extract_decoding_error(message: str, value: pth.AnyPathLike,
 class NumberParser:
 
   @classmethod
-  def any_float(cls, value: Any, name: str = "float") -> float:
+  def any_float(cls, value: object, name: str = "float") -> float:
+    if not isinstance(value, (int, float, str)):
+      raise argparse.ArgumentTypeError(f"Invalid {name}: {value!r}")
     try:
       return float(value)
     except ValueError as e:
       raise argparse.ArgumentTypeError(f"Invalid {name}: {value!r}") from e
 
   @classmethod
-  def positive_float(cls, value: Any, name: str = "float") -> float:
+  def positive_float(cls, value: object, name: str = "float") -> float:
     value_f = cls.any_float(value, name)
     if not math.isfinite(value_f) or value_f <= 0:
       raise argparse.ArgumentTypeError(
@@ -734,7 +741,7 @@ class NumberParser:
 
   @classmethod
   def _float_range(cls,
-                   value: Any,
+                   value: object,
                    min: float = 0.0,
                    max: float = math.inf,
                    name: str = "float") -> float:
@@ -745,24 +752,24 @@ class NumberParser:
     return value_f
 
   @classmethod
-  def positive_zero_float(cls, value: Any, name: str = "float") -> float:
+  def positive_zero_float(cls, value: object, name: str = "float") -> float:
     return cls._float_range(value, 0.0, math.inf, name=name)
 
   @classmethod
   def float_range(cls,
                   min: float = 0.0,
                   max: float = math.inf,
-                  name: str = "float") -> Callable[[Any], float]:
+                  name: str = "float") -> Callable[[object], float]:
     assert min < max, f"Expected min={min} to be less than max={max}"
 
-    def float_ranged(value: Any) -> float:
+    def float_ranged(value: object) -> float:
       return cls._float_range(value, min, max, name)
 
     return float_ranged
 
   @classmethod
   def any_int(cls,
-              value: Any,
+              value: object,
               name: str = "value",
               parse_str: bool = True) -> int:
     if (not parse_str and
@@ -779,7 +786,7 @@ class NumberParser:
 
   @classmethod
   def optional_int(cls,
-                   value: Any,
+                   value: object,
                    name: str = "value",
                    parse_str: bool = True) -> int | None:
     if value is None or value == "":
@@ -788,14 +795,23 @@ class NumberParser:
 
   @classmethod
   def positive_zero_int(cls,
-                        value: Any,
+                        value: object,
                         name: str = "value",
                         parse_str: bool = True) -> int:
     return cls.int_range(0.0, name=name, parse_str=parse_str)(value)
 
   @classmethod
+  def optional_positive_int(cls,
+                            value: object,
+                            name: str = "value",
+                            parse_str: bool = True) -> int | None:
+    if value is None or value == "":
+      return None
+    return cls.positive_int(value, name, parse_str)
+
+  @classmethod
   def positive_int(cls,
-                   value: Any,
+                   value: object,
                    name: str = "value",
                    parse_str: bool = True) -> int:
     value_i = cls.any_int(value, name, parse_str)
@@ -806,7 +822,7 @@ class NumberParser:
 
   @classmethod
   def negative_int(cls,
-                   value: Any,
+                   value: object,
                    name: str = "value",
                    parse_str: bool = True) -> int:
     value_i = cls.any_int(value, name, parse_str)
@@ -817,7 +833,7 @@ class NumberParser:
 
   @classmethod
   def negative_zero_int(cls,
-                        value: Any,
+                        value: object,
                         name: str = "value",
                         parse_str: bool = True) -> int:
     return cls.int_range(-math.inf, 0.0, name=name, parse_str=parse_str)(value)
@@ -827,10 +843,10 @@ class NumberParser:
                 min: float = 0.0,
                 max: float = math.inf,
                 name: str = "value",
-                parse_str: bool = True) -> Callable[[Any], int]:
+                parse_str: bool = True) -> Callable[[object], int]:
     assert min < max, f"Expected min={min} to be less than max={max}"
 
-    def int_ranged(value: Any) -> int:
+    def int_ranged(value: object) -> int:
       value_i = cls.any_int(value, name, parse_str)
       if not math.isfinite(value_i) or value_i < min or max < value_i:
         raise argparse.ArgumentTypeError(
@@ -841,22 +857,23 @@ class NumberParser:
 
   @classmethod
   def port_number(cls,
-                  value: Any,
+                  value: object,
                   name: str = "port",
                   parse_str: bool = True) -> int:
     return cls.int_range(1, 65535, name, parse_str)(value)
 
   @classmethod
   def port_number_zero(cls,
-                       value: Any,
+                       value: object,
                        name: str = "port",
                        parse_str: bool = True) -> int:
     return cls.int_range(0, 65535, name, parse_str)(value)
 
-  _SIZE_RE: Final[re.Pattern] = re.compile(r"^(?P<value>\d+)(?P<unit>[KMG])?$")
+  _SIZE_RE: Final[re.Pattern[str]] = re.compile(
+      r"^(?P<value>\d+)(?P<unit>[KMG])?$")
 
   @classmethod
-  def _parse_power_of_two(cls, value: Any, name: str) -> int:
+  def _parse_power_of_two(cls, value: object, name: str) -> int:
     if isinstance(value, int):
       return value
     str_value = ObjectParser.non_empty_str(value, name)
@@ -875,7 +892,7 @@ class NumberParser:
     return int_value
 
   @classmethod
-  def power_of_two_with_unit(cls, value: Any, name: str = "value") -> str:
+  def power_of_two_with_unit(cls, value: object, name: str = "value") -> str:
     """
     Parses a size string (e.g., '4M', '256K') and validates that it's a
     power of two.
@@ -939,19 +956,19 @@ class DurationParser:
   def help(cls) -> str:
     return "'12.5' == '12.5s',  units=['ms', 's', 'm', 'h']"
 
-  _DURATION_RE: Final[re.Pattern] = re.compile(
+  _DURATION_RE: Final[re.Pattern[str]] = re.compile(
       r"(?P<value>(-?\d+(\.\d+)?)) ?(?P<unit>[a-z]+)?")
 
   @classmethod
   def positive_duration_ms(cls,
-                           time_value: Any,
+                           time_value: object,
                            name: str = "duration") -> dt.timedelta:
     return cls.positive_duration(time_value, name, TimeUnit.MILLISECOND)
 
   @classmethod
   def positive_duration(
       cls,
-      time_value: Any,
+      time_value: object,
       name: str = "duration",
       default_time_unit: TimeUnit = TimeUnit.SECOND) -> dt.timedelta:
     duration: dt.timedelta = cls.any_duration(
@@ -963,7 +980,7 @@ class DurationParser:
   @classmethod
   def _duration_range(
       cls,
-      value: Any,
+      value: object,
       min: dt.timedelta = dt.timedelta.min,
       max: dt.timedelta = dt.timedelta.max,
       name: str = "duration",
@@ -979,7 +996,7 @@ class DurationParser:
   @classmethod
   def positive_or_zero_duration(
       cls,
-      time_value: Any,
+      time_value: object,
       name: str = "duration",
       default_time_unit: TimeUnit = TimeUnit.SECOND) -> dt.timedelta:
     return cls._duration_range(
@@ -996,7 +1013,7 @@ class DurationParser:
       max: dt.timedelta | float | str | None = dt.timedelta.max,
       name: str = "duration",
       default_time_unit: TimeUnit = TimeUnit.SECOND,
-  ) -> Callable[[Any], dt.timedelta]:
+  ) -> Callable[[object], dt.timedelta]:
     if min is None or min == -math.inf:
       min = dt.timedelta.min
     elif not isinstance(min, dt.timedelta):
@@ -1007,7 +1024,7 @@ class DurationParser:
       max = cls.any_duration(max, f"max {name}", default_time_unit)
     assert min < max, f"Expected min={min} to be less than max={max}"
 
-    def duration_ranged(value: Any) -> dt.timedelta:
+    def duration_ranged(value: object) -> dt.timedelta:
       return cls._duration_range(value, min, max, name, default_time_unit)
 
     return duration_ranged
@@ -1015,7 +1032,7 @@ class DurationParser:
   @classmethod
   def duration_or_user_input(
       cls,
-      time_value: Any,
+      time_value: object,
       name: str = "duration",
       default_time_unit: TimeUnit = TimeUnit.SECOND) -> dt.timedelta:
     if time_value == "input":
@@ -1025,7 +1042,7 @@ class DurationParser:
   @classmethod
   def any_duration(
       cls,
-      time_value: Any,
+      time_value: object,
       name: str = "duration",
       default_time_unit: TimeUnit = TimeUnit.SECOND) -> dt.timedelta:
     """
@@ -1057,19 +1074,19 @@ class DurationParser:
           f"Make sure to include a valid {name} value: '{time_value}'")
     time_unit = match.group("unit")
     try:
-      time_value = float(value)
+      float_value = float(value)
     except ValueError as e:
       raise DurationParseError(f"{name} must be a valid number, {e}") from e
-    if not math.isfinite(time_value):
-      raise DurationParseError(f"{name} must be finite, but got: {time_value}")
+    if not math.isfinite(float_value):
+      raise DurationParseError(f"{name} must be finite, but got: {float_value}")
 
     if not time_unit:
       # If no time unit provided we assume it is in seconds.
-      return default_time_unit.timedelta(time_value)
-    return TimeUnit.parse(time_unit).timedelta(time_value)
+      return default_time_unit.timedelta(float_value)
+    return TimeUnit.parse(time_unit).timedelta(float_value)
 
   @classmethod
-  def time_unit(cls, value: Any, name: str = "time-unit") -> dt.timedelta:
+  def time_unit(cls, value: object, name: str = "time-unit") -> dt.timedelta:
     """Parses a time unit, supporting standard durations and 'x' as
        a seconds multiplier. e.g. 10x == 10s"""
     if isinstance(value, str):
