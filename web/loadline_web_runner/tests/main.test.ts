@@ -1235,3 +1235,131 @@ describe('Simple Mode & Developer Mode Interface', () => {
            .toBe('loadline2-tablet --browser cdp:chrome-beta --repeat 10');
      });
 });
+
+describe('Git Build Verification & Footer Revision Link', () => {
+  it('verifies clean main branch and upstream submission before building',
+     async () => {
+       const {
+         getGitCommitHash,
+         verifyGitStatusForBuild,
+       } = await import('../scripts/check_git_status.mjs');
+       const fullHash = '48b70334069f38f5bc980d1e73f58afcb782fb50';
+
+       const validRunner = vi.fn((args: string[]) => {
+         if (args.join(' ') === 'rev-parse --abbrev-ref HEAD') {
+           return {status: 0, stdout: 'main', stderr: ''};
+         }
+         if (args.join(' ') === 'status --porcelain --untracked-files=no') {
+           return {status: 0, stdout: '', stderr: ''};
+         }
+         if (args.join(' ') === 'rev-parse HEAD') {
+           return {status: 0, stdout: fullHash, stderr: ''};
+         }
+         if (args.join(' ') === 'merge-base --is-ancestor HEAD origin/main') {
+           return {status: 0, stdout: '', stderr: ''};
+         }
+         return {status: 1, stdout: '', stderr: 'unexpected command'};
+       });
+
+       expect(getGitCommitHash(validRunner)).toBe(fullHash);
+       expect(verifyGitStatusForBuild(validRunner)).toBe(fullHash);
+     });
+
+  it('rejects build when not on the main branch', async () => {
+    const {verifyGitStatusForBuild} =
+        await import('../scripts/check_git_status.mjs');
+
+    const featureBranchRunner = vi.fn((args: string[]) => {
+      if (args.join(' ') === 'rev-parse --abbrev-ref HEAD') {
+        return {status: 0, stdout: 'feature_branch', stderr: ''};
+      }
+      return {status: 0, stdout: '', stderr: ''};
+    });
+
+    expect(() => verifyGitStatusForBuild(featureBranchRunner))
+        .toThrow(
+            'Production builds must be created from the \'main\' branch ' +
+            '(current branch: \'feature_branch\').');
+  });
+
+  it('rejects build when working tree has uncommitted tracked changes',
+     async () => {
+       const {verifyGitStatusForBuild} =
+           await import('../scripts/check_git_status.mjs');
+
+       const dirtyTreeRunner = vi.fn((args: string[]) => {
+         if (args.join(' ') === 'rev-parse --abbrev-ref HEAD') {
+           return {status: 0, stdout: 'main', stderr: ''};
+         }
+         if (args.join(' ') === 'status --porcelain --untracked-files=no') {
+           return {
+             status: 0,
+             stdout: ' M web/loadline_web_runner/src/main.ts',
+             stderr: '',
+           };
+         }
+         return {status: 0, stdout: '', stderr: ''};
+       });
+
+       expect(() => verifyGitStatusForBuild(dirtyTreeRunner))
+           .toThrow('Production builds require a clean working tree.');
+     });
+
+  it('rejects build when current hash is not submitted in origin/main',
+     async () => {
+       const {verifyGitStatusForBuild} =
+           await import('../scripts/check_git_status.mjs');
+       const unsubmittedHash = '52f182d4c064ecd1bbaa02abdede930a24f1cad5';
+
+       const unsubmittedRunner = vi.fn((args: string[]) => {
+         if (args.join(' ') === 'rev-parse --abbrev-ref HEAD') {
+           return {status: 0, stdout: 'main', stderr: ''};
+         }
+         if (args.join(' ') === 'status --porcelain --untracked-files=no') {
+           return {status: 0, stdout: '', stderr: ''};
+         }
+         if (args.join(' ') === 'rev-parse HEAD') {
+           return {status: 0, stdout: unsubmittedHash, stderr: ''};
+         }
+         if (args.join(' ') === 'merge-base --is-ancestor HEAD origin/main') {
+           return {status: 1, stdout: '', stderr: ''};
+         }
+         return {status: 0, stdout: '', stderr: ''};
+       });
+
+       expect(() => verifyGitStatusForBuild(unsubmittedRunner))
+           .toThrow(
+               'Current commit (52f182d4) is not submitted upstream in ' +
+               '\'origin/main\'.');
+     });
+
+  it('statically injects crossbench commit hash link into index.html footer',
+     async () => {
+       const {injectGitRevisionIntoHtml} =
+           await import('../scripts/check_git_status.mjs');
+       const rawHtml = `
+      <footer>
+        <a id="crossbench-revision-link" href="https://chromium.googlesource.com/crossbench" target="_blank" rel="noopener noreferrer">unknown</a>
+      </footer>
+    `;
+       const hash = '48b70334069f38f5bc980d1e73f58afcb782fb50';
+
+       document.body.innerHTML = injectGitRevisionIntoHtml(rawHtml, hash);
+       const link = document.getElementById(
+                        'crossbench-revision-link',
+                        ) as HTMLAnchorElement;
+       expect(link.href).toBe(
+           `https://chromium.googlesource.com/crossbench/+/${hash}`);
+       expect(link.textContent).toBe('48b70334');
+       expect(link.title).toBe(hash);
+
+       document.body.innerHTML = injectGitRevisionIntoHtml(rawHtml, '');
+       const fallbackLink = document.getElementById(
+                                'crossbench-revision-link',
+                                ) as HTMLAnchorElement;
+       expect(fallbackLink.href)
+           .toBe('https://chromium.googlesource.com/crossbench');
+       expect(fallbackLink.textContent).toBe('unknown');
+       expect(fallbackLink.hasAttribute('title')).toBe(false);
+     });
+});

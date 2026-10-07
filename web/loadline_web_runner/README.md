@@ -101,6 +101,10 @@ npx tsc --noEmit
 The application is deployed as a static Single Page Application (SPA) to
 **Firebase Hosting**.
 
+> **Build Safety Check:** `npm run build` verifies that the repository is on
+> the `main` branch, has no uncommitted changes to tracked files, and that
+> `HEAD` is submitted upstream in `origin/main` before building.
+
 ### One-Command Build & Deploy
 ```bash
 npm run build && npx firebase deploy --only hosting

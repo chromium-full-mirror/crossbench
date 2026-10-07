@@ -4,9 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "check:git": "node scripts/check_git_status.mjs",
     "prepare:bin": "node scripts/fetch_binaries.mjs",
     "predev": "npm run prepare:bin",
-    "prebuild": "npm run prepare:bin",
+    "prebuild": "npm run check:git && npm run prepare:bin",
     "pretest": "npm run prepare:bin",
     "dev": "vite",
     "build": "tsc && vite build",

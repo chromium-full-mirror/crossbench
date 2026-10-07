@@ -5,6 +5,8 @@
 import {resolve} from 'path';
 import {defineConfig, type Plugin, searchForWorkspaceRoot} from 'vite';
 
+import {getGitCommitHash, injectGitRevisionIntoHtml, verifyGitStatusForBuild} from './scripts/check_git_status.mjs';
+
 const POPUP_ALLOWED_PREFIXES = [
   '/auth',
   '/privacy',
@@ -35,42 +37,64 @@ function coopCoepPlugin(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [coopCoepPlugin()],
-  worker: {
-    format: 'es',
-  },
-  optimizeDeps: {
-    exclude: ['pyodide'],
-  },
-  server: {
-    fs: {
-      allow: [searchForWorkspaceRoot(process.cwd())],
-      deny: ['.env', '.env.*', '**/.git/**'],
+function gitRevisionPlugin(gitHash: string, isBuild: boolean): Plugin {
+  return {
+    name: 'git-revision-plugin',
+    buildStart() {
+      if (isBuild) {
+        verifyGitStatusForBuild();
+      }
     },
-    proxy: {
-      '/gcs-proxy': {
-        target: 'https://storage.googleapis.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/gcs-proxy/, ''),
+    transformIndexHtml(html) {
+      return injectGitRevisionIntoHtml(html, gitHash);
+    },
+  };
+}
+
+export default defineConfig(({command, mode}) => {
+  const gitHash = getGitCommitHash();
+  const isBuild = command === 'build' && mode !== 'test';
+
+  return {
+    plugins: [
+      coopCoepPlugin(),
+      gitRevisionPlugin(gitHash, isBuild),
+    ],
+    worker: {
+      format: 'es',
+    },
+    optimizeDeps: {
+      exclude: ['pyodide'],
+    },
+    server: {
+      fs: {
+        allow: [searchForWorkspaceRoot(process.cwd())],
+        deny: ['.env', '.env.*', '**/.git/**'],
+      },
+      proxy: {
+        '/gcs-proxy': {
+          target: 'https://storage.googleapis.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/gcs-proxy/, ''),
+        },
       },
     },
-  },
-  build: {
-    target: 'es2022',
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'index.html'),
-        auth: resolve(__dirname, 'auth.html'),
-        privacy: resolve(__dirname, 'privacy.html'),
+    build: {
+      target: 'es2022',
+      rollupOptions: {
+        input: {
+          main: resolve(__dirname, 'index.html'),
+          auth: resolve(__dirname, 'auth.html'),
+          privacy: resolve(__dirname, 'privacy.html'),
+        },
       },
     },
-  },
-  test: {
-    globals: true,
-    environment: 'happy-dom',
-    setupFiles: ['./tests/setup.ts'],
-    include: ['tests/**/*.test.ts'],
-    pool: 'forks',
-  },
+    test: {
+      globals: true,
+      environment: 'happy-dom',
+      setupFiles: ['./tests/setup.ts'],
+      include: ['tests/**/*.test.ts'],
+      pool: 'forks',
+    },
+  };
 });
