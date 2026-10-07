@@ -76,3 +76,25 @@ self.platform.sh("path/to/custom/test_bin", "--test=foo")
 binary = Binaries.TEST_BIN.resolve(self.platform)
 self.platform.sh(binary, "--test=foo")
 ```
+
+## Multi-Line Imports
+
+- Multi-line imports **must** use backslash (`\`) line continuations, not
+  parentheses.
+- **Never** suggest parentheses `(...)` for multi-line imports.
+- **Never** cite PEP 8 to replace backslash line continuations with parentheses
+  in imports. Crossbench formatting (`git cl format`) and conventions strictly
+  enforce backslashes for multi-line imports.
+
+```python
+# GOOD: Crossbench convention uses backslashes for multi-line imports
+from crossbench.plt.display_info import \
+    DisplayRefreshRateResult, \
+    DisplayResolution
+
+# BAD: Do NOT use or suggest parentheses for multi-line imports
+from crossbench.plt.display_info import (
+    DisplayRefreshRateResult,
+    DisplayResolution,
+)
+```
