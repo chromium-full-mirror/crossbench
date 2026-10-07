@@ -22,7 +22,10 @@ from typing_extensions import override
 
 from crossbench import path as pth
 from crossbench.action_runner.action.enums import ButtonClick
+from crossbench.action_runner.action.position import UiSelectorConfig
 from crossbench.action_runner.display_rectangle import DisplayRectangle
+from crossbench.action_runner.element_not_found_error import \
+    ElementNotFoundError
 from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
     MouseButtonEvent, MouseMoveEvent, TouchEvent, WaitEvent
 from crossbench.action_runner.virtual_device.keyboard import \
@@ -1391,6 +1394,52 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
         self.assertEqual(
             parse_binary_manifest_package_name(manifest_file.read()),
             package_name)
+
+  def test_get_ui_element_rect(self) -> None:
+    mock_ad = mock.MagicMock()
+    mock_ui_obj = mock.MagicMock()
+    mock_ui_obj.wait.exists.return_value = True
+    bounds_mock = mock.MagicMock()
+    bounds_mock.left = 10
+    bounds_mock.top = 20
+    bounds_mock.right = 110
+    bounds_mock.bottom = 220
+    mock_ui_obj.visible_bounds = bounds_mock
+    mock_ad.ui.return_value = mock_ui_obj
+
+    mock_context = mock.MagicMock()
+    mock_context.__enter__.return_value = mock_ad
+    mock_context.__exit__.return_value = None
+
+    with mock.patch.object(
+        self.platform, "uiautomator_device",
+        return_value=mock_context) as mock_uiautomator:
+      ui_selector = UiSelectorConfig(text="Click me")
+      rect = self.platform.get_ui_element_rect(ui_selector)
+      self.assertEqual(rect.origin, Point(10, 20))
+      self.assertEqual(rect.width, 100)
+      self.assertEqual(rect.height, 200)
+      self.assertEqual(rect.middle, Point(60, 120))
+      mock_uiautomator.assert_called_once_with(root_device=False)
+      mock_ad.ui.assert_called_once_with(text="Click me")
+      mock_ui_obj.wait.exists.assert_called_once()
+
+  def test_get_ui_element_rect_not_found_raises(self) -> None:
+    mock_ad = mock.MagicMock()
+    mock_ui_obj = mock.MagicMock()
+    mock_ui_obj.wait.exists.return_value = False
+    mock_ad.ui.return_value = mock_ui_obj
+
+    mock_context = mock.MagicMock()
+    mock_context.__enter__.return_value = mock_ad
+    mock_context.__exit__.return_value = None
+
+    with mock.patch.object(
+        self.platform, "uiautomator_device", return_value=mock_context):
+      ui_selector = UiSelectorConfig(text="Click me")
+      with self.assertRaises(ElementNotFoundError) as cm:
+        self.platform.get_ui_element_rect(ui_selector)
+      self.assertIn("Click me", str(cm.exception))
 
   def _create_axml(self, package_name: str) -> bytes:
     # A very minimal Android Binary XML generator for testing.

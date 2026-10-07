@@ -5,25 +5,19 @@
 from __future__ import annotations
 
 import datetime as dt
-import logging
 import re
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, Final
 
-from crossbench.action_runner.base import InputSourceNotImplementedError
 from crossbench.action_runner.display_rectangle import DisplayRectangle
 from crossbench.action_runner.element_not_found_error import \
     ElementNotFoundError
-from crossbench.action_runner.screenshot_annotation import \
-    ScreenshotPointAnnotation, ScreenshotRectAnnotation
 from crossbench.action_runner.unified_input_action_runner import \
     UnifiedInputActionRunner
 from crossbench.benchmarks.loading.point import Point
 
 if TYPE_CHECKING:
   from crossbench.action_runner.action import all as i_action
-  from crossbench.action_runner.action.position import UiSelectorConfig
   from crossbench.browsers.attributes import BrowserAttributes
-  from crossbench.plt.android_adb import AndroidAdbPlatform
   from crossbench.runner.actions import Actions
 
 
@@ -158,84 +152,10 @@ return [
 
         remaining_distance -= current_distance
 
-  def click_touch(self, action: i_action.ClickAction) -> None:
-    if ui_selector := action.position.ui_selector:
-      self._click_touch_selector(action, ui_selector)
-      return
-    super().click_touch(action)
-
-  def _click_touch_selector(self, action: i_action.ClickAction,
-                            ui_selector: UiSelectorConfig) -> None:
-    with self.actions("ClickAction", measure=False) as actions:
-      self._click_ui_selector(ui_selector, action.timeout)
-      if action.verify:
-        self.wait_for_element_impl(
-            actions,
-            selector=action.verify,
-            timeout=action.timeout,
-            check_element_rect=True)
-
-  def click_driver(self, action: i_action.ClickAction) -> None:
-    self._click_driver_impl(action)
-
   def swipe(self, action: i_action.SwipeAction) -> None:
     with self.actions("SwipeAction", measure=False):
       self._swipe_impl(action.start_x, action.start_y, action.end_x,
                        action.end_y, action.duration)
-
-
-  def _click_driver_impl(self, action: i_action.ClickAction) -> None:
-    if action.duration > dt.timedelta():
-      raise InputSourceNotImplementedError(self, action, action.input_source,
-                                           "Non-zero duration not implemented")
-    coordinates: Point | None = None
-    with self.actions("ClickAction", measure=False) as actions:
-
-      if coordinates_config := action.position.coordinates:
-        coordinates = coordinates_config.point()
-      elif ui_selector := action.position.ui_selector:
-        self._click_ui_selector(ui_selector, action.timeout)
-      elif selector_config := action.position.selector:
-        if selector_config.wait:
-          self.wait_for_element_impl(
-              actions,
-              selector=selector_config.selector,
-              timeout=action.timeout,
-              scroll_into_view=selector_config.scroll_into_view,
-              check_element_rect=True,
-              required=selector_config.required)
-
-        viewport_info = self._get_android_viewport_info(
-            actions, selector_config.selector, selector_config.scroll_into_view)
-
-        rect = viewport_info.element_rect()
-        if not rect:
-          logging.warning("No clickable element_rect found for %s",
-                          selector_config.selector)
-          if selector_config.required:
-            raise ElementNotFoundError(selector_config.selector)
-          return
-
-        self.add_failure_screenshot_annotation(
-            ScreenshotRectAnnotation(
-                label="Chrome viewport", rect=viewport_info.chrome_window))
-        self.add_failure_screenshot_annotation(
-            ScreenshotRectAnnotation(label=selector_config.selector, rect=rect))
-        coordinates = Point(rect.mid_x, rect.mid_y)
-
-      if not action.position.ui_selector:
-        assert coordinates, "missing coordinates"
-        self.add_failure_screenshot_annotation(
-            ScreenshotPointAnnotation(label="click", point=coordinates))
-        self.browser_platform.sh("input", "tap", str(coordinates.x),
-                                 str(coordinates.y))
-
-      if action.verify:
-        self.wait_for_element_impl(
-            actions,
-            selector=action.verify,
-            timeout=action.timeout,
-            check_element_rect=True)
 
   def _swipe_impl(self, start_x: int, start_y: int, end_x: int, end_y: int,
                   duration: dt.timedelta) -> None:
@@ -297,19 +217,3 @@ return [
         self.browser.attributes())
 
     return self.browser_platform.get_window_rect(browser_main_window_name)
-
-
-  def _click_ui_selector(self, ui_selector: UiSelectorConfig,
-                         timeout: dt.timedelta) -> None:
-    adb_platform = cast("AndroidAdbPlatform", self.browser_platform)
-    with adb_platform.uiautomator_device() as ad:
-      selector_dict = ui_selector.to_json()
-      ui_object = ad.ui(**ui_selector.to_json())
-      # This verification step verifies if the element exists.
-      if not ui_object.wait.exists(timeout=timeout):
-        if not ui_selector.required:
-          logging.debug("Optional UI element %s not found within %s",
-                        selector_dict, timeout)
-          return
-        raise AssertionError(f"Element with selector {selector_dict} not found")
-      ui_object.click()

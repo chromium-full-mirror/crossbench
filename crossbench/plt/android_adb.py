@@ -25,6 +25,8 @@ from typing_extensions import override
 
 from crossbench import path as pth
 from crossbench.action_runner.display_rectangle import DisplayRectangle
+from crossbench.action_runner.element_not_found_error import \
+    ElementNotFoundError
 from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
     MouseButtonEvent, MouseMoveEvent, TouchEvent, WaitEvent
 from crossbench.action_runner.keyboard_layout import \
@@ -50,6 +52,7 @@ from third_party.protoc import activitymanagerservice_pb2, battery_pb2, \
     enums_pb2, windowmanagerservice_pb2
 
 if TYPE_CHECKING:
+  from crossbench.action_runner.action.position import UiSelectorConfig
   from crossbench.action_runner.virtual_device.virtual_device_config import \
       VirtualDeviceConfig
   from crossbench.action_runner.virtual_device.virtual_device_type import \
@@ -1531,6 +1534,22 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
     height = bottom - top
 
     return DisplayRectangle(Point(left, top), width, height)
+
+  @override
+  def get_ui_element_rect(
+      self,
+      ui_selector: UiSelectorConfig,
+      timeout: dt.timedelta = dt.timedelta(seconds=10),
+  ) -> DisplayRectangle:
+    with self.uiautomator_device(root_device=False) as ad:
+      selector_dict = ui_selector.to_json()
+      ui_object = ad.ui(**selector_dict)
+      if not ui_object.wait.exists(timeout=timeout):
+        raise ElementNotFoundError(str(selector_dict))
+      bounds = ui_object.visible_bounds
+      return DisplayRectangle(
+          Point(bounds.left, bounds.top), bounds.right - bounds.left,
+          bounds.bottom - bounds.top)
 
   @override
   def set_display_refresh_rate(self,

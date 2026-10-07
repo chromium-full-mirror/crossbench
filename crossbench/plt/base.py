@@ -9,6 +9,7 @@ import atexit
 import collections.abc
 import contextlib
 import dataclasses
+import datetime as dt
 import functools
 import gzip
 import inspect
@@ -45,10 +46,9 @@ from crossbench.plt.port_manager import LocalPortManager, PortManager, \
 from crossbench.plt.remote import RemotePopen
 
 if TYPE_CHECKING:
-  import datetime as dt
-
   import google.cloud.storage.blob as gcloud_blob  # type: ignore
 
+  from crossbench.action_runner.action.position import UiSelectorConfig
   from crossbench.action_runner.display_rectangle import DisplayRectangle
   from crossbench.action_runner.input_events import InputEvent
   from crossbench.device_config import DeviceConfigKeyPath
@@ -1366,6 +1366,14 @@ class Platform(abc.ABC):
   def get_window_rect(self, window_name: str) -> DisplayRectangle:
     raise NotImplementedError(
         "'get_window_rect' is only available on Android for now")
+
+  def get_ui_element_rect(
+      self,
+      ui_selector: UiSelectorConfig,
+      timeout: dt.timedelta = dt.timedelta(seconds=10),
+  ) -> DisplayRectangle:
+    raise NotImplementedError(
+        f"'get_ui_element_rect' is not supported on {self.name}")
 
   @contextlib.contextmanager
   def low_power_mode(self) -> Generator[None, Any, None]:

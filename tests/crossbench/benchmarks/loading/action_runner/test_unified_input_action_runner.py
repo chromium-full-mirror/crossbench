@@ -4,15 +4,21 @@
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import pathlib
 import unittest
+from typing import TYPE_CHECKING
 from unittest import mock
+
+if TYPE_CHECKING:
+  from collections.abc import Iterator
 
 from crossbench.action_runner.action.click import ClickAction
 from crossbench.action_runner.action.enums import ButtonClick
 from crossbench.action_runner.action.position import PositionConfig
 from crossbench.action_runner.action.text_input import TextInputAction
+from crossbench.action_runner.display_rectangle import DisplayRectangle
 from crossbench.action_runner.element_not_found_error import \
     ElementNotFoundError
 from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
@@ -426,6 +432,104 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
         WaitEvent(duration=UnifiedInputActionRunner.DEFAULT_CLICK_DURATION),
         MouseButtonEvent(button=ButtonClick.LEFT, is_down=False),
     ])
+
+  @contextlib.contextmanager
+  def patch_get_ui_element_rect(
+      self,
+      return_value: DisplayRectangle | None = None,
+      side_effect: Exception | None = None,
+  ) -> Iterator[mock.MagicMock]:
+    if return_value is None and side_effect is None:
+      return_value = DisplayRectangle(Point(100, 200), 50, 40)
+    with mock.patch.object(
+        self.action_runner.browser_platform,
+        "get_ui_element_rect",
+        return_value=return_value,
+        side_effect=side_effect) as mock_get_rect:
+      yield mock_get_rect
+
+  def test_click_touch_ui_selector_success(self) -> None:
+    click_action = ClickAction.create(
+        InputSource.TOUCH,
+        position=PositionConfig.from_ui_selector(res="button_id"))
+    with self.patch_get_ui_element_rect() as mock_get_rect:
+      self.run_action(click_action)
+      mock_get_rect.assert_called_once()
+
+    self.assert_input_events_injected([
+        TouchEvent(Point(125, 220), is_down=True),
+        WaitEvent(duration=UnifiedInputActionRunner.DEFAULT_CLICK_DURATION),
+        TouchEvent(Point(125, 220), is_down=False),
+    ])
+
+  def test_click_mouse_ui_selector_success(self) -> None:
+    click_action = ClickAction.create(
+        InputSource.MOUSE,
+        position=PositionConfig.from_ui_selector(res="button_id"))
+    with self.patch_get_ui_element_rect() as mock_get_rect:
+      self.run_action(click_action)
+      mock_get_rect.assert_called_once()
+
+    self.assert_input_events_injected([
+        MouseMoveEvent(Point(125, 220)),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=True),
+        WaitEvent(duration=UnifiedInputActionRunner.DEFAULT_CLICK_DURATION),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=False),
+    ])
+
+  def test_click_touch_ui_selector_with_verify(self) -> None:
+    click_action = ClickAction.create(
+        InputSource.TOUCH,
+        position=PositionConfig.from_ui_selector(res="button_id"),
+        verify="#success")
+    self.browser.expect_js(expected_js=JsInvocation(result=1))
+    with self.patch_get_ui_element_rect() as mock_get_rect:
+      self.run_action(click_action)
+      mock_get_rect.assert_called_once()
+
+    self.assert_input_events_injected([
+        TouchEvent(Point(125, 220), is_down=True),
+        WaitEvent(duration=UnifiedInputActionRunner.DEFAULT_CLICK_DURATION),
+        TouchEvent(Point(125, 220), is_down=False),
+    ])
+
+  def test_click_mouse_ui_selector_with_verify(self) -> None:
+    click_action = ClickAction.create(
+        InputSource.MOUSE,
+        position=PositionConfig.from_ui_selector(res="button_id"),
+        verify="#success")
+    self.browser.expect_js(expected_js=JsInvocation(result=1))
+    with self.patch_get_ui_element_rect() as mock_get_rect:
+      self.run_action(click_action)
+      mock_get_rect.assert_called_once()
+
+    self.assert_input_events_injected([
+        MouseMoveEvent(Point(125, 220)),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=True),
+        WaitEvent(duration=UnifiedInputActionRunner.DEFAULT_CLICK_DURATION),
+        MouseButtonEvent(button=ButtonClick.LEFT, is_down=False),
+    ])
+
+  def test_click_ui_selector_not_found_required(self) -> None:
+    click_action = ClickAction.create(
+        InputSource.TOUCH,
+        position=PositionConfig.from_ui_selector(
+            res="button_id", required=True))
+    with self.patch_get_ui_element_rect(
+        side_effect=ElementNotFoundError("button_id")):
+      with self.assertRaises(ElementNotFoundError):
+        self.run_action(click_action)
+    self.inject_events_mock.assert_not_called()
+
+  def test_click_ui_selector_not_found_optional(self) -> None:
+    click_action = ClickAction.create(
+        InputSource.TOUCH,
+        position=PositionConfig.from_ui_selector(
+            res="button_id", required=False))
+    with self.patch_get_ui_element_rect(
+        side_effect=ElementNotFoundError("button_id")):
+      self.run_action(click_action)
+    self.inject_events_mock.assert_not_called()
 
 
 class ScriptsDirTestCase(unittest.TestCase):

@@ -8,7 +8,7 @@ import json
 import pathlib
 import tempfile
 import urllib.parse
-from typing import Any
+from typing import Any, Final
 
 import pytest
 
@@ -56,13 +56,7 @@ def _run_loading_test_with_probes(browser_config: str, page_config: Any,
                       pathlib.Path(probe_config_file.name))
 
 
-@pytest.mark.parametrize("input_source", InputSource)
-def test_click(browser_config, input_source, test_env) -> None:
-
-  if input_source is InputSource.KEYBOARD:
-    return
-
-  test_page = urllib.parse.quote("""
+_CLICK_TEST_PAGE: Final[str] = urllib.parse.quote("""
 <!DOCTYPE html>
 <html>
 <body>
@@ -79,13 +73,21 @@ def test_click(browser_config, input_source, test_env) -> None:
 </html>
 """)
 
+
+@pytest.mark.parametrize("input_source", [
+    InputSource.JS,
+    InputSource.TOUCH,
+    InputSource.MOUSE,
+    InputSource.DRIVER,
+])
+def test_click(browser_config, input_source, test_env) -> None:
   page_config = {
       "pages": {
           "ClickTest": {
               "actions": [
                   {
                       "action": "get",
-                      "url": f"data:text/html;charset=utf-8,{test_page}",
+                      "url": f"data:text/html;charset=utf-8,{_CLICK_TEST_PAGE}",
                       "ready_state": "complete",
                   },
                   {
@@ -95,6 +97,33 @@ def test_click(browser_config, input_source, test_env) -> None:
                           "required": True,
                           "scroll_into_view": True,
                           "wait": True,
+                      },
+                      "verify": "button[id='clicked-button']",
+                      "source": str(input_source),
+                  },
+              ],
+          },
+      },
+  }
+
+  _run_loading_test(browser_config, page_config, test_env)
+
+
+@pytest.mark.parametrize("input_source", [InputSource.TOUCH, InputSource.MOUSE])
+def test_click_ui_selector(browser_config, input_source, test_env) -> None:
+  page_config = {
+      "pages": {
+          "ClickTest": {
+              "actions": [
+                  {
+                      "action": "get",
+                      "url": f"data:text/html;charset=utf-8,{_CLICK_TEST_PAGE}",
+                      "ready_state": "complete",
+                  },
+                  {
+                      "action": "click",
+                      "position": {
+                          "text": "Click me",
                       },
                       "verify": "button[id='clicked-button']",
                       "source": str(input_source),

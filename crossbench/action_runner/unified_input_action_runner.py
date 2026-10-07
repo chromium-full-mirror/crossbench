@@ -24,7 +24,8 @@ from crossbench.benchmarks.loading.point import Point
 
 if TYPE_CHECKING:
   from crossbench.action_runner.action import all as i_action
-  from crossbench.action_runner.action.position import SelectorConfig
+  from crossbench.action_runner.action.position import SelectorConfig, \
+      UiSelectorConfig
   from crossbench.runner.actions import Actions
 
 SCRIPTS_DIR: Final[pth.LocalPath] = (
@@ -129,15 +130,19 @@ class UnifiedInputActionRunner(ActionRunner):
   def _get_click_location(self, actions: Actions,
                           action: i_action.ClickAction) -> Point | None:
     if selector_config := action.position.selector:
-      return self._get_selector_click_location(actions, action, selector_config)
-
-    if coordinates_config := action.position.coordinates:
+      click_location = self._get_selector_click_location(
+          actions, action, selector_config)
+    elif coordinates_config := action.position.coordinates:
       click_location = coordinates_config.point()
+    elif ui_selector := action.position.ui_selector:
+      click_location = self._get_ui_selector_click_location(action, ui_selector)
+    else:
+      raise RuntimeError("Missing coordinates")
+
+    if click_location:
       self.add_failure_screenshot_annotation(
           ScreenshotPointAnnotation(label="click", point=click_location))
-      return click_location
-
-    raise RuntimeError("Missing coordinates")
+    return click_location
 
   def _get_selector_click_location(
       self, actions: Actions, action: i_action.ClickAction,
@@ -161,10 +166,22 @@ class UnifiedInputActionRunner(ActionRunner):
     self.add_failure_screenshot_annotation(
         ScreenshotRectAnnotation(
             label=selector_config.selector, rect=element_rect))
-    click_location = element_rect.middle
+    return element_rect.middle
+
+  def _get_ui_selector_click_location(
+      self, action: i_action.ClickAction,
+      ui_selector: UiSelectorConfig) -> Point | None:
+    try:
+      element_rect = self.browser_platform.get_ui_element_rect(
+          ui_selector, action.timeout)
+    except ElementNotFoundError:
+      if ui_selector.required:
+        raise
+      return None
     self.add_failure_screenshot_annotation(
-        ScreenshotPointAnnotation(label="click", point=click_location))
-    return click_location
+        ScreenshotRectAnnotation(
+            label=str(ui_selector.to_json()), rect=element_rect))
+    return element_rect.middle
 
   def _get_viewport_info(self,
                          actions: Actions,

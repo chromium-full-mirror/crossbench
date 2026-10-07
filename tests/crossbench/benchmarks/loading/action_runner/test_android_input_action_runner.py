@@ -597,6 +597,61 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
           MouseButtonEvent(ButtonClick.LEFT, is_down=False),
       ])
 
+  def test_click_touch_ui_selector(self) -> None:
+    click_action = ClickAction.create(
+        InputSource.TOUCH,
+        position=PositionConfig.from_ui_selector(text="Click me"))
+
+    with mock.patch.object(
+        self.platform,
+        "get_ui_element_rect",
+        return_value=DisplayRectangle(Point(100, 200), 50,
+                                      40)) as mock_get_rect:
+      with mock.patch.object(self.platform,
+                             "inject_input_events") as mock_inject:
+        self.run_action(click_action)
+        mock_get_rect.assert_called_once()
+        mock_inject.assert_called_once()
+        device_name, events = mock_inject.call_args[0]
+        self.assertEqual(device_name, "default_touchscreen")
+        self.assertSequenceEqual(events, [
+            TouchEvent(Point(125, 220), is_down=True),
+            WaitEvent(dt.timedelta(milliseconds=50)),
+            TouchEvent(Point(125, 220), is_down=False),
+        ])
+
+  def test_click_mouse_ui_selector(self) -> None:
+    click_action = ClickAction.create(
+        InputSource.MOUSE,
+        position=PositionConfig.from_ui_selector(text="Click me"))
+
+    with mock.patch.object(
+        self.platform,
+        "get_ui_element_rect",
+        return_value=DisplayRectangle(Point(100, 200), 50,
+                                      40)) as mock_get_rect:
+      with mock.patch.object(self.platform,
+                             "inject_input_events") as mock_inject:
+        self.run_action(click_action)
+        mock_get_rect.assert_called_once()
+        mock_inject.assert_called_once()
+        device_name, events = mock_inject.call_args[0]
+        self.assertEqual(device_name, "default_mouse")
+        self.assertSequenceEqual(events, [
+            MouseMoveEvent(Point(125, 220)),
+            MouseButtonEvent(ButtonClick.LEFT, is_down=True),
+            WaitEvent(dt.timedelta(milliseconds=50)),
+            MouseButtonEvent(ButtonClick.LEFT, is_down=False),
+        ])
+
+  def test_click_driver_selector(self) -> None:
+    click_action = ClickAction.create(
+        InputSource.DRIVER,
+        position=PositionConfig.from_selector(selector="#submit-button"))
+    with mock.patch.object(self.browser, "trusted_click") as mock_trusted_click:
+      self.run_action(click_action)
+      mock_trusted_click.assert_called_once_with("#submit-button")
+
   def test_click_wait_timeout_required(self):
     click_action = ClickAction.create(
         InputSource.MOUSE,
@@ -728,7 +783,7 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
 
     self.run_action(scroll_action)
 
-  def test_click_ui_selector_required_element_not_found_raises(self):
+  def test_click_ui_selector_required_element_not_found_raises(self) -> None:
     click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_ui_selector(
@@ -743,14 +798,13 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
         self.platform,
         "uiautomator_device",
         return_value=contextlib.nullcontext(mock_ad)):
-      with self.assertRaises(AssertionError) as cm:
+      with self.assertRaises(ElementNotFoundError) as cm:
         self.run_action(click_action)
-      self.assertIn("Element with selector", str(cm.exception))
       self.assertIn("mock_target", str(cm.exception))
       mock_ad.ui.assert_called_once_with(text="mock_target")
-      mock_ui_object.click.assert_not_called()
 
-  def test_click_ui_selector_non_required_element_not_found_success(self):
+  def test_click_ui_selector_non_required_element_not_found_success(
+      self) -> None:
     click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_ui_selector(
@@ -765,11 +819,13 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
         self.platform,
         "uiautomator_device",
         return_value=contextlib.nullcontext(mock_ad)):
-      self.run_action(click_action)
-      mock_ad.ui.assert_called_once_with(text="mock_target")
-      mock_ui_object.click.assert_not_called()
+      with mock.patch.object(self.platform,
+                             "inject_input_events") as mock_inject:
+        self.run_action(click_action)
+        mock_ad.ui.assert_called_once_with(text="mock_target")
+        mock_inject.assert_not_called()
 
-  def test_click_ui_selector_required_element_found_clicks(self):
+  def test_click_ui_selector_required_element_found_clicks(self) -> None:
     click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_ui_selector(res="mock_res", required=True))
@@ -777,17 +833,29 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
     mock_ad = mock.MagicMock()
     mock_ui_object = mock.MagicMock()
     mock_ui_object.wait.exists.return_value = True
+    bounds = mock.MagicMock()
+    bounds.left = 10
+    bounds.top = 20
+    bounds.right = 30
+    bounds.bottom = 40
+    mock_ui_object.visible_bounds = bounds
     mock_ad.ui.return_value = mock_ui_object
 
     with mock.patch.object(
         self.platform,
         "uiautomator_device",
         return_value=contextlib.nullcontext(mock_ad)):
-      self.run_action(click_action)
-      mock_ad.ui.assert_called_once_with(res="mock_res")
-      mock_ui_object.click.assert_called_once()
+      with mock.patch.object(self.platform,
+                             "inject_input_events") as mock_inject:
+        self.run_action(click_action)
+        mock_ad.ui.assert_called_once_with(res="mock_res")
+        mock_inject.assert_called_once()
+        device_name, events = mock_inject.call_args[0]
+        self.assertEqual(device_name, "default_touchscreen")
+        self.assertEqual(events[0], TouchEvent(Point(20, 30), is_down=True))
+        self.assertEqual(events[-1], TouchEvent(Point(20, 30), is_down=False))
 
-  def test_click_ui_selector_non_required_element_found_clicks(self):
+  def test_click_ui_selector_non_required_element_found_clicks(self) -> None:
     click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_ui_selector(
@@ -796,17 +864,29 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
     mock_ad = mock.MagicMock()
     mock_ui_object = mock.MagicMock()
     mock_ui_object.wait.exists.return_value = True
+    bounds = mock.MagicMock()
+    bounds.left = 10
+    bounds.top = 20
+    bounds.right = 30
+    bounds.bottom = 40
+    mock_ui_object.visible_bounds = bounds
     mock_ad.ui.return_value = mock_ui_object
 
     with mock.patch.object(
         self.platform,
         "uiautomator_device",
         return_value=contextlib.nullcontext(mock_ad)):
-      self.run_action(click_action)
-      mock_ad.ui.assert_called_once_with(clazz="mock_clazz")
-      mock_ui_object.click.assert_called_once()
+      with mock.patch.object(self.platform,
+                             "inject_input_events") as mock_inject:
+        self.run_action(click_action)
+        mock_ad.ui.assert_called_once_with(clazz="mock_clazz")
+        mock_inject.assert_called_once()
+        device_name, events = mock_inject.call_args[0]
+        self.assertEqual(device_name, "default_touchscreen")
+        self.assertEqual(events[0], TouchEvent(Point(20, 30), is_down=True))
+        self.assertEqual(events[-1], TouchEvent(Point(20, 30), is_down=False))
 
-  def test_click_ui_selector_pkg_and_text(self):
+  def test_click_ui_selector_pkg_and_text(self) -> None:
     click_action = ClickAction.create(
         InputSource.TOUCH,
         position=PositionConfig.from_ui_selector(
@@ -815,16 +895,28 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
     mock_ad = mock.MagicMock()
     mock_ui_object = mock.MagicMock()
     mock_ui_object.wait.exists.return_value = True
+    bounds = mock.MagicMock()
+    bounds.left = 10
+    bounds.top = 20
+    bounds.right = 30
+    bounds.bottom = 40
+    mock_ui_object.visible_bounds = bounds
     mock_ad.ui.return_value = mock_ui_object
 
     with mock.patch.object(
         self.platform,
         "uiautomator_device",
         return_value=contextlib.nullcontext(mock_ad)):
-      self.run_action(click_action)
-      mock_ad.ui.assert_called_once_with(
-          pkg="com.android.systemui", text="Chrome")
-      mock_ui_object.click.assert_called_once()
+      with mock.patch.object(self.platform,
+                             "inject_input_events") as mock_inject:
+        self.run_action(click_action)
+        mock_ad.ui.assert_called_once_with(
+            pkg="com.android.systemui", text="Chrome")
+        mock_inject.assert_called_once()
+        device_name, events = mock_inject.call_args[0]
+        self.assertEqual(device_name, "default_touchscreen")
+        self.assertEqual(events[0], TouchEvent(Point(20, 30), is_down=True))
+        self.assertEqual(events[-1], TouchEvent(Point(20, 30), is_down=False))
 
 
 if __name__ == "__main__":
