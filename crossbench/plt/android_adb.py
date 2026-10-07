@@ -38,6 +38,7 @@ from crossbench.browsers.chromium.devtools import DevToolsRemoteClient
 from crossbench.flags.base import Flags, FlagsData
 from crossbench.helper.path_finder import BundletoolFinder
 from crossbench.helper.size import Size
+from crossbench.helper.wait import WaitRange
 from crossbench.parse import NumberParser
 from crossbench.plt import axml
 from crossbench.plt.arch import MachineArch
@@ -973,6 +974,9 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
       return
     self.sh("sync")
     self.sh("setprop", "perf.drop_caches", "3")
+    for _ in WaitRange(0.01, timeout=5).wait_with_backoff():
+      if self.adb.getprop("perf.drop_caches") == "0":
+        break
 
   @functools.cached_property
   @override

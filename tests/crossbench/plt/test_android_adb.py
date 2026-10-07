@@ -191,6 +191,8 @@ class BaseAndroidAdbMockPlatformTestCase(BasePosixMockPlatformTestCase):
     self.expect_sh("getprop ro.build.version.sdk", result="37")
     self.expect_sh("sync")
     self.expect_sh("setprop perf.drop_caches 3")
+    self.expect_sh("getprop perf.drop_caches", result="3")
+    self.expect_sh("getprop perf.drop_caches", result="0")
     with mock.patch.object(
         self.platform, "sh", wraps=self.platform.sh) as mock_sh:
       self.platform.clear_memory_page_cache()
