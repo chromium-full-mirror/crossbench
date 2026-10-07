@@ -387,8 +387,10 @@ class WebPowerBenchmarkBase(SubStoryBenchmark):
       stories: Sequence[WebPowerStory],
       action_runner_config: ActionRunnerConfig | None = None,
       bits_probe: BitsProbe | None = None,
+      has_custom_network: bool = False,
   ) -> None:
     self._bits_probe = bits_probe
+    self._has_custom_network = has_custom_network
     super().__init__(stories, action_runner_config)
 
   @property
@@ -427,7 +429,7 @@ class WebPowerBenchmarkBase(SubStoryBenchmark):
     if not isinstance(network, WprReplayNetwork):
       return
 
-    if story.site_config.archive:
+    if not self._has_custom_network and story.site_config.archive:
       local_archive_path = network.ensure_archive(story.site_config.archive)
       network.set_archive_path(local_archive_path)
 
@@ -526,6 +528,8 @@ class WebPowerBenchmarkBase(SubStoryBenchmark):
   @override
   def kwargs_from_cli(cls, args: argparse.Namespace) -> dict[str, Any]:
     kwargs = super().kwargs_from_cli(args)
+    kwargs["has_custom_network"] = bool(args.network_config and
+                                        not args.network_config.is_default())
     cls._select_network(args)
     if bits_probe := cls._parse_bits_probe(args):
       kwargs["bits_probe"] = bits_probe

@@ -355,8 +355,33 @@ class WebPowerBenchmarkBaseTestCase(BaseWebPowerBenchmarkTestCase):
     kwargs = MockWebPowerBenchmark.kwargs_from_cli(args)
     [story] = kwargs["stories"]
     self.assertEqual(story.name, "web-power-mock-story-custom")
+    self.assertIsNone(story.site_config.archive)
     self.assertEqual(args.network_config.type, NetworkType.WPR)
     self.assertEqual(args.network_config.url, "gs://some/other.wprgo")
+    self.assertTrue(kwargs["has_custom_network"])
+
+  def test_kwargs_from_cli_stories_with_explicit_network(self) -> None:
+    custom_archive = pth.LocalPath("/tmp/custom.wprgo")
+    self.fs.create_file(custom_archive)
+    args = self.parse_args("--stories=cnn")
+    args.network_config = NetworkConfig(
+        type=NetworkType.WPR, path=custom_archive)
+    kwargs = MockWebPowerBenchmark.kwargs_from_cli(args)
+    [story] = kwargs["stories"]
+    self.assertEqual(story.site_config.archive,
+                     WebPowerStory.SITES["cnn"].archive)
+    self.assertEqual(args.network_config.type, NetworkType.WPR)
+    self.assertEqual(args.network_config.path, custom_archive)
+    self.assertTrue(args.network_config.no_archive_certificates)
+    self.assertTrue(kwargs["has_custom_network"])
+
+  def test_kwargs_from_cli_stories_default_network(self) -> None:
+    args = self.parse_args("--stories=cnn")
+    kwargs = MockWebPowerBenchmark.kwargs_from_cli(args)
+    [story] = kwargs["stories"]
+    self.assertEqual(story.site_config.archive,
+                     WebPowerStory.SITES["cnn"].archive)
+    self.assertFalse(kwargs["has_custom_network"])
 
   def test_kwargs_from_cli_site_with_explicit_network_fails(self) -> None:
     args = self.parse_args("--site", "cnn")
@@ -846,6 +871,7 @@ class WebPowerBenchmarkSetupSessionTestCase(BaseCrossbenchTestCase):
       self,
       site_key: str | None = None,
       url: str | None = None,
+      has_custom_network: bool = False,
   ) -> tuple[MockWebPowerBenchmark, FakeWprReplayNetwork, mock.MagicMock]:
     archive_path = pth.LocalPath("/tmp/archive.wprgo")
     if not self.fs.exists(str(archive_path)):
@@ -864,7 +890,8 @@ class WebPowerBenchmarkSetupSessionTestCase(BaseCrossbenchTestCase):
       self.assertIsNotNone(url)
       story = MockWebPowerStory.from_url(
           url, total_duration=dt.timedelta(seconds=10))
-    benchmark = MockWebPowerBenchmark(stories=[story])
+    benchmark = MockWebPowerBenchmark(
+        stories=[story], has_custom_network=has_custom_network)
     run = mock.MagicMock()
     run.story = story
     run.browser = browser
@@ -1005,6 +1032,29 @@ class WebPowerBenchmarkSetupSessionTestCase(BaseCrossbenchTestCase):
       rules_file = network._response_transformations_file
       self.assertIsNotNone(rules_file)
       self.assertTrue(pathlib.Path(rules_file).exists())
+
+  def test_setup_session_network_predefined_site_with_custom_wpr(self) -> None:
+    archive_path = pth.LocalPath("/tmp/custom_archive.wprgo")
+    self.fs.create_file(archive_path)
+
+    benchmark, network, session = self._create_session(
+        site_key="cnn", has_custom_network=True)
+    network.set_archive_path(archive_path)
+
+    dismisser_file = pathlib.Path(wpr_helpers.__file__).parent / "dismisser.js"
+    self.fs.add_real_file(dismisser_file)
+
+    with mock.patch.object(
+        self.platform,
+        "sh_stdout",
+        return_value=('Dismisser target: button,button,"Accept All",'
+                      'https://www.cnn.com')):
+      benchmark.setup_session_network(session)
+      self.assertEqual(network.archive_path, archive_path)
+      rules_file = network._response_transformations_file
+      self.assertIsNotNone(rules_file)
+      self.assertTrue(pathlib.Path(rules_file).exists())
+      self.mock_download.assert_not_called()
 
 
 if __name__ == "__main__":
