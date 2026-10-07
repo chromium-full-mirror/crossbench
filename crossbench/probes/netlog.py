@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Self
+from typing import TYPE_CHECKING, ClassVar, Self
 
 from typing_extensions import override
 
@@ -31,7 +31,7 @@ class NetLogCaptureMode(StrEnumWithHelp):
 
   @classmethod
   @override
-  def _missing_(cls, value: Any) -> NetLogCaptureMode | None:
+  def _missing_(cls, value: object) -> NetLogCaptureMode | None:
     value_str = str(value).lower()
     if value_str == "normal":
       return NetLogCaptureMode.DEFAULT

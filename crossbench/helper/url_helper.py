@@ -7,12 +7,13 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import urllib.parse as urlparse
-from typing import TYPE_CHECKING, Any, Callable, Mapping
+from typing import TYPE_CHECKING, Callable, Mapping
 
 import requests
 
 if TYPE_CHECKING:
   from crossbench.runner.timing import AnyTime
+  from crossbench.types import Json
 
 DEFAULT_REQUEST_TIMEOUT = dt.timedelta(seconds=10)
 
@@ -60,7 +61,7 @@ def get(url: str,
 
 
 def post(url: str,
-         body_json: Any | None = None,
+         body_json: Json = None,
          headers: Mapping[str, str] | None = None,
          timeout: AnyTime = DEFAULT_REQUEST_TIMEOUT,
          retry: int = 0,

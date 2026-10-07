@@ -8,7 +8,7 @@ import dataclasses
 import datetime as dt
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Mapping, Self, Sequence
+from typing import TYPE_CHECKING, Mapping, Self, Sequence
 
 import google.auth.transport.requests
 from google.auth.credentials import TokenState
@@ -23,6 +23,7 @@ if TYPE_CHECKING:
   import requests
 
   from crossbench.cli.config.secrets import ServiceAccount
+  from crossbench.types import Json, JsonDict
 
 
 @enum.unique
@@ -77,7 +78,7 @@ class AddBotsConfig(ConfigObject):
 
     return parser
 
-  def to_request_body_json(self, conference_code: str) -> Any:
+  def to_request_body_json(self, conference_code: str) -> JsonDict:
     requested_layout = self.requested_layout
     if requested_layout is MeetLayout.AUTOMATIC:
       if self.num_of_bots <= 1:
@@ -89,7 +90,7 @@ class AddBotsConfig(ConfigObject):
       else:
         requested_layout = MeetLayout.BRADY_BUNCH_7_7
 
-    media_options = {
+    media_options: JsonDict = {
         "audio_file_path": self.audio_file_path,
         "mute_audio": self.mute_audio,
         "video_fps": self.video_fps,
@@ -99,7 +100,7 @@ class AddBotsConfig(ConfigObject):
     if self.video_file_path:
       media_options["video_file_path"] = self.video_file_path
 
-    body_json = {
+    body_json: JsonDict = {
         "num_of_bots": self.num_of_bots,
         "ttl_secs": self.ttl_secs,
         "video_call_options": {
@@ -160,7 +161,7 @@ class BondClient:
 
   def _post_with_retry(self,
                        url: str,
-                       body_json: Any,
+                       body_json: Json,
                        timeout: dt.timedelta,
                        retry: int = 3) -> requests.Response:
     deadline = dt.datetime.now() + timeout
@@ -176,7 +177,7 @@ class BondClient:
         retry=retry)
 
   def create_meeting(self, timeout: dt.timedelta) -> str:
-    request_body_json = {
+    request_body_json: JsonDict = {
         "conference_type": "THOR",
         "backend_options": {
             "mesi_apiary_url": MESI_APIARY_URL,
@@ -215,7 +216,7 @@ class BondClient:
 
   def run_script(self, conference_code: str, script: str,
                  timeout: dt.timedelta) -> None:
-    request_body_json = {
+    request_body_json: JsonDict = {
         "script": script,
         "conference": {
             "conference_code": conference_code,
@@ -228,7 +229,7 @@ class BondClient:
 
   def remove_all_bots(self, conference_code: str,
                       timeout: dt.timedelta) -> None:
-    request_body_json = {
+    request_body_json: JsonDict = {
         "conference": {
             "conference_code": conference_code,
         },

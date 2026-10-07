@@ -4,14 +4,17 @@
 
 from __future__ import annotations
 
-from typing import IO, Any, Iterable
+from typing import IO, TYPE_CHECKING, Any, Iterable
 
 import hjson
 
+if TYPE_CHECKING:
+  from crossbench.types import Json, JsonDict
+
 
 def _check_for_duplicate_keys(
-    key_values: Iterable[tuple[str, Any]]) -> dict[str, Any]:
-  result = {}
+    key_values: Iterable[tuple[str, Json]]) -> JsonDict:
+  result: JsonDict = {}
   for key, value in key_values:
     if key in result:
       raise ValueError(f"Duplicate key in hjson: {key}")

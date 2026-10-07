@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import functools
-from typing import Any, Final, Iterable
+from typing import Final, Iterable
 
 
 class VersionParseError(ValueError):
@@ -79,13 +79,13 @@ class Version:
     assert isinstance(other, Version)
     return self.key == other.key
 
-  def __le__(self, other: Any) -> bool:
+  def __le__(self, other: Version) -> bool:
     if not self.is_compatible_type(other):
       raise TypeError("Cannot compare unrelated versions : "
                       f"{type(self).__name__} vs. "
                       f"{type(other).__name__}.")
-    return self.key <= other.key
+    return self._parts <= other._parts
 
   @property
-  def key(self) -> tuple[tuple[int, ...], Any]:
+  def key(self) -> tuple[tuple[int, ...], object]:
     return (self._parts, None)

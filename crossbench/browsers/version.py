@@ -9,7 +9,7 @@ import dataclasses
 import enum
 import functools
 import re
-from typing import Any, Final, Iterable, Self
+from typing import Final, Iterable, Self
 
 from typing_extensions import override
 
@@ -36,9 +36,7 @@ class BrowserVersionChannel(_BrowserVersionChannelMixin, enum.Enum):
   def __str__(self) -> str:
     return self.label
 
-  def __lt__(self, other: Any) -> bool:
-    if not isinstance(other, BrowserVersionChannel):
-      raise TypeError("BrowserVersionChannel can not be compared to {other}")
+  def __lt__(self, other: BrowserVersionChannel) -> bool:
     return self.index < other.index
 
   def __hash__(self) -> int:
@@ -229,11 +227,12 @@ class BrowserVersion(Version, metaclass=abc.ABCMeta):
             f"({self.parts_str}, {self.channel_name}, {self._version_str!r})")
 
   @override
-  def __le__(self, other: Any) -> bool:
+  def __le__(self, other: Version) -> bool:
     if not self.is_compatible_type(other):
       raise TypeError("Cannot compare versions from unrelated browsers: "
                       f"{type(self).__name__} vs. "
                       f"{type(other).__name__}.")
+    assert isinstance(other, BrowserVersion)
     if self.is_channel_version and other.is_channel_version:
       return self._channel <= other._channel
     if self.is_channel_version:

@@ -72,10 +72,6 @@ class BrowserVersionChannelTestCase(unittest.TestCase):
             BrowserVersionChannel.ANY,
         ])
 
-  def test_compare_invalid(self):
-    with self.assertRaises(TypeError):
-      _ = BrowserVersionChannel.LTS < "some value"
-
   def test_matches_any(self):
     base = BrowserVersionChannel.ANY
     self.assertTrue(base.matches(BrowserVersionChannel.ANY))

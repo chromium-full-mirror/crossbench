@@ -4,12 +4,19 @@
 
 from __future__ import annotations
 
-from typing import Any, Final, Mapping
+from typing import Final, Mapping, TypedDict
 
 from immutabledict import immutabledict
 
+
+class TrafficSetting(TypedDict):
+  rtt_ms: int
+  in_kbps: int
+  out_kbps: int
+
+
 # TODO: improve and double check
-TRAFFIC_SETTINGS: Final[Mapping[str, Any]] = immutabledict({
+TRAFFIC_SETTINGS: Final[Mapping[str, TrafficSetting]] = immutabledict({
     "3G-slow": {
         "rtt_ms": 400,
         "in_kbps": 400,

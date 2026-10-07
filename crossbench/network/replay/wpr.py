@@ -8,7 +8,7 @@ import abc
 import contextlib
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Final, Iterator, Self, TypeVar
+from typing import TYPE_CHECKING, Final, Iterable, Iterator, Self, TypeVar
 
 from typing_extensions import override
 
@@ -198,29 +198,30 @@ class LocalWprReplayNetwork(WprReplayNetwork):
 
   @override
   def _create_server(self, log_dir: pth.LocalPath) -> WprReplayServer:
-    extra_kwargs: dict[str, Any] = {}
-    if self._http_port is not None:
-      extra_kwargs["http_port"] = self._http_port
-    if self._https_port is not None:
-      extra_kwargs["https_port"] = self._https_port
-
+    http_port: int = self._http_port or 0
+    https_port: int = self._https_port or 0
+    inject_scripts: Iterable[pth.AnyPath] | None = None
     if not self._inject_deterministic_script:
-      extra_kwargs["inject_scripts"] = []
+      inject_scripts = []
+    run_as_root: bool = False
     if self._cross_platform_mode:
-      extra_kwargs["http_port"] = 80
-      extra_kwargs["https_port"] = 443
-      extra_kwargs["run_as_root"] = True
-    if self._host:
-      extra_kwargs["host"] = self._host
+      http_port = 80
+      https_port = 443
+      run_as_root = True
+    host: str = self._host or "127.0.0.1"
 
     return WprReplayServer(
         self.archive_path,
         self._wpr_go_bin,
+        http_port=http_port,
+        https_port=https_port,
+        host=host,
+        inject_scripts=inject_scripts,
         log_path=log_dir / "network.wpr.log",
         no_archive_certificates=self._no_archive_certificates,
         rules_file=self._response_transformations_file,
-        platform=self.host_platform,
-        **extra_kwargs)
+        run_as_root=run_as_root,
+        platform=self.host_platform)
 
 
 class RemoteWprReplayNetwork(WprReplayNetwork):
@@ -304,22 +305,17 @@ class RemoteWprReplayNetwork(WprReplayNetwork):
     for script in self._get_injected_scripts():
       self._push_file(script)
 
-    extra_kwargs: dict[str, Any] = {}
-    if self._http_port is not None:
-      extra_kwargs["http_port"] = self._http_port
-    if self._https_port is not None:
-      extra_kwargs["https_port"] = self._https_port
-
     return WprReplayServer(
         archive_path=archive,
         bin_path=wpr_go_bin,
+        http_port=self._http_port or 0,
+        https_port=self._https_port or 0,
         key_file=key_file,
         cert_file=cert_file,
         inject_scripts=inject_scripts,
         log_path=log_dir / "network.wpr.log",
         platform=self.browser_platform,
-        rules_file=rules_file,
-        **extra_kwargs)
+        rules_file=rules_file)
 
   def _get_injected_scripts(self) -> list[pth.LocalPath]:
     if not self._response_transformations_file:

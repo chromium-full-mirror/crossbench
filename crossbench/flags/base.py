@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import collections
 import re
-from typing import Any, ClassVar, Final, Iterable, Iterator, Self, TypeAlias, \
+from typing import ClassVar, Final, Iterable, Iterator, Self, TypeAlias, \
     TypeVar, Union
 
 from typing_extensions import override
@@ -73,7 +73,7 @@ class BasicFlags(Freezable, collections.UserDict):
     return (flag_str, None)
 
   @classmethod
-  def parse(cls, data: Any) -> Self:
+  def parse(cls, data: FlagsData | str) -> Self:
     if isinstance(data, cls):
       return data
     if isinstance(data, str):

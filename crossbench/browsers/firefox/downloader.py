@@ -168,7 +168,7 @@ class FirefoxDownloaderMacOS(FirefoxDownloader):
   @override
   def _download_archive(self, archive_url: str, tmp_dir: pth.LocalPath) -> None:
     assert self._browser_platform.is_macos
-    if self._browser_platform.is_arm64 and (self.requested_version
+    if self._browser_platform.is_arm64 and (self.requested_version.major
                                             < self.MIN_MAC_ARM64_MILESTONE):
       raise ValueError(
           "Firefox Arm64 Apple Silicon is only available starting with "

@@ -11,7 +11,7 @@ import re
 import sys
 import traceback as tb
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Final, Iterator, Self
+from typing import TYPE_CHECKING, Final, Iterator, Self
 
 from ordered_set import OrderedSet
 
@@ -167,9 +167,7 @@ class ExceptionAnnotator:
   def depth(self) -> int:
     return self._depth
 
-  def __getitem__(self, key: Any) -> Entry:
-    if not isinstance(key, int):
-      raise TypeError(f"Expected int key, but got: {key}")
+  def __getitem__(self, key: int) -> Entry:
     return self._exceptions[key]
 
   def __len__(self) -> int:

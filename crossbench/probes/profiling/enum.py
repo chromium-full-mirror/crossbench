@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import enum
-from typing import Any
 
 from crossbench.str_enum_with_help import StrEnumWithHelp
 
@@ -14,7 +13,7 @@ from crossbench.str_enum_with_help import StrEnumWithHelp
 class CleanupMode(StrEnumWithHelp):
 
   @classmethod
-  def _missing_(cls, value: Any) -> CleanupMode | None:
+  def _missing_(cls, value: object) -> CleanupMode | None:
     if value is True:
       return CleanupMode.ALWAYS
     if value is False:
@@ -53,7 +52,7 @@ class PprofMode(StrEnumWithHelp):
   """Execution mode for corp pprof profile symbolization and upload."""
 
   @classmethod
-  def _missing_(cls, value: Any) -> PprofMode | None:
+  def _missing_(cls, value: object) -> PprofMode | None:
     if value is True:
       return PprofMode.ALWAYS
     if value is False:
@@ -70,7 +69,7 @@ class TraceconvMode(StrEnumWithHelp):
   """Execution mode for local traceconv profile conversion."""
 
   @classmethod
-  def _missing_(cls, value: Any) -> TraceconvMode | None:
+  def _missing_(cls, value: object) -> TraceconvMode | None:
     if value is True:
       return TraceconvMode.ALWAYS
     if value is False:

@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import enum
-from typing import Any, Final, Iterable
+from typing import Final, Iterable
 
 from ordered_set import OrderedSet
 
@@ -103,13 +103,13 @@ class ChromeExtensions(Freezable):
     for extension in other.extensions:
       self.add(extension, should_override=True)
 
-  def __getitem__(self, key: Any) -> Any:
+  def __getitem__(self, key: str) -> None:
     if key == self.DISABLE_FLAG:
-      return None
+      return
     if key == self.LOAD_FLAG:
-      return None
+      return
     if key == self.DISABLE_EXCEPT_FLAG:
-      return None
+      return
     raise KeyError(f"Unsupported extension flag: {key}")
 
   def set(self,

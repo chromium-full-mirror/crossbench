@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, Any, Mapping, Self
+from typing import TYPE_CHECKING, Mapping, Self, cast
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -15,27 +15,28 @@ from crossbench.config import ConfigObject, ConfigParser
 from crossbench.parse import ObjectParser
 
 if TYPE_CHECKING:
-  from crossbench.types import JsonDict
+  from crossbench.types import ImmutableJsonDict, Json, JsonDict
 
 
 @dataclasses.dataclass(frozen=True)
 class Replacements(ConfigObject):
-  _replacements: immutabledict[str, Any] = dataclasses.field(
+  _replacements: ImmutableJsonDict = dataclasses.field(
       default_factory=immutabledict)
 
   @classmethod
   @override
   def create(
       cls,
-      replacements: Mapping[str, Any] | None = None,
+      replacements: Mapping[str, object] | None = None,
   ) -> Self:
     dict_value = ObjectParser.dict(replacements or {}, "replacements")
-    validated_replacements: dict[str, Any] = {}
+    validated_replacements: JsonDict = {}
     for replace_key, replace_value in dict_value.items():
       with exception.annotate_argparsing(
           f"Parsing ...[{replace_key!r}] = {dict_value!r}"):
         key = ObjectParser.non_empty_str(replace_key, "replacement key")
-        val = ObjectParser.not_none(replace_value, "replacement value")
+        val = cast("Json",
+                   ObjectParser.not_none(replace_value, "replacement value"))
         validated_replacements[key] = val
     return cls(_replacements=immutabledict(validated_replacements))
 
@@ -47,7 +48,7 @@ class Replacements(ConfigObject):
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict[str, Any], **kwargs) -> Self:
+  def parse_dict(cls, config: dict[str, object], **kwargs) -> Self:
     del kwargs
     return cls.create(config)
 

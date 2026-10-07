@@ -221,7 +221,7 @@ class ConfigArgParser:
     if self.is_enum:
       raise ValueError(f"Enum '{self.name}' cannot have argument dependencies")
 
-  def _is_iterable_non_str(self, value: Any) -> bool:
+  def _is_iterable_non_str(self, value: object) -> bool:
     if isinstance(value, str):
       return False
     return isinstance(value, collections.abc.Iterable)
