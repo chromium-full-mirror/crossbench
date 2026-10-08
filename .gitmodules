@@ -12,6 +12,10 @@
 [submodule "third_party/tsproxy"]
 	path = third_party/tsproxy
 	url = https://chromium.googlesource.com/external/github.com/catchpoint/WebPageTest.tsproxy
+[submodule "third_party/speedometer/v3.1"]
+	path = third_party/speedometer/v3.1
+	url = https://chromium.googlesource.com/external/github.com/WebKit/Speedometer
+	gclient-condition = checkout_press_benchmarks and not build_with_chromium
 [submodule "third_party/webpagereplay"]
 	path = third_party/webpagereplay
 	url = https://chromium.googlesource.com/webpagereplay

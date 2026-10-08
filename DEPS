@@ -44,12 +44,18 @@ vars = {
   'chromium_webpagereplay_git': 'https://chromium.googlesource.com/webpagereplay',
   'clang_format_git': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
   'hjson_js_git': 'https://chromium.googlesource.com/external/github.com/hjson/hjson-js',
+  'speedometer_git': 'https://chromium.googlesource.com/external/github.com/WebKit/Speedometer.git',
 
   # This variable is overridden in Chromium's DEPS file.
   'build_with_chromium': False,
 
   'chrome_internal_url': 'https://chrome-internal.googlesource.com',
   'checkout_crossbench_internal': False,
+
+  # Check out press benchmark sources (e.g. third_party/speedometer) so they
+  # can be served from a local file server instead of a live URL.
+  # Chromium checkouts already provide these under src/third_party.
+  'checkout_press_benchmarks': True,
 
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling crossbench-internal
@@ -76,6 +82,10 @@ vars = {
   # the commit queue can handle CLs rolling webpagereplay
   # and whatever else without interference from each other.
   'hjson_js_revision': '74bfd14e07d6586e3c12e0d2ab9885a97b2d579c',
+  # Three lines of non-changing comments so that
+  # the commit queue can handle CLs rolling Speedometer v3.1
+  # and whatever else without interference from each other.
+  'speedometer_3.1_revision': '1386415be8fef2f6b6bbdbe1828872471c5d802a',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.
@@ -152,6 +162,10 @@ deps = {
       ],
   },
   'third_party/tsproxy': Var('chromium_tsproxy_git') + '@' + Var('tsproxy_revision'),
+  'third_party/speedometer/v3.1': {
+    'url': Var('speedometer_git') + '@' + Var('speedometer_3.1_revision'),
+    'condition': 'checkout_press_benchmarks and not build_with_chromium',
+  },
   'third_party/webpagereplay': {
     'url': Var('chromium_webpagereplay_git') + '@' + Var('webpagereplay_revision'),
     'condition': 'not build_with_chromium',

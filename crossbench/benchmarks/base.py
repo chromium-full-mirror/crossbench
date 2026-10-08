@@ -15,7 +15,9 @@ from typing import TYPE_CHECKING, Any, ClassVar, Final, Generic, Iterable, \
 from ordered_set import OrderedSet
 from typing_extensions import override
 
+from crossbench import path as pth
 from crossbench.action_runner.config import ActionRunnerConfig
+from crossbench.cli.config.network import NetworkConfig, NetworkType
 from crossbench.flags.base import Flags
 from crossbench.helper import txt_helper
 from crossbench.helper.collection_helper import close_matches_message
@@ -24,7 +26,6 @@ from crossbench.stories.press_benchmark import PressBenchmarkStory
 from crossbench.stories.story import Story
 
 if TYPE_CHECKING:
-  from crossbench import path as pth
   from crossbench.action_runner.base import ActionRunner
   from crossbench.benchmarks.benchmark_probe import BenchmarkProbeMixin
   from crossbench.browsers.attributes import BrowserAttributes
@@ -139,6 +140,12 @@ class Benchmark(abc.ABC):
   def required_device_config(cls) -> DeviceConfig | None:
     """Returns the device config this benchmark requires, if any."""
     return None
+
+  @classmethod
+  def default_network_config(cls, args: argparse.Namespace) -> NetworkConfig:
+    """Network config used if none was requested explicitly (--network, --wpr,
+    --local-file-server or a config file)."""
+    return args.network_config
 
   @classmethod
   def extra_flags(cls, browser_attributes: BrowserAttributes,
@@ -737,6 +744,12 @@ class PressBenchmark(SubStoryBenchmark):
       type[PressBenchmarkStoryFilter]] = PressBenchmarkStoryFilter
   DEFAULT_STORY_CLS: ClassVar[
       type[PressBenchmarkStory]] = PressBenchmarkStory  # type: ignore
+  # Crossbench-relative dir of the benchmark sources (see DEPS), served by
+  # default from a local file server. None if not available.
+  LOCAL_DIR: ClassVar[pth.LocalPath | None] = None
+  # Port 0 lets the local file server pick a free port, which is then
+  # reverse-forwarded to the device and used to build the story URL.
+  LOCAL_FILE_SERVER_URL: ClassVar[str] = "http://localhost:0"
 
   @classmethod
   @abc.abstractmethod
@@ -796,10 +809,11 @@ class PressBenchmark(SubStoryBenchmark):
         "--browser-ben",
         "--browserben",
         dest="custom_benchmark_url",
-        const=None,
+        const=live_url,
         action="store_const",
         help=(f"Use chrome live benchmark url ({live_url}) "
-              "on https://browserben.ch."))
+              "on https://browserben.ch. "
+              "Overrides the default local file server."))
     benchmark_url_group.add_argument(
         "--official",
         "--official-url",
@@ -839,6 +853,18 @@ class PressBenchmark(SubStoryBenchmark):
     kwargs = super().kwargs_from_cli(args)
     kwargs["custom_url"] = args.custom_benchmark_url
     return kwargs
+
+  @classmethod
+  @override
+  def default_network_config(cls, args: argparse.Namespace) -> NetworkConfig:
+    """Serve the benchmark from the checked-out sources (see DEPS), unless an
+    explicit url was requested via --live/--official/--url."""
+    if args.custom_benchmark_url or not cls.LOCAL_DIR:
+      return super().default_network_config(args)
+    return NetworkConfig(
+        type=NetworkType.LOCAL,
+        path=pth.ROOT_DIR / cls.LOCAL_DIR,
+        url=cls.LOCAL_FILE_SERVER_URL)
 
   @classmethod
   @override
