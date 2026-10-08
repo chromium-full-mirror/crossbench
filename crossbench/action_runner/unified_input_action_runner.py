@@ -20,6 +20,8 @@ from crossbench.action_runner.keyboard_layout import US_KEYBOARD_LAYOUT
 from crossbench.action_runner.screenshot_annotation import \
     ScreenshotPointAnnotation, ScreenshotRectAnnotation
 from crossbench.action_runner.viewport_info import ViewportInfo
+from crossbench.action_runner.virtual_device.pointing import \
+    PointingVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.touchscreen import \
     DEFAULT_TOUCH_POLLING_RATE_HZ
 from crossbench.benchmarks.loading.point import Point
@@ -219,21 +221,94 @@ class UnifiedInputActionRunner(ActionRunner):
         element_rect=element_rect)
 
   def scroll_touch(self, action: i_action.ScrollAction) -> None:
-    # TODO(b/553272919): implement
-    del action
+    with self.actions("ScrollAction", measure=False) as actions:
+      viewport_info = self._get_viewport_info(actions, action.selector)
+      scroll_area = self._get_scroll_area(viewport_info, action)
+      if not scroll_area:
+        return
+
+      assert action.source_device
+      total_scroll_distance = viewport_info.css_to_native_distance(
+          action.distance)
+      self._inject_scroll_swipes(scroll_area, total_scroll_distance,
+                                 action.duration, action.source_device)
+
+  def _inject_scroll_swipes(self, scroll_area: DisplayRectangle,
+                            total_scroll_distance: float,
+                            total_duration: dt.timedelta,
+                            source_device: str) -> None:
+    # get_scrollable_area will apply a non-scrollable border around the
+    # rectangle to avoid issues with swiping on the very edge of windows.
+    (scrollable_top, scrollable_bottom,
+     max_swipe_distance) = scroll_area.get_scrollable_area()
+    mid_x = scroll_area.mid_x
+    total_distance = abs(total_scroll_distance)
+    remaining_distance = total_distance
+
+    while remaining_distance > 0:
+      current_distance = min(max_swipe_distance, remaining_distance)
+      current_duration = (current_distance / total_distance) * total_duration
+      y_start, y_end = self._get_scroll_swipe_y_range(total_scroll_distance,
+                                                      current_distance,
+                                                      scrollable_top,
+                                                      scrollable_bottom)
+      self._inject_swipe(
+          start_x=mid_x,
+          start_y=y_start,
+          end_x=mid_x,
+          end_y=y_end,
+          duration=current_duration,
+          source_device=source_device)
+      remaining_distance -= current_distance
+
+  def _get_scroll_swipe_y_range(self, total_scroll_distance: float,
+                                current_distance: float, scrollable_top: int,
+                                scrollable_bottom: int) -> tuple[int, int]:
+    if total_scroll_distance < 0:
+      return scrollable_top, round(scrollable_top + current_distance)
+    return scrollable_bottom, round(scrollable_bottom - current_distance)
+
+  def _get_scroll_area(
+      self, viewport_info: ViewportInfo,
+      action: i_action.ScrollAction) -> DisplayRectangle | None:
+    if not action.selector:
+      return viewport_info.browser_viewable
+    if element_rect := viewport_info.element_rect:
+      return element_rect
+    if action.required:
+      raise ElementNotFoundError(action.selector)
+    return None
 
   def swipe(self, action: i_action.SwipeAction) -> None:
     with self.actions("SwipeAction", measure=False):
-      events = self._get_swipe_events(action)
-      self.browser_platform.inject_input_events(action.source_device, events)
+      self._inject_swipe(
+          start_x=action.start_x,
+          start_y=action.start_y,
+          end_x=action.end_x,
+          end_y=action.end_y,
+          duration=action.duration,
+          source_device=action.source_device)
 
-  def _get_swipe_events(self, action: i_action.SwipeAction) -> list[InputEvent]:
-    start_point = Point(action.start_x, action.start_y)
-    end_point = Point(action.end_x, action.end_y)
-    num_steps = max(
-        1,
-        round(action.duration.total_seconds() * DEFAULT_TOUCH_POLLING_RATE_HZ))
-    total_duration_us = int(action.duration.total_seconds() * 1_000_000)
+  def _inject_swipe(self, start_x: int, start_y: int, end_x: int, end_y: int,
+                    duration: dt.timedelta, source_device: str) -> None:
+    polling_rate_hz = self._get_polling_rate_hz(source_device)
+    events = self._get_swipe_events(start_x, start_y, end_x, end_y, duration,
+                                    polling_rate_hz)
+    self.browser_platform.inject_input_events(source_device, events)
+
+  def _get_polling_rate_hz(self, source_device: str) -> int:
+    device = self.browser_platform.virtual_devices.get(source_device)
+    if isinstance(device, PointingVirtualDeviceConfig):
+      return device.polling_rate_hz
+    return DEFAULT_TOUCH_POLLING_RATE_HZ
+
+  def _get_swipe_events(self, start_x: int, start_y: int, end_x: int,
+                        end_y: int, duration: dt.timedelta,
+                        polling_rate_hz: int) -> list[InputEvent]:
+    start_point = Point(start_x, start_y)
+    end_point = Point(end_x, end_y)
+    num_steps = max(1, round(duration.total_seconds() * polling_rate_hz))
+    total_duration_us = int(duration.total_seconds() * 1_000_000)
     previous_cumulative_us = 0
 
     events: list[InputEvent] = [TouchEvent(position=start_point, is_down=True)]
@@ -244,8 +319,8 @@ class UnifiedInputActionRunner(ActionRunner):
       previous_cumulative_us = target_cumulative_us
 
       fraction = step / num_steps
-      cur_x = self._interpolate(action.start_x, action.end_x, fraction)
-      cur_y = self._interpolate(action.start_y, action.end_y, fraction)
+      cur_x = self._interpolate(start_x, end_x, fraction)
+      cur_y = self._interpolate(start_y, end_y, fraction)
       events.append(TouchEvent(position=Point(cur_x, cur_y), is_down=True))
 
     events.append(TouchEvent(position=end_point, is_down=False))

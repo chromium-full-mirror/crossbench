@@ -75,13 +75,15 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
 
   def test_setup_virtual_devices(self) -> None:
     platform = MockEvemuPlatform()
-    platform.setup_virtual_devices((KeyboardVirtualDeviceConfig(name="kb1"),))
+    kb_config = KeyboardVirtualDeviceConfig(name="kb1")
+    platform.setup_virtual_devices((kb_config,))
     self.assertEqual(len(platform.popen_calls), 1)
     args, kwargs = platform.popen_calls[0]
     self.assertEqual(args, ("mock-evemu", "-"))
     self.assertEqual(kwargs, {"stdin": subprocess.PIPE})
     self.assertIn("kb1", platform._virtual_devices)
     self.assertIs(platform._virtual_devices["kb1"].proc, platform.mock_proc)
+    self.assertEqual(platform.virtual_devices, {"kb1": kb_config})
     platform.mock_proc.stdin.write.assert_called_once()
     platform.mock_proc.stdin.flush.assert_called_once()
 
@@ -89,8 +91,12 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
     self.assertIn("test_kb", self.platform._virtual_devices)
     self.assertIn("test_touch", self.platform._virtual_devices)
     self.assertIn("test_mouse", self.platform._virtual_devices)
+    self.assertEqual(
+        set(self.platform.virtual_devices.keys()),
+        {"test_kb", "test_touch", "test_mouse"})
     self.platform.teardown_virtual_devices()
     self.assertEqual(self.platform._virtual_devices, {})
+    self.assertEqual(self.platform.virtual_devices, {})
     self.assertEqual(self.platform.mock_proc.stdin.close.call_count, 3)
     self.platform.mock_proc.wait.assert_has_calls(
         [mock.call(timeout=2),

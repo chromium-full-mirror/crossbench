@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from crossbench.action_runner.action.click import ClickAction
 from crossbench.action_runner.action.enums import ButtonClick
 from crossbench.action_runner.action.position import PositionConfig
+from crossbench.action_runner.action.scroll import ScrollAction
 from crossbench.action_runner.action.swipe import SwipeAction
 from crossbench.action_runner.action.text_input import TextInputAction
 from crossbench.action_runner.display_rectangle import DisplayRectangle
@@ -25,7 +26,9 @@ from crossbench.action_runner.element_not_found_error import \
 from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
     MouseButtonEvent, MouseMoveEvent, TouchEvent, WaitEvent
 from crossbench.action_runner.unified_input_action_runner import SCRIPTS_DIR, \
-    UnifiedInputActionRunner
+    UnifiedInputActionRunner, WindowPositions
+from crossbench.action_runner.virtual_device.touchscreen import \
+    TouchscreenVirtualDeviceConfig
 from crossbench.benchmarks.loading.input_source import InputSource
 from crossbench.benchmarks.loading.point import Point
 from crossbench.browsers.settings import Settings
@@ -582,6 +585,169 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
     self.assert_input_events_injected(
         list(self._EXPECTED_50MS_SWIPE_EVENTS),
         expected_device_name="my_touch_device")
+
+  def test_swipe_custom_polling_rate(self) -> None:
+    custom_ts = TouchscreenVirtualDeviceConfig(
+        name="custom_ts", polling_rate_hz=40)
+    self.action_runner = UnifiedInputActionRunner(
+        self.mock_run, virtual_devices=(custom_ts,))
+    self.mock_run.action_runner = self.action_runner
+
+    swipe_action = SwipeAction.create(
+        0,
+        0,
+        30,
+        60,
+        duration=dt.timedelta(milliseconds=50),
+        source_device="custom_ts")
+    self.run_action(swipe_action)
+
+    self.assert_input_events_injected([
+        TouchEvent(Point(0, 0), is_down=True),
+        WaitEvent(duration=dt.timedelta(microseconds=25000)),
+        TouchEvent(Point(15, 30), is_down=True),
+        WaitEvent(duration=dt.timedelta(microseconds=25000)),
+        TouchEvent(Point(30, 60), is_down=True),
+        TouchEvent(Point(30, 60), is_down=False),
+    ],
+                                      expected_device_name="custom_ts")
+
+  def test_scroll_touch_window_down(self) -> None:
+    scroll_action = ScrollAction.create(
+        InputSource.TOUCH, distance=100, duration=dt.timedelta(milliseconds=50))
+    self.browser.expect_js(expected_js=self._NO_ELEMENT_JS_RESULT)
+    self.run_action(scroll_action)
+
+    self.inject_events_mock.assert_called_once()
+    device_name, events = self.inject_events_mock.call_args[0]
+    self.assertEqual(device_name, "default_touchscreen")
+    self.assertEqual(events[0], TouchEvent(Point(960, 972), is_down=True))
+    self.assertEqual(events[-1], TouchEvent(Point(960, 872), is_down=False))
+
+  def test_scroll_touch_window_up(self) -> None:
+    scroll_action = ScrollAction.create(
+        InputSource.TOUCH,
+        distance=-100,
+        duration=dt.timedelta(milliseconds=50))
+    self.browser.expect_js(expected_js=self._NO_ELEMENT_JS_RESULT)
+    self.run_action(scroll_action)
+
+    self.inject_events_mock.assert_called_once()
+    device_name, events = self.inject_events_mock.call_args[0]
+    self.assertEqual(device_name, "default_touchscreen")
+    self.assertEqual(events[0], TouchEvent(Point(960, 108), is_down=True))
+    self.assertEqual(events[-1], TouchEvent(Point(960, 208), is_down=False))
+
+  def test_scroll_touch_scales_by_pixel_ratio(self) -> None:
+    scroll_action = ScrollAction.create(
+        InputSource.TOUCH, distance=100, duration=dt.timedelta(milliseconds=50))
+    self.browser.expect_js(
+        expected_js=JsInvocation(
+            result=WindowPositions(
+                found_element=False,
+                pixel_ratio=2,
+                outer_width=960,
+                outer_height=540,
+                inner_width=960,
+                inner_height=540,
+                screen_width=960,
+                screen_height=540,
+                avail_width=960,
+                avail_height=540,
+                screen_x=0,
+                screen_y=0,
+                element_left=0,
+                element_top=0,
+                element_width=0,
+                element_height=0),
+            arguments=[None, False]))
+    self.run_action(scroll_action)
+
+    self.inject_events_mock.assert_called_once()
+    device_name, events = self.inject_events_mock.call_args[0]
+    self.assertEqual(device_name, "default_touchscreen")
+    self.assertEqual(events[0], TouchEvent(Point(960, 972), is_down=True))
+    self.assertEqual(events[-1], TouchEvent(Point(960, 772), is_down=False))
+
+  def test_scroll_touch_selector_success(self) -> None:
+    scroll_action = ScrollAction.create(
+        InputSource.TOUCH,
+        distance=10,
+        selector="div#scrollable",
+        required=True,
+        duration=dt.timedelta(milliseconds=50))
+    self.browser.expect_js(
+        expected_js=JsInvocation(
+            result=WindowPositions(
+                found_element=True,
+                pixel_ratio=1,
+                outer_width=1920,
+                outer_height=1080,
+                inner_width=1920,
+                inner_height=1080,
+                screen_width=1920,
+                screen_height=1080,
+                avail_width=1920,
+                avail_height=1080,
+                screen_x=0,
+                screen_y=0,
+                element_left=10,
+                element_top=10,
+                element_width=80,
+                element_height=80),
+            arguments=["div#scrollable", False]))
+    self.run_action(scroll_action)
+
+    self.inject_events_mock.assert_called_once()
+    device_name, events = self.inject_events_mock.call_args[0]
+    self.assertEqual(device_name, "default_touchscreen")
+    self.assertEqual(events[0], TouchEvent(Point(50, 82), is_down=True))
+    self.assertEqual(events[-1], TouchEvent(Point(50, 72), is_down=False))
+
+  def test_scroll_touch_selector_non_existent_required_raises(self) -> None:
+    scroll_action = ScrollAction.create(
+        InputSource.TOUCH, distance=100, selector="div#missing", required=True)
+    self.browser.expect_js(expected_js=self._NO_ELEMENT_JS_RESULT)
+    with self.assertRaisesRegex(ElementNotFoundError, "div#missing"):
+      self.run_action(scroll_action)
+
+  def test_scroll_touch_selector_non_required_success(self) -> None:
+    scroll_action = ScrollAction.create(
+        InputSource.TOUCH, distance=100, selector="div#missing", required=False)
+    self.browser.expect_js(expected_js=self._NO_ELEMENT_JS_RESULT)
+    self.run_action(scroll_action)
+    self.inject_events_mock.assert_not_called()
+
+  def test_scroll_touch_chunked(self) -> None:
+    scroll_action = ScrollAction.create(
+        InputSource.TOUCH,
+        distance=900,
+        duration=dt.timedelta(milliseconds=100))
+    self.browser.expect_js(expected_js=self._NO_ELEMENT_JS_RESULT)
+    self.run_action(scroll_action)
+
+    self.assertEqual(self.inject_events_mock.call_count, 2)
+    first_events = self.inject_events_mock.call_args_list[0][0][1]
+    self.assertEqual(first_events[0], TouchEvent(Point(960, 972), is_down=True))
+    self.assertEqual(first_events[-1],
+                     TouchEvent(Point(960, 108), is_down=False))
+    second_events = self.inject_events_mock.call_args_list[1][0][1]
+    self.assertEqual(second_events[0],
+                     TouchEvent(Point(960, 972), is_down=True))
+    self.assertEqual(second_events[-1],
+                     TouchEvent(Point(960, 936), is_down=False))
+
+  def test_scroll_touch_with_source_device(self) -> None:
+    scroll_action = ScrollAction.create(
+        InputSource.TOUCH,
+        distance=100,
+        source_device="custom_ts",
+        duration=dt.timedelta(milliseconds=50))
+    self.browser.expect_js(expected_js=self._NO_ELEMENT_JS_RESULT)
+    self.run_action(scroll_action)
+    self.inject_events_mock.assert_called_once()
+    device_name, _ = self.inject_events_mock.call_args[0]
+    self.assertEqual(device_name, "custom_ts")
 
 
 class ScriptsDirTestCase(unittest.TestCase):

@@ -51,6 +51,8 @@ if TYPE_CHECKING:
   from crossbench.action_runner.action.position import UiSelectorConfig
   from crossbench.action_runner.display_rectangle import DisplayRectangle
   from crossbench.action_runner.input_events import InputEvent
+  from crossbench.action_runner.virtual_device.virtual_device_config import \
+      VirtualDeviceConfig
   from crossbench.device_config import DeviceConfigKeyPath
   from crossbench.plt.display_info import DisplayInfo
   from crossbench.plt.process_meminfo import ProcessMeminfo
@@ -132,6 +134,7 @@ class Platform(abc.ABC):
     self._default_port_manager: Final[PortManager] = self._create_port_manager()
     self._default_tmp_dir: Final[pth.AnyPath] = self._create_default_tmp_dir()
     self._popens: weakref.WeakSet[subprocess.Popen] = weakref.WeakSet()
+    self._virtual_device_configs: dict[str, VirtualDeviceConfig] = {}
     atexit.register(self.kill_all_popens)
 
   def _create_port_manager(self) -> PortManager:
@@ -141,11 +144,17 @@ class Platform(abc.ABC):
     self.assert_is_local()
     return self.path(tempfile.gettempdir())
 
-  def setup_virtual_devices(self, virtual_devices: tuple) -> None:
-    del virtual_devices
+  @property
+  def virtual_devices(self) -> Mapping[str, VirtualDeviceConfig]:
+    return self._virtual_device_configs
+
+  def setup_virtual_devices(
+      self, virtual_devices: tuple[VirtualDeviceConfig, ...]) -> None:
+    for device in virtual_devices:
+      self._virtual_device_configs[device.name] = device
 
   def teardown_virtual_devices(self) -> None:
-    pass
+    self._virtual_device_configs.clear()
 
   def assert_is_local(self) -> None:
     if self.is_local:

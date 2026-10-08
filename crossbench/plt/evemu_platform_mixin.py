@@ -275,6 +275,7 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
       else:
         raise ValueError(
             f"Unsupported virtual device type: {device_config.device_type}")
+    super().setup_virtual_devices(virtual_devices)
 
   @override
   def teardown_virtual_devices(self) -> None:
@@ -287,6 +288,7 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
         except subprocess.TimeoutExpired:
           state.proc.terminate()
     self._virtual_devices.clear()
+    super().teardown_virtual_devices()
 
   def _is_device_running(self, device_name: str) -> bool:
     state = self._virtual_devices.get(device_name)
