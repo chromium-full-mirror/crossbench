@@ -145,6 +145,12 @@ def CheckChange(input_api: Any, output_api: Any, on_commit: bool) -> Any:
   results += CheckAst(input_api, output_api)
 
   # ---------------------------------------------------------------------------
+  # Top-level files:
+  # ---------------------------------------------------------------------------
+  from tools.presubmit.toplevel_files import check_no_new_toplevel_files
+  results += check_no_new_toplevel_files(input_api, output_api)
+
+  # ---------------------------------------------------------------------------
   # Skills:
   # ---------------------------------------------------------------------------
   results += input_api.canned_checks.CheckSkillFiles(input_api, output_api)

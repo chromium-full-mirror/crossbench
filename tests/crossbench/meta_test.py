@@ -23,10 +23,8 @@ from tests import test_helper
 if TYPE_CHECKING:
   from crossbench.config import ConfigObject
 
-RUN_SNIPPET = """
-if __name__ == "__main__":
-  test_helper.run_pytest(__file__)
-""".strip()
+MAIN_SNIPPET: Final[str] = 'if __name__ == "__main__":'
+RUN_SNIPPET: Final[str] = f"{MAIN_SNIPPET}\n  test_helper.run_pytest(__file__)"
 FUTURE_ANNOTATIONS_SNIPPET = "from __future__ import annotations"
 
 COMMENTS_ONLY_RE = re.compile(r"^(?:#.*|\s*)*$", re.MULTILINE)
@@ -38,7 +36,15 @@ CROSSBENCH_DIR = ROOT_DIR / "crossbench"
 
 class MetaTestCase(unittest.TestCase):
 
-  def test_unittest_runner_snippet(self):
+  def test_toplevel_py_main_snippet(self) -> None:
+    for py_file in ROOT_DIR.glob("*.py"):
+      if py_file.name == "PRESUBMIT.py":
+        continue
+      with self.subTest(py_file=str(py_file)):
+        self.assertIn(MAIN_SNIPPET, py_file.read_text(),
+                      f"{py_file} misses main snippet: {MAIN_SNIPPET}")
+
+  def test_unittest_runner_snippet(self) -> None:
     # - All unittests files must end with the snippet for the CQ to pick it up.
     # - pytest files (in end2end) use a different approach that doesn't rely
     #   on a per-file runner

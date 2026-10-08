@@ -14,7 +14,9 @@ from unittest import mock
 from typing_extensions import override
 
 from tests import test_helper
-from tools.presubmit import ast_checks, banned_builtins, constant_final
+from tools.presubmit import (ast_checks, banned_builtins, constant_final,
+                             toplevel_files)
+from tools.presubmit.toplevel_files import FileAction
 
 ChangedLines: TypeAlias = set[int] | None
 ChangedLinesMap: TypeAlias = dict[str, set[int]] | None
@@ -139,12 +141,17 @@ class MockAffectedFile:
       self,
       path: str,
       changed_lines: ChangedLines = None,
+      action: FileAction = FileAction.ADD,
   ) -> None:
     self._path: str = path
     self._changed_lines: ChangedLines = changed_lines
+    self._action: FileAction = action
 
   def LocalPath(self) -> str:  # noqa: N802
     return self._path
+
+  def Action(self) -> FileAction:  # noqa: N802
+    return self._action
 
   def ChangedContents(self) -> list[tuple[int, str]]:  # noqa: N802
     if self._changed_lines is None:
@@ -158,6 +165,7 @@ class _PresubmitTestCase(unittest.TestCase, metaclass=abc.ABCMeta):
       self,
       files: dict[str, str],
       changed_lines_map: ChangedLinesMap = None,
+      default_action: FileAction = FileAction.ADD,
       description: str = "",
   ) -> mock.MagicMock:
     input_api = mock.MagicMock()
@@ -175,7 +183,8 @@ class _PresubmitTestCase(unittest.TestCase, metaclass=abc.ABCMeta):
       changed_lines: ChangedLines = None
       if changed_lines_map:
         changed_lines = changed_lines_map.get(file_path)
-      affected_files.append(MockAffectedFile(file_path, changed_lines))
+      affected_files.append(
+          MockAffectedFile(file_path, changed_lines, action=default_action))
 
     def get_affected_files(
         file_filter: Callable[[MockAffectedFile], bool] = lambda _: True,
@@ -212,11 +221,13 @@ class _PresubmitTestCase(unittest.TestCase, metaclass=abc.ABCMeta):
       self,
       files: dict[str, str],
       changed_lines_map: ChangedLinesMap = None,
+      default_action: FileAction = FileAction.ADD,
       description: str = "",
   ) -> list[Any]:
     input_api = self._mock_input_api(
         files=files,
         changed_lines_map=changed_lines_map,
+        default_action=default_action,
         description=description,
     )
     return self._run_check(input_api, self._mock_output_api())
@@ -225,11 +236,13 @@ class _PresubmitTestCase(unittest.TestCase, metaclass=abc.ABCMeta):
       self,
       files: dict[str, str],
       changed_lines_map: ChangedLinesMap = None,
+      default_action: FileAction = FileAction.ADD,
       description: str = "",
   ) -> None:
     results = self._check(
         files=files,
         changed_lines_map=changed_lines_map,
+        default_action=default_action,
         description=description,
     )
     self.assertEqual(results, [])
@@ -444,6 +457,98 @@ class CheckAstCombinedTestCase(_PresubmitTestCase):
     self.assertEqual(len(results), 2)
     self.assertEqual(results[0][0], PresubmitStatus.NOTIFY)
     self.assertEqual(results[1][0], PresubmitStatus.NOTIFY)
+
+
+class CheckNoNewToplevelFilesTestCase(_PresubmitTestCase):
+
+  @override
+  def _run_check(self, input_api: Any, output_api: Any) -> list[Any]:
+    return toplevel_files.check_no_new_toplevel_files(input_api, output_api)
+
+  def test_new_files_in_subdirectories_allowed(self) -> None:
+    self._assert_no_errors(
+        files={
+            "crossbench/helper/new_module.py": "",
+            "crossbench/probes/new_probe.py": "",
+            "tests/crossbench/helper/test_new_module.py": "",
+            "tests/crossbench/probes/test_new_probe.py": "",
+            "config/new_config.hjson": "",
+            "tools/presubmit/toplevel_files.py": "",
+        })
+
+  def test_modified_toplevel_files_allowed(self) -> None:
+    self._assert_no_errors(
+        files={
+            "PRESUBMIT.py": "",
+            "README.md": "",
+            "pyproject.toml": "",
+            "crossbench/config.py": "",
+            "crossbench/parse.py": "",
+            "tests/test_helper.py": "",
+            "tests/crossbench/test_presubmit.py": "",
+        },
+        default_action=FileAction.MODIFY,
+    )
+
+  def test_new_toplevel_file_error_without_bypass(self) -> None:
+    for disallowed_path in (
+        "new_script.py",
+        "crossbench/new_module.py",
+        "tests/test_new_module.py",
+        "tests/crossbench/test_new_module.py",
+    ):
+      with self.subTest(path=disallowed_path):
+        self._assert_error(
+            files={
+                disallowed_path: "",
+                "crossbench/helper/ok.py": "",
+                "tests/crossbench/helper/test_ok.py": "",
+            },
+            description="Add new module",
+            expected_msg="Found newly added file(s) in a top-level directory",
+            expected_items=[disallowed_path],
+            expected_long_text="ALLOW_TOPLEVEL_FILE=<REASON>",
+        )
+
+  def test_multiple_new_toplevel_files_sorted_error(self) -> None:
+    self._assert_error(
+        files={
+            "z_script.py": "",
+            "tests/crossbench/test_new_module.py": "",
+            "crossbench/new_helper.py": "",
+            ".new_dotfile": "",
+            "a_doc.md": "",
+        },
+        description="Add top-level files",
+        expected_items=[
+            ".new_dotfile",
+            "a_doc.md",
+            "crossbench/new_helper.py",
+            "tests/crossbench/test_new_module.py",
+            "z_script.py",
+        ],
+    )
+
+  def test_new_toplevel_file_passed_with_bypass(self) -> None:
+    self._assert_notify(
+        files={
+            "new_entry.py": "",
+            "crossbench/new_core.py": "",
+            "tests/crossbench/test_new_module.py": "",
+        },
+        expected_substrings=(
+            "Bypassing top-level file check (crossbench/new_core.py, "
+            "new_entry.py, tests/crossbench/test_new_module.py)",
+            "ALLOW_TOPLEVEL_FILE=Required CLI entry",
+        ),
+        description="Add entry point\n\nALLOW_TOPLEVEL_FILE=Required CLI entry",
+    )
+
+  def test_placeholder_bypass_rejected(self) -> None:
+    self._assert_error(
+        files={"tests/crossbench/test_new_module.py": ""},
+        description="Add core module\n\nALLOW_TOPLEVEL_FILE=TODO",
+    )
 
 
 if __name__ == "__main__":
