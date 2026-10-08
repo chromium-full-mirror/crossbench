@@ -516,7 +516,7 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
       })
     self.assertIn("coordinate or selector", str(cm.exception))
 
-  def test_parse_swipe(self):
+  def test_parse_swipe(self) -> None:
     config_dict = {
         "action": "swipe",
         "startx": 100,
@@ -534,12 +534,29 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
     self.assertEqual(action.start_y, 200)
     self.assertEqual(action.end_x, 110)
     self.assertEqual(action.end_y, 220)
+    self.assertEqual(action.source_device, "default_touchscreen")
     self.assertTrue(action.has_timeout)
     action.validate()
 
     action_2 = SwipeAction.parse_dict(action.to_json())
     self.assertEqual(action, action_2)
     action_2.validate()
+
+  def test_parse_swipe_source_device(self) -> None:
+    config_dict = {
+        "action": "swipe",
+        "start_x": 10,
+        "start_y": 20,
+        "end_x": 30,
+        "end_y": 40,
+        "source_device": "custom_touch",
+    }
+    action = SwipeAction.parse_dict(config_dict)
+    self.assertEqual(action.source_device, "custom_touch")
+    action.validate()
+
+    action_2 = SwipeAction.parse_dict(action.to_json())
+    self.assertEqual(action, action_2)
 
   def test_parse_text_input_minimal(self):
     config_dict = {

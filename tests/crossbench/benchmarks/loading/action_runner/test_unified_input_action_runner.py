@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from crossbench.action_runner.action.click import ClickAction
 from crossbench.action_runner.action.enums import ButtonClick
 from crossbench.action_runner.action.position import PositionConfig
+from crossbench.action_runner.action.swipe import SwipeAction
 from crossbench.action_runner.action.text_input import TextInputAction
 from crossbench.action_runner.display_rectangle import DisplayRectangle
 from crossbench.action_runner.element_not_found_error import \
@@ -530,6 +531,57 @@ class UnifiedInputActionRunnerTestCase(ActionRunnerTestCase):
         side_effect=ElementNotFoundError("button_id")):
       self.run_action(click_action)
     self.inject_events_mock.assert_not_called()
+
+  _EXPECTED_50MS_SWIPE_EVENTS: tuple[InputEvent, ...] = (
+      TouchEvent(Point(0, 0), is_down=True),
+      WaitEvent(duration=dt.timedelta(microseconds=8333)),
+      TouchEvent(Point(5, 10), is_down=True),
+      WaitEvent(duration=dt.timedelta(microseconds=8333)),
+      TouchEvent(Point(10, 20), is_down=True),
+      WaitEvent(duration=dt.timedelta(microseconds=8334)),
+      TouchEvent(Point(15, 30), is_down=True),
+      WaitEvent(duration=dt.timedelta(microseconds=8333)),
+      TouchEvent(Point(20, 40), is_down=True),
+      WaitEvent(duration=dt.timedelta(microseconds=8333)),
+      TouchEvent(Point(25, 50), is_down=True),
+      WaitEvent(duration=dt.timedelta(microseconds=8334)),
+      TouchEvent(Point(30, 60), is_down=True),
+      TouchEvent(Point(30, 60), is_down=False),
+  )
+
+  def test_swipe_minimal_duration(self) -> None:
+    swipe_action = SwipeAction.create(
+        10, 20, 30, 40, duration=dt.timedelta(milliseconds=1))
+    self.run_action(swipe_action)
+
+    self.assert_input_events_injected([
+        TouchEvent(Point(10, 20), is_down=True),
+        WaitEvent(duration=dt.timedelta(microseconds=1000)),
+        TouchEvent(Point(30, 40), is_down=True),
+        TouchEvent(Point(30, 40), is_down=False),
+    ])
+
+  def test_swipe_with_duration(self) -> None:
+    # 50ms at 120Hz -> 6 steps
+    swipe_action = SwipeAction.create(
+        0, 0, 30, 60, duration=dt.timedelta(milliseconds=50))
+    self.run_action(swipe_action)
+
+    self.assert_input_events_injected(list(self._EXPECTED_50MS_SWIPE_EVENTS))
+
+  def test_swipe_with_source_device(self) -> None:
+    swipe_action = SwipeAction.create(
+        0,
+        0,
+        30,
+        60,
+        duration=dt.timedelta(milliseconds=50),
+        source_device="my_touch_device")
+    self.run_action(swipe_action)
+
+    self.assert_input_events_injected(
+        list(self._EXPECTED_50MS_SWIPE_EVENTS),
+        expected_device_name="my_touch_device")
 
 
 class ScriptsDirTestCase(unittest.TestCase):

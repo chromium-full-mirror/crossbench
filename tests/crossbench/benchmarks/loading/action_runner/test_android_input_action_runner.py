@@ -226,7 +226,19 @@ class AndroidInputActionRunnerTestCase(ActionRunnerTestCase):
             ],
             arguments=js_args))
 
-  def test_swipe(self):
+  def test_swipe(self) -> None:
+    with mock.patch.object(self.platform, "inject_input_events") as mock_inject:
+      swipe_action = SwipeAction.create(
+          0, 1, 2, 3, duration=dt.timedelta(milliseconds=3000))
+      self.run_action(swipe_action)
+      mock_inject.assert_called_once()
+      device_name, events = mock_inject.call_args[0]
+      self.assertEqual(device_name, "default_touchscreen")
+      self.assertEqual(events[0], TouchEvent(Point(0, 1), is_down=True))
+      self.assertEqual(events[-1], TouchEvent(Point(2, 3), is_down=False))
+
+  def test_swipe_legacy_sdk(self) -> None:
+    self.adb.mock_sdk_version = 36
     self.platform.expect_sh("input", "swipe", "0", "1", "2", "3", "3000")
     swipe_action = SwipeAction.create(
         0, 1, 2, 3, duration=dt.timedelta(milliseconds=3000))

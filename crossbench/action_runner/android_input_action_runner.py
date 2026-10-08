@@ -152,11 +152,6 @@ return [
 
         remaining_distance -= current_distance
 
-  def swipe(self, action: i_action.SwipeAction) -> None:
-    with self.actions("SwipeAction", measure=False):
-      self._swipe_impl(action.start_x, action.start_y, action.end_x,
-                       action.end_y, action.duration)
-
   def _swipe_impl(self, start_x: int, start_y: int, end_x: int, end_y: int,
                   duration: dt.timedelta) -> None:
 

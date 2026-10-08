@@ -20,6 +20,8 @@ from crossbench.action_runner.keyboard_layout import US_KEYBOARD_LAYOUT
 from crossbench.action_runner.screenshot_annotation import \
     ScreenshotPointAnnotation, ScreenshotRectAnnotation
 from crossbench.action_runner.viewport_info import ViewportInfo
+from crossbench.action_runner.virtual_device.touchscreen import \
+    DEFAULT_TOUCH_POLLING_RATE_HZ
 from crossbench.benchmarks.loading.point import Point
 
 if TYPE_CHECKING:
@@ -221,8 +223,36 @@ class UnifiedInputActionRunner(ActionRunner):
     del action
 
   def swipe(self, action: i_action.SwipeAction) -> None:
-    # TODO(b/553272919): implement
-    del action
+    with self.actions("SwipeAction", measure=False):
+      events = self._get_swipe_events(action)
+      self.browser_platform.inject_input_events(action.source_device, events)
+
+  def _get_swipe_events(self, action: i_action.SwipeAction) -> list[InputEvent]:
+    start_point = Point(action.start_x, action.start_y)
+    end_point = Point(action.end_x, action.end_y)
+    num_steps = max(
+        1,
+        round(action.duration.total_seconds() * DEFAULT_TOUCH_POLLING_RATE_HZ))
+    total_duration_us = int(action.duration.total_seconds() * 1_000_000)
+    previous_cumulative_us = 0
+
+    events: list[InputEvent] = [TouchEvent(position=start_point, is_down=True)]
+    for step in range(1, num_steps + 1):
+      target_cumulative_us = (total_duration_us * step) // num_steps
+      if (wait_us := target_cumulative_us - previous_cumulative_us) > 0:
+        events.append(WaitEvent(duration=dt.timedelta(microseconds=wait_us)))
+      previous_cumulative_us = target_cumulative_us
+
+      fraction = step / num_steps
+      cur_x = self._interpolate(action.start_x, action.end_x, fraction)
+      cur_y = self._interpolate(action.start_y, action.end_y, fraction)
+      events.append(TouchEvent(position=Point(cur_x, cur_y), is_down=True))
+
+    events.append(TouchEvent(position=end_point, is_down=False))
+    return events
+
+  def _interpolate(self, start: int, end: int, fraction: float) -> int:
+    return round(start + (end - start) * fraction)
 
   def _text_to_weighted_events(self, text: str) -> list[KeyEvent | int]:
     events: list[KeyEvent | int] = []
