@@ -54,7 +54,7 @@ if TYPE_CHECKING:
   from crossbench.action_runner.virtual_device.virtual_device_config import \
       VirtualDeviceConfig
   from crossbench.device_config import DeviceConfigKeyPath
-  from crossbench.plt.display_info import DisplayInfo
+  from crossbench.plt.display_info import DisplayInfo, DisplayResolution
   from crossbench.plt.process_meminfo import ProcessMeminfo
   from crossbench.plt.signals import AnySignals, Signals
   from crossbench.plt.types import CmdArg, ProcessIo, ProcessLike, TupleCmdArgs
@@ -1365,7 +1365,7 @@ class Platform(abc.ABC):
     # TODO: support screen coordinates
     raise NotImplementedError("'screenshot' is only available on MacOS for now")
 
-  def display_resolution(self) -> tuple[int, int]:
+  def display_resolution(self) -> DisplayResolution:
     raise NotImplementedError(
         "'display_resolution' is only available on Android and ChromeOS for "
         "now")

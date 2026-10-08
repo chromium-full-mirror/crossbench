@@ -45,6 +45,7 @@ from crossbench.plt.arch import MachineArch
 from crossbench.plt.base import SubprocessError
 from crossbench.plt.bin import Binaries
 from crossbench.plt.device_info import DeviceInfo
+from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.evemu_platform_mixin import EvemuPlatformMixin
 from crossbench.plt.port_manager import PortManager
 from crossbench.plt.posix import PosixVersion, RemotePosixPlatform
@@ -1477,7 +1478,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
     return ({"resolution": self.display_resolution(), "refresh_rate": -1},)
 
   @override
-  def display_resolution(self) -> tuple[int, int]:
+  def display_resolution(self) -> DisplayResolution:
     displays_bytes = self.adb.dumpsys_bytes("window", "displays", "--proto")
 
     displays = windowmanagerservice_pb2.WindowManagerServiceDumpProto()
@@ -1490,7 +1491,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
         displays.root_window_container.window_container.configuration_container
         .full_configuration.window_configuration.max_bounds.bottom)
 
-    return (width, height)
+    return DisplayResolution(width, height)
 
   @override
   def get_ui_element_rect(

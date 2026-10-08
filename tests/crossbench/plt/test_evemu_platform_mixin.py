@@ -22,6 +22,7 @@ from crossbench.action_runner.virtual_device.touchscreen import \
 from crossbench.action_runner.virtual_device.virtual_device_config import \
     VirtualDeviceConfig
 from crossbench.benchmarks.loading.point import Point
+from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.evemu_platform_mixin import _INPUT_DRAIN_BUFFER, \
     _INPUT_LEAD_BUFFER, EvemuPlatformMixin
 from tests import test_helper
@@ -43,8 +44,8 @@ class MockEvemuPlatform(EvemuPlatformMixin, LinuxMockPlatform):
     self.popen_calls: list[tuple] = []
     self.sleep_calls: list[float | dt.timedelta] = []
 
-  def display_resolution(self) -> tuple[int, int]:
-    return (1080, 1920)
+  def display_resolution(self) -> DisplayResolution:
+    return DisplayResolution(1080, 1920)
 
   def _get_evemu_device_cmd(self,
                             device_type: VirtualDeviceType) -> TupleCmdArgs:
@@ -124,7 +125,9 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
   def test_setup_virtual_devices_touchscreen_fallback_resolution(self) -> None:
     platform = MockEvemuPlatform()
     with mock.patch.object(
-        platform, "display_resolution", return_value=(1440, 3120)) as mock_res:
+        platform,
+        "display_resolution",
+        return_value=DisplayResolution(1440, 3120)) as mock_res:
       platform.setup_virtual_devices(
           (TouchscreenVirtualDeviceConfig(name="touch1"),))
       mock_res.assert_called_once()
@@ -155,7 +158,9 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
   def test_setup_virtual_devices_mouse_fallback_resolution(self) -> None:
     platform = MockEvemuPlatform()
     with mock.patch.object(
-        platform, "display_resolution", return_value=(1440, 3120)) as mock_res:
+        platform,
+        "display_resolution",
+        return_value=DisplayResolution(1440, 3120)) as mock_res:
       platform.setup_virtual_devices((MouseVirtualDeviceConfig(name="mouse1"),))
       mock_res.assert_called_once()
       self.assertIn("mouse1", platform._virtual_devices)

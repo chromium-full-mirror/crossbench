@@ -71,11 +71,11 @@ class AndroidAdbPlatformTestCase(PosixNativePlatformTestCase):
       self.assertIsNone(self.platform.process_info(popen.remote_pid))
 
   def test_display_resolution(self):
-    [x, y] = self.platform.display_resolution()
+    resolution = self.platform.display_resolution()
     # We don't know the display resolution of the test device, but we can check
     # that it doesn't raise and that is has some size.
-    self.assertGreater(x, 0)
-    self.assertGreater(y, 0)
+    self.assertGreater(resolution.width, 0)
+    self.assertGreater(resolution.height, 0)
 
   def test_user_id(self):
     self.assertGreaterEqual(self.platform.user_id(), 0)

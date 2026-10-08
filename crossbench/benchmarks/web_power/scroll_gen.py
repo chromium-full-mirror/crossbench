@@ -7,7 +7,10 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import math
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
+
+if TYPE_CHECKING:
+  from crossbench.plt.display_info import DisplayResolution
 
 __all__ = ["GeneratorConfig", "generate_scroll_commands"]
 
@@ -194,8 +197,9 @@ def generate_swipes(
 
 
 def generate_scroll_commands(config: GeneratorConfig,
-                             display_resolution: tuple[int, int]) -> str:
-  max_x, max_y = display_resolution
+                             display_resolution: DisplayResolution) -> str:
+  max_x = display_resolution.width
+  max_y = display_resolution.height
   assert max_x > 0
   assert max_y > 0
 

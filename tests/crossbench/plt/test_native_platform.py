@@ -26,6 +26,7 @@ from typing_extensions import override
 import crossbench.path as pth
 from crossbench import __version__, plt
 from crossbench.plt.base import DEFAULT_CACHE_DIR, SubprocessError
+from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.posix import PosixPlatform, RemotePosixPlatform
 from crossbench.plt.remote import RemotePopen
 from tests import test_helper
@@ -1054,11 +1055,11 @@ class PosixNativePlatformTestCase(BaseNativePlatformTestCase):
     self.assertTrue(displays)
     self.assertTrue(json.dumps(displays))
     for display in displays:
-      resolution = display.get("resolution")
-      self.assertEqual(len(resolution), 2)
-      self.assertGreater(resolution[0], 0)
-      self.assertGreater(resolution[1], 0)
-      refresh_rate = display.get("refresh_rate")
+      resolution = display["resolution"]
+      self.assertIsInstance(resolution, DisplayResolution)
+      self.assertGreater(resolution.width, 0)
+      self.assertGreater(resolution.height, 0)
+      refresh_rate = display["refresh_rate"]
       if refresh_rate != -1.0:
         self.assertGreater(refresh_rate, 0)
     # cached

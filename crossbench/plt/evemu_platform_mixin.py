@@ -298,10 +298,10 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
                           height: int | None) -> tuple[int, int]:
     if width is not None and height is not None:
       return width, height
-    disp_width, disp_height = self.display_resolution()
+    resolution = self.display_resolution()
     return (
-        width if width is not None else disp_width,
-        height if height is not None else disp_height,
+        width if width is not None else resolution.width,
+        height if height is not None else resolution.height,
     )
 
   def _start_virtual_device(self, device_name: str,

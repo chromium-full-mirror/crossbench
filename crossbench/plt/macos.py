@@ -22,7 +22,9 @@ import psutil
 from typing_extensions import override
 
 from crossbench import path as pth
+from crossbench.helper.size import Size
 from crossbench.parse import NumberParser
+from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.posix import PosixPlatform, PosixVersion
 from crossbench.plt.signals import MacOSSignals
 
@@ -31,8 +33,6 @@ if TYPE_CHECKING:
   from crossbench.plt.display_info import DisplayInfo
   from crossbench.plt.types import TupleCmdArgs
   from crossbench.plt.version import PlatformVersion
-
-from crossbench.helper.size import Size
 
 DISPLAY_NDRV_RE: Final[re.Pattern] = re.compile(
     "(?P<resX>[0-9]+) x (?P<resY>[0-9]+) @ (?P<freq>[0-9.]+)Hz")
@@ -69,9 +69,13 @@ def parse_display_ndrvs(spdisplays_ndrvs: dict) -> Iterator[DisplayInfo]:
     freq_str = spdisplay_ndrv.get("_spdisplays_resolution", "")
     if match := DISPLAY_NDRV_RE.search(freq_str):
       yield {
-          "resolution": (NumberParser.positive_int(match.group("resX")),
-                         NumberParser.positive_int(match.group("resY"))),
-          "refresh_rate": NumberParser.positive_float(match.group("freq")),
+          "resolution":
+              DisplayResolution(
+                  NumberParser.positive_int(match.group("resX")),
+                  NumberParser.positive_int(match.group("resY")),
+              ),
+          "refresh_rate":
+              NumberParser.positive_float(match.group("freq")),
       }
 
 
@@ -212,7 +216,7 @@ class MacOSPlatform(PosixPlatform):
         return tuple(parse_display_ndrvs(spdisplays_ndrvs))
     return ()
 
-  def display_resolution(self) -> tuple[int, int]:
+  def display_resolution(self) -> DisplayResolution:
     return self.display_details()[0]["resolution"]
 
   def _cpu_freq(self) -> CPUFreqInfo | None:

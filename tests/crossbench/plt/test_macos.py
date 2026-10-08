@@ -14,6 +14,7 @@ from typing_extensions import override
 
 from crossbench import path as pth
 from crossbench.helper.version import VersionParseError
+from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.macos import MacOSPlatform, MacOsVersion
 from tests import test_helper
 from tests.crossbench.mock_helper import MacOsMockPlatform
@@ -343,16 +344,16 @@ class MacOsMockPlatformTestCase(BaseLocalMockPlatformTestMixin,
     displays = self.platform.display_details()
     self.assertEqual(len(displays), 2)
     self.assertDictEqual(displays[0], {
-        "resolution": (1728, 1117),
+        "resolution": DisplayResolution(1728, 1117),
         "refresh_rate": 60,
     })
     self.assertDictEqual(displays[1], {
-        "resolution": (3360, 1890),
+        "resolution": DisplayResolution(3360, 1890),
         "refresh_rate": 30,
     })
-    self.assertSequenceEqual(
+    self.assertEqual(
         self.platform.display_resolution(),
-        (1728, 1117),
+        DisplayResolution(1728, 1117),
     )
 
   def test_system_memory_bytes(self):

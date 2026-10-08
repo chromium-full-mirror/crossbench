@@ -85,8 +85,8 @@ class ScreenshotProbeContext(ProbeContext[ScreenshotProbe]):
 
   def _annotate_screenshot(self, screenshot_file_name: str, label: str,
                            annotations: Sequence[ScreenshotAnnotation]) -> None:
-    (screen_width, screen_height) = self.browser_platform.display_resolution()
-    svg = annotate_screenshot_svg(screen_width, screen_height,
+    resolution = self.browser_platform.display_resolution()
+    svg = annotate_screenshot_svg(resolution.width, resolution.height,
                                   screenshot_file_name, annotations)
     svg_path = self.result_path / f"{label}.svg"
     self.browser_platform.write_text(svg_path, svg)

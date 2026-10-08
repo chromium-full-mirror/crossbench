@@ -15,6 +15,7 @@ from typing_extensions import override
 
 from crossbench import path as pth
 from crossbench.helper.version import VersionParseError
+from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.linux import PERF_EVENT_PARANOID_PATH, SCRIPTS_DIR, \
     LinuxPlatform, parse_display_xrandr
 from crossbench.plt.posix import PosixVersion
@@ -96,7 +97,7 @@ class _LinuxMockPlatformTestCase(BasePosixMockPlatformTestCase):
     parsed = tuple(parse_display_xrandr(xrandr_output))
     self.assertEqual(len(parsed), 1)
     self.assertDictEqual(parsed[0], {
-        "resolution": (1728, 946),
+        "resolution": DisplayResolution(1728, 946),
         "refresh_rate": 120.0,
     })
 

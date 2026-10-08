@@ -19,6 +19,7 @@ from crossbench import path as pth
 from crossbench.helper.size import Size
 from crossbench.parse import NumberParser
 from crossbench.plt.base import SubprocessError
+from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.posix import PosixPlatform, RemotePosixPlatform
 from crossbench.plt.process_meminfo import ProcessMeminfo
 from crossbench.plt.signals import LinuxSignals
@@ -44,10 +45,12 @@ class XrandrDisplayInfo:
   def is_connected(self) -> bool:
     return "disconnected" not in self.header
 
-  def resolution(self) -> tuple[int, int] | None:
+  def display_resolution(self) -> DisplayResolution | None:
     if match := self.RESOLUTION_RE.search(self.header):
-      return (NumberParser.positive_int(match.group("resX")),
-              NumberParser.positive_int(match.group("resY")))
+      return DisplayResolution(
+          NumberParser.positive_int(match.group("resX")),
+          NumberParser.positive_int(match.group("resY")),
+      )
     return None
 
   def refresh_rate(self) -> float:
@@ -83,7 +86,7 @@ def parse_display_xrandr(xrandr_str: str) -> Iterator[DisplayInfo]:
   for display_info in display_infos:
     if not display_info.is_connected():
       continue
-    if resolution := display_info.resolution():
+    if resolution := display_info.display_resolution():
       yield {
           "resolution": resolution,
           "refresh_rate": display_info.refresh_rate(),

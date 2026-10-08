@@ -45,6 +45,7 @@ from crossbench.plt.arch import MachineArch
 from crossbench.plt.axml import RES_STRING_POOL_TYPE, \
     RES_XML_START_ELEMENT_TYPE, RES_XML_TYPE, \
     parse_binary_manifest_package_name
+from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.evemu_platform_mixin import VirtualDeviceState
 from crossbench.plt.port_manager import PortForwardException
 from crossbench.plt.process_meminfo import ProcessMeminfo
@@ -268,7 +269,7 @@ class BaseAndroidAdbMockPlatformTestCase(BasePosixMockPlatformTestCase):
     result = self.platform.display_details()
     self.assertEqual(len(result), 1)
     self.assertDictEqual(result[0], {
-        "resolution": (1920, 1080),
+        "resolution": DisplayResolution(1920, 1080),
         "refresh_rate": -1,
     })
 
@@ -468,8 +469,9 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
   def test_setup_virtual_devices_touchscreen_fallback_resolution(self) -> None:
     with self._patch_uinput_setup() as (mock_popen, mock_proc):
       with mock.patch.object(
-          self.platform, "display_resolution",
-          return_value=(1440, 3120)) as mock_res:
+          self.platform,
+          "display_resolution",
+          return_value=DisplayResolution(1440, 3120)) as mock_res:
         self.platform.setup_virtual_devices(
             (TouchscreenVirtualDeviceConfig(name="touch1"),))
         mock_res.assert_called_once()
@@ -497,8 +499,9 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
   def test_setup_virtual_devices_mouse_fallback_resolution(self) -> None:
     with self._patch_uinput_setup() as (mock_popen, mock_proc):
       with mock.patch.object(
-          self.platform, "display_resolution",
-          return_value=(1440, 3120)) as mock_res:
+          self.platform,
+          "display_resolution",
+          return_value=DisplayResolution(1440, 3120)) as mock_res:
         self.platform.setup_virtual_devices(
             (MouseVirtualDeviceConfig(name="mouse1"),))
         mock_res.assert_called_once()
@@ -1165,9 +1168,10 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
     self.expect_sh(
         "dumpsys window displays --proto",
         result=DUMPSYS_WINDOW_DISPLAYS_OUTPUT)
-    [horizontal, vertical] = self.platform.display_resolution()
-    self.assertEqual(horizontal, 1920)
-    self.assertEqual(vertical, 1080)
+    resolution = self.platform.display_resolution()
+    self.assertEqual(resolution, DisplayResolution(1920, 1080))
+    self.assertEqual(resolution.width, 1920)
+    self.assertEqual(resolution.height, 1080)
 
   def test_user_id(self):
     self.expect_sh("am get-current-user", result="10")

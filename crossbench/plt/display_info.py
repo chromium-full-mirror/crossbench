@@ -4,9 +4,14 @@
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import NamedTuple, TypedDict
+
+
+class DisplayResolution(NamedTuple):
+  width: int
+  height: int
 
 
 class DisplayInfo(TypedDict):
-  resolution: tuple[int, int]
+  resolution: DisplayResolution
   refresh_rate: float

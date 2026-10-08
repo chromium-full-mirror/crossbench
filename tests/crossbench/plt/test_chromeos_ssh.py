@@ -10,6 +10,7 @@ import pathlib
 from typing_extensions import override
 
 from crossbench.plt.chromeos_ssh import ChromeOsSshPlatform
+from crossbench.plt.display_info import DisplayResolution
 from tests import test_helper
 from tests.crossbench.plt.test_linux_ssh import LinuxSshMockPlatformTestCase
 
@@ -65,9 +66,10 @@ class ChromeOsSshMockPlatformTestCase(LinuxSshMockPlatformTestCase):
     self._expect_sh_ssh(
         "cros-health-tool telem --category=display",
         result=cros_health_tool_out)
-    [horizontal, vertical] = self.platform.display_resolution()
-    self.assertEqual(horizontal, 1366)
-    self.assertEqual(vertical, 768)
+    resolution = self.platform.display_resolution()
+    self.assertEqual(resolution, DisplayResolution(1366, 768))
+    self.assertEqual(resolution.width, 1366)
+    self.assertEqual(resolution.height, 768)
 
   def test_create_debugging_session(self):
     expected_port = 80

@@ -15,6 +15,7 @@ from typing_extensions import override
 from crossbench import path as pth
 from crossbench import plt
 from crossbench.parse import NumberParser, ObjectParser
+from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.linux_ssh import LinuxSshPlatform
 
 if TYPE_CHECKING:
@@ -124,7 +125,7 @@ class ChromeOsSshPlatform(LinuxSshPlatform):
     return ({"resolution": self.display_resolution(), "refresh_rate": -1},)
 
   @override
-  def display_resolution(self) -> tuple[int, int]:
+  def display_resolution(self) -> DisplayResolution:
     display_info_json = self.sh_stdout("cros-health-tool", "telem",
                                        "--category=display")
     display_info = json.loads(display_info_json)
@@ -134,7 +135,7 @@ class ChromeOsSshPlatform(LinuxSshPlatform):
         embedded_display.get("resolution_horizontal"), "resolution_horizontal")
     resolution_vertical = NumberParser.positive_int(
         embedded_display.get("resolution_vertical"), "resolution_vertical")
-    return (resolution_horizontal, resolution_vertical)
+    return DisplayResolution(resolution_horizontal, resolution_vertical)
 
   def _parse_lsb_release(self) -> dict[str, str]:
     # lsb-release has the format:
