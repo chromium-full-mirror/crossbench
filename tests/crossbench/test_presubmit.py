@@ -4,12 +4,25 @@
 
 from __future__ import annotations
 
+import abc
 import ast
+import enum
 import unittest
+from typing import Any, Callable, ClassVar, Iterable, TypeAlias
 from unittest import mock
+
+from typing_extensions import override
 
 from tests import test_helper
 from tools.presubmit import ast_checks, banned_builtins, constant_final
+
+ChangedLines: TypeAlias = set[int] | None
+ChangedLinesMap: TypeAlias = dict[str, set[int]] | None
+
+
+class PresubmitStatus(enum.StrEnum):
+  ERROR = "ERROR"
+  NOTIFY = "NOTIFY"
 
 
 class BannedBuiltinVisitorTestCase(unittest.TestCase):
@@ -122,9 +135,13 @@ class MyClass:
 
 class MockAffectedFile:
 
-  def __init__(self, path: str, changed_lines: set[int] | None = None) -> None:
-    self._path = path
-    self._changed_lines = changed_lines
+  def __init__(
+      self,
+      path: str,
+      changed_lines: ChangedLines = None,
+  ) -> None:
+    self._path: str = path
+    self._changed_lines: ChangedLines = changed_lines
 
   def LocalPath(self) -> str:  # noqa: N802
     return self._path
@@ -135,12 +152,12 @@ class MockAffectedFile:
     return [(lineno, "") for lineno in self._changed_lines]
 
 
-class CheckNoBannedBuiltinsTestCase(unittest.TestCase):
+class _PresubmitTestCase(unittest.TestCase, metaclass=abc.ABCMeta):
 
   def _mock_input_api(
       self,
       files: dict[str, str],
-      changed_lines_map: dict[str, set[int]] | None = None,
+      changed_lines_map: ChangedLinesMap = None,
       description: str = "",
   ) -> mock.MagicMock:
     input_api = mock.MagicMock()
@@ -153,317 +170,265 @@ class CheckNoBannedBuiltinsTestCase(unittest.TestCase):
     input_api.change.DescriptionText.return_value = description
     input_api.change.FullDescriptionText.return_value = description
 
-    affected_files = []
+    affected_files: list[MockAffectedFile] = []
     for file_path in files:
-      changed_lines = (
-          changed_lines_map.get(file_path) if changed_lines_map else None)
+      changed_lines: ChangedLines = None
+      if changed_lines_map:
+        changed_lines = changed_lines_map.get(file_path)
       affected_files.append(MockAffectedFile(file_path, changed_lines))
 
-    input_api.AffectedFiles.side_effect = (
-        lambda file_filter=None, include_deletes=True:
-        [f for f in affected_files if (file_filter is None or file_filter(f))])
+    def get_affected_files(
+        file_filter: Callable[[MockAffectedFile], bool] = lambda _: True,
+        include_deletes: bool = True,
+    ) -> list[MockAffectedFile]:
+      del include_deletes
+      return [f for f in affected_files if file_filter(f)]
+
+    input_api.AffectedFiles.side_effect = get_affected_files
     return input_api
 
   def _mock_output_api(self) -> mock.MagicMock:
     output_api = mock.MagicMock()
-    output_api.PresubmitError.side_effect = lambda msg, items=(
-    ), long_text="": (
-        "ERROR",
-        msg,
-        items,
-        long_text,
-    )
-    output_api.PresubmitNotifyResult.side_effect = lambda msg: ("NOTIFY", msg)
+
+    def presubmit_error(
+        msg: str,
+        items: tuple[str, ...] = (),
+        long_text: str = "",
+    ) -> tuple[PresubmitStatus, str, tuple[str, ...], str]:
+      return (PresubmitStatus.ERROR, msg, items, long_text)
+
+    def presubmit_notify(msg: str) -> tuple[PresubmitStatus, str]:
+      return (PresubmitStatus.NOTIFY, msg)
+
+    output_api.PresubmitError.side_effect = presubmit_error
+    output_api.PresubmitNotifyResult.side_effect = presubmit_notify
     return output_api
 
-  def test_no_violations(self) -> None:
-    input_api = self._mock_input_api({"foo.py": "x = obj.field\n"})
-    output_api = self._mock_output_api()
-    results = banned_builtins.CheckNoBannedBuiltins(input_api, output_api)
+  @abc.abstractmethod
+  def _run_check(self, input_api: Any, output_api: Any) -> list[Any]:
+    raise NotImplementedError
+
+  def _check(
+      self,
+      files: dict[str, str],
+      changed_lines_map: ChangedLinesMap = None,
+      description: str = "",
+  ) -> list[Any]:
+    input_api = self._mock_input_api(
+        files=files,
+        changed_lines_map=changed_lines_map,
+        description=description,
+    )
+    return self._run_check(input_api, self._mock_output_api())
+
+  def _assert_no_errors(
+      self,
+      files: dict[str, str],
+      changed_lines_map: ChangedLinesMap = None,
+      description: str = "",
+  ) -> None:
+    results = self._check(
+        files=files,
+        changed_lines_map=changed_lines_map,
+        description=description,
+    )
     self.assertEqual(results, [])
 
-  def test_getattr_error_on_new_code(self) -> None:
-    input_api = self._mock_input_api(
-        {"foo.py": "x = getattr(obj, 'field', None)\n"},
-        description="Fix something",
-    )
-    output_api = self._mock_output_api()
-    results = banned_builtins.CheckNoBannedBuiltins(input_api, output_api)
+  def _assert_error(
+      self,
+      files: dict[str, str],
+      description: str = "",
+      expected_msg: str = "",
+      expected_items: list[str] | None = None,
+      expected_long_text: str = "",
+  ) -> None:
+    results = self._check(files=files, description=description)
     self.assertEqual(len(results), 1)
     status, msg, items, long_text = results[0]
-    self.assertEqual(status, "ERROR")
-    self.assertIn("Found banned built-in function calls", msg)
-    self.assertEqual(len(items), 1)
-    self.assertIn("foo.py:1:5: x = getattr(obj, 'field', None)", items[0])
-    self.assertIn("ALLOW_GETATTR=<REASON>", long_text)
+    self.assertEqual(status, PresubmitStatus.ERROR)
+    if expected_msg:
+      self.assertIn(expected_msg, msg)
+    if expected_items is not None:
+      self.assertEqual(items, expected_items)
+    if expected_long_text:
+      self.assertIn(expected_long_text, long_text)
+
+  def _assert_notify(
+      self,
+      files: dict[str, str],
+      expected_substrings: Iterable[str],
+      description: str = "",
+  ) -> None:
+    results = self._check(files=files, description=description)
+    self.assertEqual(len(results), 1)
+    status, msg = results[0]
+    self.assertEqual(status, PresubmitStatus.NOTIFY)
+    for substring in expected_substrings:
+      self.assertIn(substring, msg)
+
+
+class CheckNoBannedBuiltinsTestCase(_PresubmitTestCase):
+  GETATTR_SNIPPET: ClassVar[str] = "x = getattr(obj, 'field', None)\n"
+  HASATTR_SNIPPET: ClassVar[str] = "if hasattr(obj, 'field'): pass\n"
+
+  @override
+  def _run_check(self, input_api: Any, output_api: Any) -> list[Any]:
+    return banned_builtins.CheckNoBannedBuiltins(input_api, output_api)
+
+  def test_no_violations(self) -> None:
+    self._assert_no_errors(files={"foo.py": "x = obj.field\n"})
+
+  def test_getattr_error_on_new_code(self) -> None:
+    self._assert_error(
+        files={"foo.py": self.GETATTR_SNIPPET},
+        description="Fix something",
+        expected_msg="Found banned built-in function calls",
+        expected_items=["foo.py:1:5: x = getattr(obj, 'field', None)"],
+        expected_long_text="ALLOW_GETATTR=<REASON>",
+    )
 
   def test_getattr_ignored_on_unchanged_line(self) -> None:
-    content = (
-        "# Line 1\n"
-        "x = getattr(obj, 'field', None)\n"  # Line 2 (not in changed lines)
-        "# Line 3\n"
-        "y = obj.other_field\n"  # Line 4 (in changed lines)
-    )
-    input_api = self._mock_input_api(
-        {"foo.py": content},
+    content = ("# Line 1\n"
+               f"{self.GETATTR_SNIPPET}"
+               "# Line 3\n"
+               "y = obj.other_field\n")
+    self._assert_no_errors(
+        files={"foo.py": content},
         changed_lines_map={"foo.py": {4}},
         description="Fix something",
     )
-    output_api = self._mock_output_api()
-    results = banned_builtins.CheckNoBannedBuiltins(input_api, output_api)
-    self.assertEqual(results, [])
 
   def test_getattr_passed_with_bypass(self) -> None:
-    input_api = self._mock_input_api(
-        {"foo.py": "x = getattr(obj, 'field', None)\n"},
+    self._assert_notify(
+        files={"foo.py": self.GETATTR_SNIPPET},
+        expected_substrings=(
+            "Bypassing banned built-in check",
+            "ALLOW_GETATTR=Need dynamic field lookup",
+        ),
         description="Fix something\n\nALLOW_GETATTR=Need dynamic field lookup",
     )
-    output_api = self._mock_output_api()
-    results = banned_builtins.CheckNoBannedBuiltins(input_api, output_api)
-    self.assertEqual(len(results), 1)
-    status, msg = results[0]
-    self.assertEqual(status, "NOTIFY")
-    self.assertIn("Bypassing banned built-in check", msg)
-    self.assertIn("ALLOW_GETATTR=Need dynamic field lookup", msg)
 
   def test_hasattr_error_on_new_code(self) -> None:
-    input_api = self._mock_input_api(
-        {"foo.py": "if hasattr(obj, 'field'): pass\n"},
+    self._assert_error(
+        files={"foo.py": self.HASATTR_SNIPPET},
         description="Fix something",
+        expected_msg="Found banned built-in function calls",
+        expected_items=["foo.py:1:4: if hasattr(obj, 'field'): pass"],
+        expected_long_text="ALLOW_HASATTR=<REASON>",
     )
-    output_api = self._mock_output_api()
-    results = banned_builtins.CheckNoBannedBuiltins(input_api, output_api)
-    self.assertEqual(len(results), 1)
-    status, msg, items, long_text = results[0]
-    self.assertEqual(status, "ERROR")
-    self.assertIn("Found banned built-in function calls", msg)
-    self.assertEqual(len(items), 1)
-    self.assertIn("foo.py:1:4: if hasattr(obj, 'field'): pass", items[0])
-    self.assertIn("ALLOW_HASATTR=<REASON>", long_text)
 
   def test_hasattr_passed_with_bypass(self) -> None:
-    input_api = self._mock_input_api(
-        {"foo.py": "if hasattr(obj, 'field'): pass\n"},
+    self._assert_notify(
+        files={"foo.py": self.HASATTR_SNIPPET},
+        expected_substrings=(
+            "Bypassing banned built-in check",
+            "ALLOW_HASATTR=Need dynamic check",
+        ),
         description="Fix something\n\nALLOW_HASATTR=Need dynamic check",
     )
-    output_api = self._mock_output_api()
-    results = banned_builtins.CheckNoBannedBuiltins(input_api, output_api)
-    self.assertEqual(len(results), 1)
-    status, msg = results[0]
-    self.assertEqual(status, "NOTIFY")
-    self.assertIn("Bypassing banned built-in check", msg)
-    self.assertIn("ALLOW_HASATTR=Need dynamic check", msg)
 
   def test_both_bypass_required(self) -> None:
-    input_api = self._mock_input_api(
-        {
-            "foo.py": ("x = getattr(obj, 'field', None)\n"
+    self._assert_notify(
+        files={
+            "foo.py": (f"{self.GETATTR_SNIPPET}"
                        "setattr(obj, 'field', 123)\n"),
         },
+        expected_substrings=(
+            "Bypassing banned built-in check",
+            "ALLOW_GETATTR=Need dynamic lookup",
+            "ALLOW_SETATTR=Need dynamic setter",
+        ),
         description=("Fix something\n\n"
                      "ALLOW_GETATTR=Need dynamic lookup\n"
                      "ALLOW_SETATTR=Need dynamic setter"),
     )
-    output_api = self._mock_output_api()
-    results = banned_builtins.CheckNoBannedBuiltins(input_api, output_api)
-    self.assertEqual(len(results), 1)
-    status, msg = results[0]
-    self.assertEqual(status, "NOTIFY")
-    self.assertIn("Bypassing banned built-in check", msg)
-    self.assertIn("ALLOW_GETATTR=Need dynamic lookup", msg)
-    self.assertIn("ALLOW_SETATTR=Need dynamic setter", msg)
 
   def test_partial_bypass_fails(self) -> None:
-    input_api = self._mock_input_api(
-        {
-            "foo.py": ("x = getattr(obj, 'field', None)\n"
+    self._assert_error(
+        files={
+            "foo.py": (f"{self.GETATTR_SNIPPET}"
                        "setattr(obj, 'field', 123)\n"),
         },
         description="Fix something\n\nALLOW_GETATTR=Dynamic lookup",
+        expected_items=[
+            "foo.py:1:5: x = getattr(obj, 'field', None)",
+            "foo.py:2:1: setattr(obj, 'field', 123)",
+        ],
+        expected_long_text="ALLOW_SETATTR=<REASON>",
     )
-    output_api = self._mock_output_api()
-    results = banned_builtins.CheckNoBannedBuiltins(input_api, output_api)
-    self.assertEqual(len(results), 1)
-    status, _, items, long_text = results[0]
-    self.assertEqual(status, "ERROR")
-    self.assertEqual(len(items), 2)
-    self.assertIn("ALLOW_SETATTR=<REASON>", long_text)
 
   def test_placeholder_bypass_rejected(self) -> None:
-    input_api = self._mock_input_api(
-        {"foo.py": "x = getattr(obj, 'field', None)\n"},
+    self._assert_error(
+        files={"foo.py": self.GETATTR_SNIPPET},
         description="Fix something\n\nALLOW_GETATTR=TODO",
     )
-    output_api = self._mock_output_api()
-    results = banned_builtins.CheckNoBannedBuiltins(input_api, output_api)
-    self.assertEqual(len(results), 1)
-    status, _, _, _ = results[0]
-    self.assertEqual(status, "ERROR")
 
 
-class CheckConstantsMarkedFinalTestCase(unittest.TestCase):
+class CheckConstantsMarkedFinalTestCase(_PresubmitTestCase):
+  CONSTANT_SNIPPET: ClassVar[str] = "FOO = 1\n"
 
-  def _mock_input_api(
-      self,
-      files: dict[str, str],
-      changed_lines_map: dict[str, set[int]] | None = None,
-      description: str = "",
-  ) -> mock.MagicMock:
-    input_api = mock.MagicMock()
-    input_api.PresubmitLocalPath.return_value = "/root"
-    input_api.fnmatch.fnmatch.return_value = False
-    input_api.os_path.exists.side_effect = lambda path: str(path).replace(
-        "/root/", "") in files
-    input_api.ReadFile.side_effect = lambda path, mode="r": files[str(
-        path).replace("/root/", "")]
-    input_api.change.DescriptionText.return_value = description
-    input_api.change.FullDescriptionText.return_value = description
-
-    affected_files = []
-    for file_path in files:
-      changed_lines = (
-          changed_lines_map.get(file_path) if changed_lines_map else None)
-      affected_files.append(MockAffectedFile(file_path, changed_lines))
-
-    input_api.AffectedFiles.side_effect = (
-        lambda file_filter=None, include_deletes=True:
-        [f for f in affected_files if (file_filter is None or file_filter(f))])
-    return input_api
-
-  def _mock_output_api(self) -> mock.MagicMock:
-    output_api = mock.MagicMock()
-    output_api.PresubmitError.side_effect = lambda msg, items=(
-    ), long_text="": (
-        "ERROR",
-        msg,
-        items,
-        long_text,
-    )
-    output_api.PresubmitNotifyResult.side_effect = lambda msg: ("NOTIFY", msg)
-    return output_api
+  @override
+  def _run_check(self, input_api: Any, output_api: Any) -> list[Any]:
+    return constant_final.CheckConstantsMarkedFinal(input_api, output_api)
 
   def test_no_violations(self) -> None:
-    input_api = self._mock_input_api({"foo.py": "FOO: Final = 1\n"})
-    output_api = self._mock_output_api()
-    results = constant_final.CheckConstantsMarkedFinal(input_api, output_api)
-    self.assertEqual(results, [])
+    self._assert_no_errors(files={"foo.py": "FOO: Final = 1\n"})
 
   def test_unannotated_constant_error_on_new_code(self) -> None:
-    input_api = self._mock_input_api(
-        {"foo.py": "FOO = 1\n"},
+    self._assert_error(
+        files={"foo.py": self.CONSTANT_SNIPPET},
         description="Fix something",
+        expected_msg="Found module constants not annotated with Final",
+        expected_items=["foo.py:1:1: FOO = 1"],
+        expected_long_text="ALLOW_MUTABLE_CONSTANT=<REASON>",
     )
-    output_api = self._mock_output_api()
-    results = constant_final.CheckConstantsMarkedFinal(input_api, output_api)
-    self.assertEqual(len(results), 1)
-    status, msg, items, long_text = results[0]
-    self.assertEqual(status, "ERROR")
-    self.assertIn("Found module constants not annotated with Final", msg)
-    self.assertEqual(len(items), 1)
-    self.assertIn("foo.py:1:1: FOO = 1", items[0])
-    self.assertIn("ALLOW_MUTABLE_CONSTANT=<REASON>", long_text)
 
   def test_non_final_annotated_constant_error(self) -> None:
-    input_api = self._mock_input_api(
-        {"foo.py": "FOO: int = 1\n"},
+    self._assert_error(
+        files={"foo.py": "FOO: int = 1\n"},
         description="Fix something",
+        expected_items=["foo.py:1:1: FOO: int = 1"],
     )
-    output_api = self._mock_output_api()
-    results = constant_final.CheckConstantsMarkedFinal(input_api, output_api)
-    self.assertEqual(len(results), 1)
-    status, msg, items, long_text = results[0]
-    self.assertEqual(status, "ERROR")
-    self.assertIn("foo.py:1:1: FOO: int = 1", items[0])
 
   def test_constant_ignored_on_unchanged_line(self) -> None:
-    content = (
-        "# Line 1\n"
-        "FOO = 1\n"  # Line 2 (not in changed lines)
-        "# Line 3\n"
-        "BAR: Final = 2\n"  # Line 4 (in changed lines)
-    )
-    input_api = self._mock_input_api(
-        {"foo.py": content},
+    content = ("# Line 1\n"
+               f"{self.CONSTANT_SNIPPET}"
+               "# Line 3\n"
+               "BAR: Final = 2\n")
+    self._assert_no_errors(
+        files={"foo.py": content},
         changed_lines_map={"foo.py": {4}},
         description="Fix something",
     )
-    output_api = self._mock_output_api()
-    results = constant_final.CheckConstantsMarkedFinal(input_api, output_api)
-    self.assertEqual(results, [])
 
   def test_constant_passed_with_bypass(self) -> None:
-    input_api = self._mock_input_api(
-        {"foo.py": "FOO = 1\n"},
+    self._assert_notify(
+        files={"foo.py": self.CONSTANT_SNIPPET},
+        expected_substrings=(
+            "Bypassing module constants Final check",
+            "ALLOW_MUTABLE_CONSTANT=Global mutable registry",
+        ),
         description=(
             "Fix something\n\nALLOW_MUTABLE_CONSTANT=Global mutable registry"),
     )
-    output_api = self._mock_output_api()
-    results = constant_final.CheckConstantsMarkedFinal(input_api, output_api)
-    self.assertEqual(len(results), 1)
-    status, msg = results[0]
-    self.assertEqual(status, "NOTIFY")
-    self.assertIn("Bypassing module constants Final check", msg)
-    self.assertIn("ALLOW_MUTABLE_CONSTANT=Global mutable registry", msg)
 
   def test_placeholder_bypass_rejected(self) -> None:
-    input_api = self._mock_input_api(
-        {"foo.py": "FOO = 1\n"},
+    self._assert_error(
+        files={"foo.py": self.CONSTANT_SNIPPET},
         description="Fix something\n\nALLOW_MUTABLE_CONSTANT=TODO",
     )
-    output_api = self._mock_output_api()
-    results = constant_final.CheckConstantsMarkedFinal(input_api, output_api)
-    self.assertEqual(len(results), 1)
-    status, _, _, _ = results[0]
-    self.assertEqual(status, "ERROR")
 
 
-class CheckAstCombinedTestCase(unittest.TestCase):
+class CheckAstCombinedTestCase(_PresubmitTestCase):
+  COMBINED_AST_SNIPPET: ClassVar[str] = ("FOO = 1\n"
+                                         "x = getattr(obj, 'prop')\n")
 
-  def _mock_input_api(
-      self,
-      files: dict[str, str],
-      changed_lines_map: dict[str, set[int]] | None = None,
-      description: str = "",
-  ) -> mock.MagicMock:
-    input_api = mock.MagicMock()
-    input_api.PresubmitLocalPath.return_value = "/root"
-    input_api.fnmatch.fnmatch.return_value = False
-    input_api.os_path.exists.side_effect = lambda path: str(path).replace(
-        "/root/", "") in files
-    input_api.ReadFile.side_effect = lambda path, mode="r": files[str(
-        path).replace("/root/", "")]
-    input_api.change.DescriptionText.return_value = description
-    input_api.change.FullDescriptionText.return_value = description
-
-    affected_files = []
-    for file_path in files:
-      changed_lines = (
-          changed_lines_map.get(file_path) if changed_lines_map else None)
-      affected_files.append(MockAffectedFile(file_path, changed_lines))
-
-    input_api.AffectedFiles.side_effect = (
-        lambda file_filter=None, include_deletes=True:
-        [f for f in affected_files if (file_filter is None or file_filter(f))])
-    return input_api
-
-  def _mock_output_api(self) -> mock.MagicMock:
-    output_api = mock.MagicMock()
-    output_api.PresubmitError.side_effect = lambda msg, items=(
-    ), long_text="": (
-        "ERROR",
-        msg,
-        items,
-        long_text,
-    )
-    output_api.PresubmitNotifyResult.side_effect = lambda msg: ("NOTIFY", msg)
-    return output_api
+  @override
+  def _run_check(self, input_api: Any, output_api: Any) -> list[Any]:
+    return ast_checks.CheckAst(input_api, output_api)
 
   def test_combined_catches_both(self) -> None:
-    content = ("FOO = 1\n"
-               "x = getattr(obj, 'prop')\n")
-    input_api = self._mock_input_api({"foo.py": content})
-    output_api = self._mock_output_api()
-    results = ast_checks.CheckAst(input_api, output_api)
+    results = self._check(files={"foo.py": self.COMBINED_AST_SNIPPET})
     self.assertEqual(len(results), 2)
     messages = [res[1] for res in results]
     self.assertTrue(any("banned built-in" in m for m in messages))
@@ -471,19 +436,14 @@ class CheckAstCombinedTestCase(unittest.TestCase):
         any("constants not annotated with Final" in m for m in messages))
 
   def test_combined_bypasses_individually(self) -> None:
-    content = ("FOO = 1\n"
-               "x = getattr(obj, 'prop')\n")
-    input_api = self._mock_input_api(
-        {"foo.py": content},
+    results = self._check(
+        files={"foo.py": self.COMBINED_AST_SNIPPET},
         description=(
             "Fix\n\nALLOW_GETATTR=Needed\nALLOW_MUTABLE_CONSTANT=Needed"),
     )
-
-    output_api = self._mock_output_api()
-    results = ast_checks.CheckAst(input_api, output_api)
     self.assertEqual(len(results), 2)
-    self.assertEqual(results[0][0], "NOTIFY")
-    self.assertEqual(results[1][0], "NOTIFY")
+    self.assertEqual(results[0][0], PresubmitStatus.NOTIFY)
+    self.assertEqual(results[1][0], PresubmitStatus.NOTIFY)
 
 
 if __name__ == "__main__":
