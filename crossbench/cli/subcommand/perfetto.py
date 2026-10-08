@@ -39,6 +39,7 @@ if TYPE_CHECKING:
   from crossbench.cli.cli import CrossBenchCLI
   from crossbench.cli.types import Subparsers
   from crossbench.runner.run import Run
+  from crossbench.types import TableData
 
   Categories: TypeAlias = Sequence[CategoryDescription]
 
@@ -201,9 +202,9 @@ class PerfettoBaseSubcommand(abc.ABC):
     pass
 
   def print_table(self, title: str, header_row: list[str],
-                  data: list[list[str]]) -> None:
+                  data: TableData) -> None:
     print(f"\n{title}:")
-    table = [header_row] + data
+    table: TableData = [header_row, *data]
     print(tbl.tabulate(table, headers="firstrow", tablefmt="fancy_grid"))
 
 
@@ -230,13 +231,13 @@ class PerfettoCategoriesSubcommand(PerfettoBaseSubcommand):
   def print_categories_table(self, browser_name: str,
                              categories: list[CategoryDescription]) -> None:
     header = ["Data Source", "Name", "Description", "Tags"]
-    data = []
-    for cat in categories:
-      desc = cat.description
-      if desc:
-        desc = "\n".join(txt_helper.wrap_lines(desc, width=60))
-      tags = "\n".join(cat.tags)
-      data.append([cat.data_source, cat.name, desc, tags])
+    data: TableData = []
+    for category in categories:
+      description = category.description
+      if description:
+        description = "\n".join(txt_helper.wrap_lines(description, width=60))
+      tags = "\n".join(category.tags)
+      data.append([category.data_source, category.name, description, tags])
     self.print_table(f"Categories for {browser_name}", header, data)
 
   def print_categories_json(self,
@@ -287,11 +288,12 @@ class PerfettoDataSourcesSubcommand(PerfettoBaseSubcommand):
       self, browser_name: str,
       data_sources: Mapping[str, Sequence[CategoryDescription]]) -> None:
     header = ["Data Source", "Categories Count", "Categories"]
-    data = []
-    for ds, cats in sorted(data_sources.items()):
-      count = len(cats)
-      cats_str = ", ".join(cat.name for cat in cats)
+    data: TableData = []
+    for data_source, categories in sorted(data_sources.items()):
+      count = len(categories)
+      categories_str = ", ".join(category.name for category in categories)
       if count > 5:
-        cats_str = "\n".join(txt_helper.wrap_lines(cats_str, width=60))
-      data.append([ds, str(count), cats_str or "-"])
+        categories_str = "\n".join(
+            txt_helper.wrap_lines(categories_str, width=60))
+      data.append([data_source, str(count), categories_str or "-"])
     self.print_table(f"Data Sources for {browser_name}", header, data)

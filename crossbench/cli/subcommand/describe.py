@@ -29,6 +29,7 @@ if TYPE_CHECKING:
   from crossbench.cli.parser import CBArgumentParser
   from crossbench.cli.types import Subparsers
   from crossbench.config import ConfigParser
+  from crossbench.types import TableData
 
   HelpData: TypeAlias = dict[str, dict[str, Any]]
 
@@ -256,21 +257,21 @@ class DescribeSubcommand(CrossbenchSubcommand):
 
   def print_probes(self, category: str, search_str: str | None,
                    help_data: HelpData) -> bool:
-    table: list[list[str | None]] = [["Probe", "Help"]]
+    table: TableData = [["Probe", "Help"]]
     self.format_property_table(help_data["probes"], table)
     return self.print_property_table("Probe", category, search_str, table,
                                      self.probe_names())
 
   def print_benchmarks(self, category: str, search_str: str | None,
                        data: HelpData) -> bool:
-    table: list[list[str | None]] = [["Benchmark", "Property", "Value"]]
+    table: TableData = [["Benchmark", "Property", "Value"]]
     self.format_property_table(data["benchmarks"], table)
     return self.print_property_table("Benchmark", category, search_str, table,
                                      self.benchmark_names())
 
   def print_networks(self, category: str, search_str: str | None,
                      help_data: HelpData) -> bool:
-    table: list[list[str | None]] = [["Network", "Help"]]
+    table: TableData = [["Network", "Help"]]
     for network_name, network_desc in help_data["networks"].items():
       table.append([network_name, network_desc])
     return self.print_property_table("Network", category, search_str, table,
@@ -278,50 +279,49 @@ class DescribeSubcommand(CrossbenchSubcommand):
 
   def print_config_objects(self, category: str, search_str: str | None,
                            help_data: HelpData) -> bool:
-    table: list[list[str | None]] = [["Config Object", "Property", "Value"]]
+    table: TableData = [["Config Object", "Property", "Value"]]
     self.format_property_table(help_data["config_objects"], table)
     return self.print_property_table("Config Objects", category, search_str,
                                      table, self.config_object_names())
 
   def print_envs(self, category: str, search_str: str | None,
                  help_data: HelpData) -> bool:
-    table: list[list[str | None]] = [["Env", "Property", "Value"]]
+    table: TableData = [["Env", "Property", "Value"]]
     self.format_property_table(help_data["envs"], table)
     return self.print_property_table("Env", category, search_str, table,
                                      self.env_names())
 
   def format_property_table(self, data: dict[str, Any],
-                            table: list[list[str | None]]) -> None:
-    max_width: int = 50
-    for name, values in data.items():
-      table.append([name])
-      for name, value in values.items():
-        if value is None:
-          value = ""
-        elif isinstance(value, str):
-          value = "\n".join(txt_helper.wrap_lines(value, width=max_width))
-        elif isinstance(value, (tuple, list)):
-          value = "\n".join(value)
-        elif isinstance(value, dict):
-          if not value.items():
-            value = "[]"
-          else:
-            kwargs = {"maxcolwidths": max_width}
-            value = tbl.tabulate(value.items(), tablefmt="plain", **kwargs)
-        table.append(["", name, value])
+                            table: TableData) -> None:
+    for section_name, values in data.items():
+      table.append([section_name])
+      for property_name, value in values.items():
+        formatted_value = self._format_property_value(value)
+        table.append(["", property_name, formatted_value])
+
+  def _format_property_value(self, value: Any, max_width: int = 50) -> str:
+    if value is None:
+      return ""
+    if isinstance(value, str):
+      return "\n".join(txt_helper.wrap_lines(value, width=max_width))
+    if isinstance(value, (tuple, list)):
+      return "\n".join(value)
+    if isinstance(value, dict):
+      if not value:
+        return "[]"
+      return tbl.tabulate(
+          value.items(), tablefmt="plain", maxcolwidths=max_width)
+    return str(value)
 
   def print_property_table(self, name: str, category: str,
-                           search_str: str | None,
-                           table: list[list[str | None]],
+                           search_str: str | None, table: TableData,
                            choices: Sequence[str]) -> bool:
-    printed_any: bool = False
     if len(table) <= 1:
       if category != "all":
         self.choice_error(f"No matching {name} found:", search_str, choices)
-    else:
-      printed_any = True
-      print(tbl.tabulate(table, tablefmt="fancy_grid"))
-    return printed_any
+      return False
+    print(tbl.tabulate(table, tablefmt="fancy_grid"))
+    return True
 
   def _benchmark_help_data(
       self,

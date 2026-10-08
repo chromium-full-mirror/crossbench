@@ -7,7 +7,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import requests
 from tabulate import tabulate
@@ -18,6 +18,9 @@ from crossbench.pinpoint.api import PINPOINT_BUILDS_API_URL_TEMPLATE
 from crossbench.pinpoint.format_time import DATETIME_FORMAT, format_time
 from crossbench.pinpoint.helper import annotate
 from crossbench.pinpoint.list_bots import fetch_bots
+
+if TYPE_CHECKING:
+  from crossbench.types import TableData
 
 
 @dataclasses.dataclass(frozen=True)
@@ -90,6 +93,9 @@ def _convert_json_to_builds(builds_json: dict[str, Any]) -> list[Build]:
 
 def _display_builds(builds: list[Build]) -> None:
   headers = ["Commit", "Number", "Date"]
-  table_data = [[build.commit, build.number,
-                 format_time(build.date)] for build in builds]
+  table_data: TableData = [[
+      build.commit,
+      str(build.number),
+      format_time(build.date),
+  ] for build in builds]
   print(tabulate(table_data, headers=headers, numalign="left"))

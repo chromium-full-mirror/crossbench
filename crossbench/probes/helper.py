@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Callable, Final, Mapping, Sequence
 
 if TYPE_CHECKING:
   from crossbench import path as pth
+  from crossbench.types import TableData
 
 INTERNAL_NAME_PREFIX: Final[str] = "cb."
 
@@ -138,7 +139,7 @@ def merge_csv(csv_list: Sequence[pth.LocalPath],
   table_row_len = row_header_len
   for csv_file in csv_list:
     with csv_file.open(encoding="utf-8") as f:
-      csv_data = list(csv.reader(f, delimiter=delimiter))
+      csv_data: TableData = list(csv.reader(f, delimiter=delimiter))
     table_row_len = _merge_csv_append(csv_data, table, table_headers,
                                       row_header_len, headers,
                                       known_row_headers, table_row_len)
@@ -175,7 +176,7 @@ def _detect_row_header_len(row: list[str]) -> int:
   return 1
 
 
-def _merge_csv_append(csv_data: list[list[Any]], table: list[list[Any]],
+def _merge_csv_append(csv_data: TableData, table: list[list[Any]],
                       table_headers: list[str | None], row_header_len: int,
                       headers: list[str] | None,
                       known_row_headers: set[tuple[str, ...]],

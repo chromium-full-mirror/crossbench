@@ -48,6 +48,7 @@ if TYPE_CHECKING:
   from crossbench.cli.subcommand.base import CrossbenchSubcommand
   from crossbench.cli.types import Subparsers
   from crossbench.parse import LateArgumentError
+  from crossbench.types import TableData
 
   BenchmarkClass: TypeAlias = type[Benchmark]
   BrowserLookupTable: TypeAlias = dict[str, tuple[type[Browser], pth.LocalPath]]
@@ -110,9 +111,9 @@ class MainCrossBenchArgumentParser(CBArgumentParser):
         "Usage: --probe-config=configs/probe/perfetto/default.config.hjson",
         "",
     ]
-    table = []
-    for probe_cls in GENERAL_PURPOSE_PROBES:
-      table.append((probe_cls.NAME, probe_cls.summary_text()))
+    table: TableData = [[probe_cls.NAME,
+                         probe_cls.summary_text()]
+                        for probe_cls in GENERAL_PURPOSE_PROBES]
     lines.append(tbl.tabulate(table, tablefmt="plain"))
     contents = "\n".join(lines)
     file = file or sys.stdout

@@ -8,7 +8,7 @@ import itertools
 import json
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import yaml
 from immutabledict import immutabledict
@@ -22,6 +22,9 @@ from crossbench.pinpoint.helper import annotate
 from crossbench.pinpoint.job_info import PinpointJobInfo, UrlSource
 from crossbench.pinpoint.output_format import OutputFormat, write_delimited
 from crossbench.pinpoint.user import UserEnum
+
+if TYPE_CHECKING:
+  from crossbench.types import TableData
 
 
 class Column:
@@ -152,7 +155,7 @@ def _prepare_job_list_data(
     all_users: bool,
     extra_columns: OrderedSet[str],
     url_source: UrlSource = UrlSource.LESZEK_PERF,
-) -> tuple[list[str], list[list[Any]], list[PinpointJobInfo]]:
+) -> tuple[list[str], TableData, list[PinpointJobInfo]]:
   if all_users and "user" not in extra_columns:
     extra_columns = OrderedSet(["user", *extra_columns])
   headers = [
@@ -164,30 +167,37 @@ def _prepare_job_list_data(
       "Job URL",
       "Status",
   ]
-  table_data = []
-  job_infos: list[PinpointJobInfo] = []
-
-  for job in jobs:
-    job_info = PinpointJobInfo.from_json(job)
-    job_infos.append(job_info)
-    job_dict = job_info.to_dict()
-    extra_values: list[str] = []
-    for col in extra_columns:
-      if (val := job_dict.get(col)) is not None:
-        extra_values.append(str(val))
-      else:
-        extra_values.append("")
-    row = [
-        job_info.benchmark or "",
-        job_info.bot or "",
-        job_info.comparison_mode or "",
-        *extra_values,
-        job_info.formatted_created,
-        url_source.format_short_job_url(job_info.job_id),
-        job_info.status or "",
-    ]
-    table_data.append(row)
+  job_infos: list[PinpointJobInfo] = [
+      PinpointJobInfo.from_json(job) for job in jobs
+  ]
+  table_data: TableData = [
+      _prepare_job_row(job_info, extra_columns, url_source)
+      for job_info in job_infos
+  ]
   return headers, table_data, job_infos
+
+
+def _prepare_job_row(
+    job_info: PinpointJobInfo,
+    extra_columns: OrderedSet[str],
+    url_source: UrlSource,
+) -> list[str]:
+  job_dict = job_info.to_dict()
+  extra_values: list[str] = []
+  for col in extra_columns:
+    if (val := job_dict.get(col)) is not None:
+      extra_values.append(str(val))
+    else:
+      extra_values.append("")
+  return [
+      job_info.benchmark or "",
+      job_info.bot or "",
+      job_info.comparison_mode or "",
+      *extra_values,
+      job_info.formatted_created,
+      url_source.format_short_job_url(job_info.job_id),
+      job_info.status or "",
+  ]
 
 
 def _display_jobs(
@@ -215,10 +225,10 @@ def _display_jobs(
       _display_jobs_as_table(headers, rows, job_infos, truncate)
 
 
-def _display_jobs_as_table(headers: list[str], rows: list[list[Any]],
+def _display_jobs_as_table(headers: list[str], rows: TableData,
                            job_infos: list[PinpointJobInfo],
                            max_length: int | None) -> None:
-  table_data: list[list[str]] = [
+  table_data: TableData = [
       [truncate(cell, max_length) for cell in row] for row in rows
   ]
   url_index = headers.index("Job URL")

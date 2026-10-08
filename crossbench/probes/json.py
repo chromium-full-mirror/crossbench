@@ -32,7 +32,7 @@ if TYPE_CHECKING:
   from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.runner.groups.repetitions import RepetitionsRunGroup
   from crossbench.runner.run import Run
-  from crossbench.types import Json
+  from crossbench.types import Json, TableData
 
 IS_NUMERIC_RE: Final[re.Pattern] = re.compile(r"[0-9.e+\-]+")
 LOG_SUMMARY_KEYS: Final[tuple[str, ...]] = (
@@ -177,9 +177,7 @@ class JsonResultProbe(Probe, metaclass=abc.ABCMeta):
         table[info_key].append(browser_result["info"][info_key])
       data = browser_result["data"]
       self._extract_result_metrics_table(data, table)
-    flattened: list[list[str]] = [
-        [label, *values] for label, values in table.items()
-    ]
+    flattened: TableData = [[label, *values] for label, values in table.items()]
     logging.critical(tabulate(flattened, tablefmt="plain"))
 
   def _extract_result_metrics_table(self, metrics: dict[str, Any],
@@ -194,12 +192,12 @@ class JsonResultProbe(Probe, metaclass=abc.ABCMeta):
 class XLSXWriter:
 
   @classmethod
-  def write(cls, table: list[list[str]], path: pth.LocalPath) -> None:
+  def write(cls, table: TableData, path: pth.LocalPath) -> None:
     instance = cls(table, path)
     instance.write_xlsx()
 
-  def __init__(self, table: list[list[str]], path: pth.LocalPath) -> None:
-    self._table: list[list[str]] = table
+  def __init__(self, table: TableData, path: pth.LocalPath) -> None:
+    self._table: TableData = table
     self._nof_header_cols: int = self._detect_header_cols()
     self._nof_header_rows: int = self._detect_header_rows()
 

@@ -26,6 +26,7 @@ from crossbench.parse import NumberParser
 from tests import test_helper
 
 if TYPE_CHECKING:
+  from crossbench.types import TableData
   from tests.test_helper import TestEnv
 
 _POWER_SCORES_FILENAME: Final[str] = "power_scores.csv"
@@ -63,7 +64,7 @@ def _run_web_power(
   ])
 
 
-def _load_csv(csv_path: pth.LocalPath) -> list[list[str]]:
+def _load_csv(csv_path: pth.LocalPath) -> TableData:
   """Reads a CSV file as a table of rows and columns.
 
   Args:
