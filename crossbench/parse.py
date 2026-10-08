@@ -14,7 +14,7 @@ import math
 import re
 import shlex
 from typing import TYPE_CHECKING, Any, Callable, Final, Iterable, Sequence, \
-    TypeVar, cast
+    TypeVar
 from urllib import parse as urlparse
 
 import google.protobuf.message
@@ -42,7 +42,12 @@ PROTOBUF_ALL_SUFFIX: Final[tuple[str, ...]] = (
     PROTOBUF_TEXT_SUFFIX + PROTOBUF_BINARY_SUFFIX)
 
 
-class PathParser:
+# Common base class to easily discover all parser classes.
+class BaseParser:
+  pass
+
+
+class PathParser(BaseParser):
 
   PATH_PREFIX: Final[re.Pattern[str]] = re.compile(r"^(?:"
                                                    r"(?:\.\.?|~)?|"
@@ -164,7 +169,10 @@ class PathParser:
                         value: pth.AnyPathLike | None,
                         platform: plt.Platform,
                         name: str = "binary") -> pth.LocalPath:
-    return cast(pth.LocalPath, cls.binary_path(value, platform, name))
+    if not platform.is_local:
+      raise argparse.ArgumentTypeError(
+          f"Cannot parse local {name} on remote {platform}")
+    return platform.local_path(cls.binary_path(value, platform, name))
 
   @classmethod
   def json_file_path(cls, value: object) -> pth.LocalPath:
@@ -197,7 +205,7 @@ SequenceT = TypeVar("SequenceT", bound=Sequence)
 ProtoClassT = TypeVar("ProtoClassT", bound=google.protobuf.message.Message)
 
 
-class ObjectParser:
+class ObjectParser(BaseParser):
 
   @classmethod
   def str_tuple(
@@ -720,7 +728,7 @@ def _extract_decoding_error(message: str, value: pth.AnyPathLike,
   return f"{message}\n    {line}\n    {marker_space}{marker}\n({e!s})"
 
 
-class NumberParser:
+class NumberParser(BaseParser):
 
   @classmethod
   def any_float(cls, value: object, name: str = "float") -> float:
@@ -950,7 +958,7 @@ class TimeUnit(TimeUnitData, enum.Enum):
     return dt.timedelta(**{self.timedelta_kwarg: value})
 
 
-class DurationParser:
+class DurationParser(BaseParser):
 
   @classmethod
   def help(cls) -> str:

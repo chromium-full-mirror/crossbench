@@ -183,9 +183,37 @@ class MockPlatformMixin:
   def install_mock_binary(self, name, path: pth.AnyPathLike) -> pth.AnyPath:
     binary = self.path(path)
     assert self.fake_fs, "missing fake fs"
-    self.fake_fs.create_file(binary)
+    if not self.fake_fs.exists(binary):
+      self.fake_fs.create_file(binary)
     self.set_binary_lookup_override(name, binary)
     return binary
+
+  def _create_default_tmp_dir(self) -> pth.AnyPath:
+    if self.use_fs and self.is_remote:
+      return self.path("/tmp")
+    return super()._create_default_tmp_dir()
+
+  def exists(self, path: pth.AnyPathLike) -> bool:
+    if self.use_fs and self.is_remote:
+      return pth.LocalPath(self.path(path)).exists()
+    return super().exists(path)
+
+  def is_file(self, path: pth.AnyPathLike) -> bool:
+    if self.use_fs and self.is_remote:
+      return pth.LocalPath(self.path(path)).is_file()
+    return super().is_file(path)
+
+  def is_dir(self, path: pth.AnyPathLike) -> bool:
+    if self.use_fs and self.is_remote:
+      return pth.LocalPath(self.path(path)).is_dir()
+    return super().is_dir(path)
+
+  def which(self, binary_name: pth.AnyPathLike) -> pth.AnyPath | None:
+    if self.use_fs and self.is_remote:
+      if binary_override := self.lookup_binary_override(binary_name):
+        return binary_override
+      return None
+    return super().which(binary_name)
 
   @property
   def has_display(self) -> bool:
