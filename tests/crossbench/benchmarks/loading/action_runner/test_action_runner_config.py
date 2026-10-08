@@ -10,13 +10,13 @@ from typing import Any
 from unittest import mock
 
 from crossbench import plt
-from crossbench.action_runner.android_input_action_runner import \
-    AndroidInputActionRunner
 from crossbench.action_runner.base import ActionRunner
 from crossbench.action_runner.chromeos_input_action_runner import \
     ChromeOSInputActionRunner
 from crossbench.action_runner.config import DEFAULT_VIRTUAL_DEVICES, \
     ActionRunnerConfig, ActionRunnerType
+from crossbench.action_runner.unified_input_action_runner import \
+    UnifiedInputActionRunner
 from crossbench.action_runner.virtual_device.keyboard import \
     KeyboardVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.mouse import \
@@ -33,35 +33,36 @@ class ActionRunnerConfigTest(unittest.TestCase):
   def setUp(self) -> None:
     self.mock_run = mock.MagicMock(spec=Run)
 
-  def test_parse_invalid(self):
+  def test_parse_invalid(self) -> None:
     for invalid in ["bas", "adnroid", "chroms"]:
       with self.subTest(pattern=invalid):
         with self.assertRaises((argparse.ArgumentTypeError, ValueError)):
           ActionRunnerConfig.parse(invalid)
 
-  def test_parse_basic(self):
+  def test_parse_basic(self) -> None:
     action_runner = ActionRunnerConfig.parse("basic")
     self.assertIsInstance(action_runner, ActionRunnerConfig)
     self.assertEqual(action_runner.type, ActionRunnerType.BASIC)
     self.assertIsInstance(
         action_runner.instantiate(plt.PLATFORM, self.mock_run), ActionRunner)
 
-  def test_parse_auto(self):
+  def test_parse_auto(self) -> None:
     action_runner = ActionRunnerConfig.parse("auto")
     self.assertIsInstance(action_runner, ActionRunnerConfig)
     self.assertEqual(action_runner.type, ActionRunnerType.AUTO)
     self.assertIsInstance(
         action_runner.instantiate(plt.PLATFORM, self.mock_run), ActionRunner)
 
-  def test_parse_auto_android(self):
-    action_runner = ActionRunnerConfig.parse("auto")
+  def test_parse_auto_android(self) -> None:
+    action_runner_config = ActionRunnerConfig.parse("auto")
     mock_platform = mock.MagicMock()
     mock_platform.is_android = True
-    self.assertIsInstance(
-        action_runner.instantiate(mock_platform, self.mock_run),
-        AndroidInputActionRunner)
+    action_runner = action_runner_config.instantiate(mock_platform,
+                                                     self.mock_run)
+    self.assertIsInstance(action_runner, UnifiedInputActionRunner)
+    self.assertEqual(action_runner_config.virtual_devices, ())
 
-  def test_parse_auto_chromeos(self):
+  def test_parse_auto_chromeos(self) -> None:
     action_runner = ActionRunnerConfig.parse("auto")
     mock_platform = mock.MagicMock()
     mock_platform.is_android = False
@@ -70,15 +71,26 @@ class ActionRunnerConfigTest(unittest.TestCase):
         action_runner.instantiate(mock_platform, self.mock_run),
         ChromeOSInputActionRunner)
 
-  def test_parse_android(self):
-    action_runner = ActionRunnerConfig.parse("android")
-    self.assertIsInstance(action_runner, ActionRunnerConfig)
-    self.assertEqual(action_runner.type, ActionRunnerType.ANDROID)
-    self.assertIsInstance(
-        action_runner.instantiate(plt.PLATFORM, self.mock_run),
-        AndroidInputActionRunner)
+  def test_parse_android(self) -> None:
+    action_runner_config = ActionRunnerConfig.parse("android")
+    self.assertIsInstance(action_runner_config, ActionRunnerConfig)
+    self.assertEqual(action_runner_config.type, ActionRunnerType.UNIFIED)
+    self.assertIs(action_runner_config.type, ActionRunnerType.ANDROID)
+    action_runner = action_runner_config.instantiate(plt.PLATFORM,
+                                                     self.mock_run)
+    self.assertIsInstance(action_runner, UnifiedInputActionRunner)
+    self.assertEqual(action_runner_config.virtual_devices, ())
 
-  def test_parse_chromeos(self):
+  def test_parse_unified(self) -> None:
+    action_runner_config = ActionRunnerConfig.parse("unified")
+    self.assertIsInstance(action_runner_config, ActionRunnerConfig)
+    self.assertEqual(action_runner_config.type, ActionRunnerType.UNIFIED)
+    self.assertIs(action_runner_config.type, ActionRunnerType.ANDROID)
+    action_runner = action_runner_config.instantiate(plt.PLATFORM,
+                                                     self.mock_run)
+    self.assertIsInstance(action_runner, UnifiedInputActionRunner)
+
+  def test_parse_chromeos(self) -> None:
     action_runner = ActionRunnerConfig.parse("chromeos")
     self.assertIsInstance(action_runner, ActionRunnerConfig)
     self.assertEqual(action_runner.type, ActionRunnerType.CHROMEOS)

@@ -23,7 +23,6 @@ from typing_extensions import override
 from crossbench import path as pth
 from crossbench.action_runner.action.enums import ButtonClick
 from crossbench.action_runner.action.position import UiSelectorConfig
-from crossbench.action_runner.display_rectangle import DisplayRectangle
 from crossbench.action_runner.element_not_found_error import \
     ElementNotFoundError
 from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
@@ -1169,44 +1168,6 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
     [horizontal, vertical] = self.platform.display_resolution()
     self.assertEqual(horizontal, 1920)
     self.assertEqual(vertical, 1080)
-
-  def test_get_window_rect(self):
-    dumpsys_output = ("Window #0 Window{1a2b3c4 u0 com.android.chrome/Main}:\n"
-                      "  mAppBounds=Rect(0, 0 - 1080, 2400)\n")
-    self.expect_sh("dumpsys window windows", result=dumpsys_output)
-    rect = self.platform.get_window_rect("com.android.chrome")
-    self.assertEqual(rect, DisplayRectangle(Point(0, 0), 1080, 2400))
-
-  def test_get_window_rect_with_insets(self):
-    dumpsys_output = (
-        "Window #0 Window{1a2b3c4 u0 com.android.chrome/Main}:\n"
-        "  mAppBounds=Rect(0, 0 - 1080, 1920)\n"
-        "  InsetsFrameProvider: {type=statusBars,"
-        " insetsSize=Insets{left=0, top=72, right=0, bottom=0}}\n"
-        "  InsetsFrameProvider: {type=navigationBars,"
-        " insetsSize=Insets{left=0, top=0, right=0, bottom=72}}\n")
-    self.expect_sh("dumpsys window windows", result=dumpsys_output)
-    rect = self.platform.get_window_rect("com.android.chrome")
-    self.assertEqual(rect, DisplayRectangle(Point(0, 72), 1080, 1776))
-
-  def test_get_window_rect_multi_window(self):
-    dumpsys_output = ("Window #0 Window{1a2b3c4 u0 com.android.chrome/Main}:\n"
-                      "  mAppBounds=Rect(191, 83 - 1174, 635)\n")
-    self.expect_sh("dumpsys window windows", result=dumpsys_output)
-    rect = self.platform.get_window_rect("com.android.chrome")
-    self.assertEqual(rect, DisplayRectangle(Point(191, 83), 983, 552))
-
-  def test_get_window_rect_empty_window_name_raises(self):
-    with self.assertRaises(AssertionError):
-      self.platform.get_window_rect("")
-
-  def test_get_window_rect_not_found_raises(self):
-    self.expect_sh(
-        "dumpsys window windows",
-        result="Window #0 Window{1a2b3c4 u0 com.other.app}:")
-    with self.assertRaisesRegex(
-        RuntimeError, "Could not find window bounds for com.android.chrome"):
-      self.platform.get_window_rect("com.android.chrome")
 
   def test_user_id(self):
     self.expect_sh("am get-current-user", result="10")

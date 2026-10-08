@@ -100,16 +100,6 @@ ANDROID_PERMISSIONS: Final = ("POST_NOTIFICATIONS", "CAMERA", "RECORD_AUDIO")
 
 _AAPT_PACKAGE_NAME_RE = re.compile(r"^package: name='([^']+)'")
 
-_WINDOW_BOUNDS_RE: Final[re.Pattern] = re.compile(
-    r"mAppBounds=Rect\((?P<left>\d+), (?P<top>\d+) - (?P<right>\d+),"
-    r" (?P<bottom>\d+)\)")
-
-_STATUS_BAR_INSETS_RE: Final[re.Pattern] = re.compile(
-    r"type=statusBars.*?insetsSize=Insets\{left=\d+, top=(?P<top>\d+)")
-_NAV_BAR_INSETS_RE: Final[re.Pattern] = re.compile(
-    r"type=navigationBars.*?insetsSize=Insets\{left=\d+, top=\d+,"
-    r" right=\d+, bottom=(?P<bottom>\d+)")
-
 # Template for Perfetto config to capture Java heaps.
 ANDROID_JAVA_HPROF_PERFETTO_CFG = """buffers {{
   size_kb: {size_kb}
@@ -1501,43 +1491,6 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
         .full_configuration.window_configuration.max_bounds.bottom)
 
     return (width, height)
-
-  # TODO(b/553272919): Remove once Android cutover to UnifiedInputActionRunner
-  # is finished.
-  @override
-  def get_window_rect(self, window_name: str) -> DisplayRectangle:
-    assert window_name, "window_name is required"
-    # Wrap window bounds (left, top - right, bottom) into `DisplayRectangle` for
-    # the corresponding window name within the z-order window stack, sourced
-    # from `dumpsys window` output.
-    # According to Android `Rect` docs, the right and bottom coordinates are
-    # exclusive, representing the boundary immediately after the last pixel.
-    # https://developer.android.com/reference/android/graphics/Rect
-    raw_window_dump = self.sh_stdout("dumpsys", "window", "windows")
-    raw_window_config = raw_window_dump[raw_window_dump.find(window_name):]
-
-    match = _WINDOW_BOUNDS_RE.search(raw_window_config)
-    if not match:
-      raise RuntimeError(f"Could not find window bounds for {window_name}")
-
-    left = int(match["left"])
-    top = int(match["top"])
-    right = int(match["right"])
-    bottom = int(match["bottom"])
-
-    # On Android 15+ (SDK 35+), edge-to-edge enforcement causes mAppBounds to
-    # encompass the entire display (top == 0), including the status and nav
-    # bars. Adjust the window rect by deducting the system bar insets.
-    if top == 0:
-      if status_match := _STATUS_BAR_INSETS_RE.search(raw_window_dump):
-        top += int(status_match["top"])
-      if nav_match := _NAV_BAR_INSETS_RE.search(raw_window_dump):
-        bottom -= int(nav_match["bottom"])
-
-    width = right - left
-    height = bottom - top
-
-    return DisplayRectangle(Point(left, top), width, height)
 
   @override
   def get_ui_element_rect(
