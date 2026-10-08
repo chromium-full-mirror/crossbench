@@ -4,12 +4,11 @@
 
 from __future__ import annotations
 
-import datetime as dt
 import itertools
 import json
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Final, Mapping
+from typing import Any, Final
 
 import yaml
 from immutabledict import immutabledict
@@ -18,18 +17,17 @@ from tabulate import tabulate
 
 from crossbench.pinpoint import http_requests
 from crossbench.pinpoint.api import PINPOINT_JOBS_API_URL, USERINFO_API_URL
-from crossbench.pinpoint.format_time import DATETIME_FORMAT, format_time
+from crossbench.pinpoint.format_time import format_time
 from crossbench.pinpoint.helper import annotate
-from crossbench.pinpoint.job_info import UrlSource
+from crossbench.pinpoint.job_info import PinpointJobInfo, UrlSource
 from crossbench.pinpoint.output_format import OutputFormat, write_delimited
 from crossbench.pinpoint.user import UserEnum
 
 
 class Column:
 
-  def __init__(self, name: str, description: str, json_field: str = "") -> None:
+  def __init__(self, name: str, description: str) -> None:
     self.name = name
-    self.json_field = json_field or name
     self.description = description
 
 
@@ -44,12 +42,10 @@ EXTRA_COLUMNS: Final[list[Column]] = [
     ),
     Column(
         name="base_commit",
-        json_field="base_git_hash",
         description="The Git commit hash of the base revision.",
     ),
     Column(
         name="exp_commit",
-        json_field="end_git_hash",
         description="The Git commit hash of the experiment revision.",
     ),
     Column(
@@ -58,7 +54,6 @@ EXTRA_COLUMNS: Final[list[Column]] = [
     ),
     Column(
         name="exp_patch",
-        json_field="experiment_patch",
         description="The Gerrit patch URL applied to the experiment.",
     ),
     Column(
@@ -67,17 +62,14 @@ EXTRA_COLUMNS: Final[list[Column]] = [
     ),
     Column(
         name="attempts",
-        json_field="initial_attempt_count",
         description="The number of times the job ran the test.",
     ),
     Column(
         name="bug",
-        json_field="bug_id",
         description="The buganier ID associated with the job.",
     ),
     Column(
         name="differences",
-        json_field="difference_count",
         description="The number of regressions found for bisection jobs.",
     ),
 ]
@@ -160,7 +152,7 @@ def _prepare_job_list_data(
     all_users: bool,
     extra_columns: OrderedSet[str],
     url_source: UrlSource = UrlSource.LESZEK_PERF,
-) -> tuple[list[str], list[list[Any]]]:
+) -> tuple[list[str], list[list[Any]], list[PinpointJobInfo]]:
   if all_users and "user" not in extra_columns:
     extra_columns = OrderedSet(["user", *extra_columns])
   headers = [
@@ -173,37 +165,29 @@ def _prepare_job_list_data(
       "Status",
   ]
   table_data = []
+  job_infos: list[PinpointJobInfo] = []
 
   for job in jobs:
-    created_time = _extract_field(job, "created")
-    if created_time:
-      dt_object = dt.datetime.fromisoformat(created_time.replace("Z", "+00:00"))
-      created_time = dt_object.strftime(DATETIME_FORMAT)
-
+    job_info = PinpointJobInfo.from_json(job)
+    job_infos.append(job_info)
+    job_dict = job_info.to_dict()
+    extra_values: list[str] = []
+    for col in extra_columns:
+      if (val := job_dict.get(col)) is not None:
+        extra_values.append(str(val))
+      else:
+        extra_values.append("")
     row = [
-        _extract_field(job, "benchmark"),
-        _extract_field(job, "configuration"),
-        _extract_field(job, "comparison_mode"),
-        *[_extract_field(job, _to_json_field(col)) for col in extra_columns],
-        created_time,
-        url_source.format_short_job_url(_extract_field(job, "job_id")),
-        _extract_field(job, "status"),
+        job_info.benchmark or "",
+        job_info.bot or "",
+        job_info.comparison_mode or "",
+        *extra_values,
+        job_info.formatted_created,
+        url_source.format_short_job_url(job_info.job_id),
+        job_info.status or "",
     ]
     table_data.append(row)
-  return headers, table_data
-
-
-def _to_json_field(column_name: str) -> str:
-  column = EXTRA_COLUMNS_DICT.get(column_name)
-  if not column:
-    raise ValueError(f"Unknown column name: {column_name}")
-  return column.json_field
-
-
-def _extract_field(job: dict[str, Any], field_name: str) -> str:
-  if value := job.get(field_name, ""):
-    return str(value)
-  return str(job.get("arguments", {}).get(field_name, ""))
+  return headers, table_data, job_infos
 
 
 def _display_jobs(
@@ -220,28 +204,34 @@ def _display_jobs(
     case OutputFormat.YAML:
       print(yaml.dump(jobs))
     case OutputFormat.CSV | OutputFormat.TSV:
-      headers, rows = _prepare_job_list_data(jobs, all_users, extra_columns,
-                                             url_source)
+      headers, rows, _ = _prepare_job_list_data(jobs, all_users, extra_columns,
+                                                url_source)
       write_delimited(
           sys.stdout, headers, rows, delimiter=output_format.delimiter)
     case OutputFormat.TABLE:
-      headers, rows = _prepare_job_list_data(jobs, all_users, extra_columns,
-                                             url_source)
-      _display_jobs_as_table(headers, rows, truncate)
+      headers, rows, job_infos = _prepare_job_list_data(jobs, all_users,
+                                                        extra_columns,
+                                                        url_source)
+      _display_jobs_as_table(headers, rows, job_infos, truncate)
 
 
-def _display_jobs_as_table(headers: list[str], rows: list,
+def _display_jobs_as_table(headers: list[str], rows: list[list[Any]],
+                           job_infos: list[PinpointJobInfo],
                            max_length: int | None) -> None:
-  table_data = [[truncate(cell, max_length) for cell in row] for row in rows]
+  table_data: list[list[str]] = [
+      [truncate(cell, max_length) for cell in row] for row in rows
+  ]
   url_index = headers.index("Job URL")
   type_index = headers.index("Type")
   time_index = headers.index("Start Time")
   status_index = headers.index("Status")
-  for row in table_data:
+  for row, job_info in zip(table_data, job_infos, strict=True):
     row[url_index] = _format_link(row[url_index])
-    row[type_index] = _format_type(row[type_index])
+    if mode := job_info.comparison_mode:
+      row[type_index] = mode.job_type
     row[time_index] = format_time(row[time_index])
-    row[status_index] = _format_status(row[status_index])
+    if status := job_info.status:
+      row[status_index] = status.status_emoji
   headers[status_index] = "🚦"
   print(tabulate(table_data, headers=headers))
 
@@ -251,33 +241,6 @@ def _format_link(url: str) -> str:
   osc8_start = "\x1b]8;;"
   osc8_end = "\x1b\\"
   return f"{osc8_start}{url}{osc8_end}{text}{osc8_start}{osc8_end}"
-
-
-JOB_TYPE_LOOKUP: Final[Mapping[str, str]] = {
-    "performance": "bisect",
-    "try": "try",
-}
-
-
-def _format_type(job_type: str) -> str:
-  lookup_str = job_type.lower().strip()
-  return JOB_TYPE_LOOKUP.get(lookup_str, job_type)
-
-
-STATUS_EMOJI_LOOKUP: Final[Mapping[str, str]] = {
-    "queued": "⌛",
-    "running": "🏃",
-    "completed": "✅",
-    # An extra space is added because this emoji eats a space from the right.
-    "cancelled": "⏹️ ",
-    "failed": "❌",
-}
-
-
-def _format_status(status: str) -> str:
-  lookup_str = status.lower().strip()
-  return STATUS_EMOJI_LOOKUP.get(lookup_str, status)
-
 
 def truncate(text: str, max_length: int | None = None) -> str:
   text = str(text)

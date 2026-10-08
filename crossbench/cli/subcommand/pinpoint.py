@@ -113,6 +113,7 @@ class PinpointListSubcommand(PinpointBaseSubcommand):
     list_parser.add_argument(
         "--format",
         "-f",
+        type=OutputFormat,
         choices=OutputFormat.all(),
         default=OutputFormat.TABLE,
         help="The output format for the list of jobs. (default: table)")
