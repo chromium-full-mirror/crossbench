@@ -23,6 +23,27 @@ code and look for better approaches.
 - Use `git cl format` to format all sources
 - Observe an 80 characters per line limit in Python files.
 
+## Multi-Line Imports
+
+- Multi-line imports **must** use backslash (`\`) line continuations, not
+  parentheses.
+- **Never** suggest parentheses `(...)` for multi-line imports, and never cite
+  PEP 8 or the Google Python Style Guide to do so. Crossbench conventions
+  strictly enforce backslashes for multi-line imports.
+
+```python
+# GOOD: Crossbench convention uses backslashes for multi-line imports
+from crossbench.plt.display_info import \
+    DisplayRefreshRateResult, \
+    DisplayResolution
+
+# BAD: Do NOT use or suggest parentheses for multi-line imports
+from crossbench.plt.display_info import (
+    DisplayRefreshRateResult,
+    DisplayResolution,
+)
+```
+
 ## Strict Import Discipline
 
 - Imports must only happen at top-level unless it's inside a TYPE_CHECKING block

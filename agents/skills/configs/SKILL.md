@@ -8,6 +8,15 @@ description: Guidelines for crossbench ConfigObjects
 This skill enforces input validation patterns and immutable configuration object
 structures across Crossbench.
 
+## Review Scope
+
+- **Only** report findings about input validation and `ConfigObject` patterns
+  covered by this skill.
+- **Do not** comment on general Python style or formatting (imports, line
+  continuations, line length, naming, comments, etc.). These are owned by the
+  separate `cb-style` review agent, and crossbench conventions intentionally
+  differ from PEP 8 and the Google Python Style Guide in places.
+
 ## Early Input Validation
 
 - All user input and CLI/HJSON arguments must pass through validation helpers in
