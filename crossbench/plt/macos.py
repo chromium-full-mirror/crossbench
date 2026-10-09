@@ -14,6 +14,7 @@ import plistlib
 import re
 import socket
 import subprocess
+import time
 import traceback as tb
 from subprocess import SubprocessError
 from typing import TYPE_CHECKING, Any, Final, Iterator
@@ -114,6 +115,14 @@ class MacOSPlatform(PosixPlatform):
     # unprivileged.
     self.sh("sync")
     self.sh("sudo", "purge")
+
+  @override
+  def clock_boottime_ns(self) -> int:
+    # macOS has no /proc/uptime, but unlike on Linux its CLOCK_MONOTONIC keeps
+    # counting through sleep, i.e. it has CLOCK_BOOTTIME semantics. (Python's
+    # time.monotonic() does not: it is based on mach_absolute_time().)
+    self.assert_is_local()
+    return time.clock_gettime_ns(time.CLOCK_MONOTONIC)
 
   @override
   def _mktemp_sh(self,

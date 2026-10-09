@@ -98,6 +98,10 @@ class LinuxSshMockPlatformTestCase(BasePosixMockPlatformTestCase):
     self._expect_sh_ssh("cat 'path/with a space/to/a/file'")
     self.platform.cat(self.platform.path("path/with a space/to/a/file"))
 
+  def test_clock_boottime_ns(self) -> None:
+    self._expect_sh_ssh("cat /proc/uptime", result="521909.79 3504712.93\n")
+    self.assertEqual(self.platform.clock_boottime_ns(), 521_909_790_000_000)
+
   def test_sh_input(self):
     self.expect_sh("cat", result="hello world")
     hello_world = self.platform.sh_stdout("cat", input=b"hello world")

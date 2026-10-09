@@ -215,6 +215,14 @@ class PosixPlatform(Platform, metaclass=abc.ABCMeta):
       return dt.timedelta()
 
   @override
+  def clock_boottime_ns(self) -> int:
+    # /proc/uptime holds "<uptime_s> <idle_s>", the first field being
+    # CLOCK_BOOTTIME in seconds at 10ms resolution, which dwarfs the float
+    # rounding error of the conversion below.
+    uptime_s = float(self.cat(pth.AnyPosixPath("/proc/uptime")).split()[0])
+    return round(uptime_s * 1e9)
+
+  @override
   def app_version(self, app_or_bin: pth.AnyPathLike) -> str:
     app_or_bin = self.path(app_or_bin)
     if not self.exists(app_or_bin):

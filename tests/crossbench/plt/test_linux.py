@@ -61,6 +61,25 @@ class _LinuxMockPlatformTestCase(BasePosixMockPlatformTestCase):
         mock.call("tee", "/proc/sys/vm/drop_caches", input=b"3\n"),
     ])
 
+  def test_clock_boottime_ns(self) -> None:
+    proc_uptime = self.fs.create_file("/proc/uptime")
+    for contents, expected_ns in (
+        ("521909.79 3504712.93\n", 521_909_790_000_000),
+        ("0.00 0.00", 0),
+        ("12.5", 12_500_000_000),
+    ):
+      with self.subTest(contents=contents):
+        proc_uptime.set_contents(contents)
+        self.assertEqual(self.platform.clock_boottime_ns(), expected_ns)
+
+  def test_clock_boottime_ns_invalid(self) -> None:
+    proc_uptime = self.fs.create_file("/proc/uptime")
+    for invalid in ("", "\n", "abc 1.0"):
+      with self.subTest(invalid=invalid):
+        proc_uptime.set_contents(invalid)
+        with self.assertRaises((ValueError, IndexError)):
+          self.platform.clock_boottime_ns()
+
   def test_version(self):
     self.platform.mock_version_str = None
     self.expect_sh("uname", "-r", result="5.4.0-104-generic")

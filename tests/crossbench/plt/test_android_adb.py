@@ -213,6 +213,10 @@ class BaseAndroidAdbMockPlatformTestCase(BasePosixMockPlatformTestCase):
           self.assertIn("Cannot clear memory page cache on Android SDK",
                         cm.output[0])
 
+  def test_clock_boottime_ns(self) -> None:
+    self.expect_sh("cat /proc/uptime", result="521909.79 3504712.93\n")
+    self.assertEqual(self.platform.clock_boottime_ns(), 521_909_790_000_000)
+
   def test_name(self):
     self.assertEqual(self.platform.name, "android")
 

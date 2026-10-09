@@ -480,6 +480,15 @@ class Platform(abc.ABC):
   def uptime(self) -> dt.timedelta:
     pass
 
+  def clock_boottime_ns(self) -> int:
+    """Current CLOCK_BOOTTIME reading of this platform, in nanoseconds.
+
+    CLOCK_BOOTTIME is the default clock domain of Perfetto traces. Unlike
+    uptime(), this returns the raw clock value so that it can be used to
+    align timestamps recorded on different machines.
+    """
+    raise NotImplementedError(f"clock_boottime_ns is not implemented on {self}")
+
   def disk_usage(self, path: pth.AnyPathLike) -> psutil._common.sdiskusage:
     return psutil.disk_usage(str(self.local_path(path)))
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 import pathlib
 import plistlib
 import textwrap
+import time
 from unittest import mock
 
 from pyfakefs.fake_filesystem import OSType
@@ -54,6 +55,15 @@ class MacOsMockPlatformTestCase(BaseLocalMockPlatformTestMixin,
         mock.call("sync"),
         mock.call("sudo", "purge"),
     ])
+
+  def test_clock_boottime_ns(self) -> None:
+    # Both attributes are POSIX-only; create=True lets mock.patch add them on
+    # hosts (e.g. Windows) where the time module lacks them.
+    with mock.patch.object(time, "CLOCK_MONOTONIC", 42, create=True), \
+         mock.patch.object(time, "clock_gettime_ns", create=True,
+                           return_value=123) as clock_gettime_ns:
+      self.assertEqual(self.platform.clock_boottime_ns(), 123)
+    clock_gettime_ns.assert_called_once_with(42)
 
   def test_is_apple(self):
     self.assertTrue(self.platform.is_apple)
