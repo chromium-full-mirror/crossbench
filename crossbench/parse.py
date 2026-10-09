@@ -132,6 +132,22 @@ class PathParser(BaseParser):
           f"{name} path already exists: {str(path)!r}")
     return path
 
+  # TODO: Replace with a generic combinator that accepts a value if any of
+  # the given parsers does, e.g. any_of(not_existing_path, empty_dir_path).
+  @classmethod
+  def empty_or_new_dir_path(cls,
+                            value: object,
+                            name: str = "value") -> pth.LocalPath:
+    """A directory that is either empty or does not exist yet."""
+    path = cls.path(value, name)
+    if not path.exists():
+      return path
+    dir_path = cls.dir_path(path, name)
+    if any(dir_path.iterdir()):
+      raise argparse.ArgumentTypeError(
+          f"{name} dir must be empty: {str(dir_path)!r}")
+    return dir_path
+
   @classmethod
   def binary_path(
       cls,

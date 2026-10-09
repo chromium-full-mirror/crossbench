@@ -165,10 +165,10 @@ afterwards:
 ```
 
 For each run, this writes an archive into the output directory (which must
-not exist yet), combining the Bits trace with the device's trace on a common
-timeline. Archives are named `<browser>_<story>_<repetition>.zip`, e.g.
-`android.5B221FDDV0000K.1_0_web-power-idle-cnn_0.zip`. Open an archive in
-[Perfetto UI](https://ui.perfetto.dev).
+be empty or not exist yet), combining the Bits trace with the device's trace
+on a common timeline. Archives are named `<browser>_<story>_<repetition>.zip`,
+e.g. `android.5B221FDDV0000K.1_0_web-power-idle-cnn_0.zip`. Open an archive
+in [Perfetto UI](https://ui.perfetto.dev).
 
 #### Uploading Results
 

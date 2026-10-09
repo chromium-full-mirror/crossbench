@@ -702,6 +702,26 @@ class PathParserTestCase(BaseFileParserTestCase):
     with self.assertRaises(argparse.ArgumentTypeError):
       PathParser.not_existing_path(path)
 
+  def test_empty_or_new_dir_path(self):
+    with self.assertRaises(argparse.ArgumentTypeError):
+      PathParser.empty_or_new_dir_path("")
+    folder = pth.LocalPath("folder")
+    self.assertFalse(folder.exists())
+    self.assertEqual(folder, PathParser.empty_or_new_dir_path(str(folder)))
+    self.assertEqual(folder, PathParser.empty_or_new_dir_path(folder))
+    folder.mkdir()
+    self.assertEqual(folder, PathParser.empty_or_new_dir_path(str(folder)))
+    self.assertEqual(folder, PathParser.empty_or_new_dir_path(folder))
+    (folder / "foo").touch()
+    with self.assertRaises(argparse.ArgumentTypeError) as cm:
+      PathParser.empty_or_new_dir_path(folder)
+    self.assertIn("must be empty", str(cm.exception))
+    file = pth.LocalPath("file")
+    file.touch()
+    with self.assertRaises(argparse.ArgumentTypeError) as cm:
+      PathParser.empty_or_new_dir_path(file)
+    self.assertIn("not a folder", str(cm.exception))
+
   def test_value_has_path_prefix(self):
     self.assertTrue(PathParser.value_has_path_prefix("./foo"))
     self.assertTrue(PathParser.value_has_path_prefix("../foo"))

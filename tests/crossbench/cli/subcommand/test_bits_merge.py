@@ -388,8 +388,16 @@ class BitsMergeSubcommandTest(BaseCliTestCase):
       self.run_cli("bits_merge", str(self.test_dir), str(self.output_dir))
     mock_merge.assert_called_once_with(self.test_dir, self.output_dir)
 
-  def test_output_dir_exists(self) -> None:
+  def test_output_dir_empty(self) -> None:
     self.output_dir.mkdir()
+    with mock.patch(
+        _MERGE_PATCH_TARGET, return_value=self.archives) as mock_merge:
+      self.run_cli("bits-merge", str(self.test_dir), str(self.output_dir))
+    mock_merge.assert_called_once_with(self.test_dir, self.output_dir)
+
+  def test_output_dir_not_empty(self) -> None:
+    self.output_dir.mkdir()
+    (self.output_dir / "foo").touch()
     self._run_cli_expecting_usage_error(
         str(self.test_dir), str(self.output_dir))
 
