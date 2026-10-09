@@ -9,7 +9,7 @@ import datetime as dt
 import json
 import logging
 import subprocess
-from typing import IO, TYPE_CHECKING, Any, ClassVar, Iterator, Self
+from typing import IO, TYPE_CHECKING, ClassVar, Iterator, Self
 
 from typing_extensions import override
 
@@ -235,7 +235,7 @@ class BitsProbeContext(ProbeContext[BitsProbe]):
     return self._bits_out_id
 
   @contextlib.contextmanager
-  def _log_files(self, mode: str) -> Iterator[tuple[IO[Any], IO[Any]]]:
+  def _log_files(self, mode: str) -> Iterator[tuple[IO[str], IO[str]]]:
     stdout_path = self.local_result_path / "stdout.txt"
     stderr_path = self.local_result_path / "stderr.txt"
     with stdout_path.open(mode, encoding="utf-8") as stdout, \
@@ -270,33 +270,26 @@ class BitsProbeContext(ProbeContext[BitsProbe]):
 
   def _stop_collection(self) -> None:
     logging.info("Stopping BITS collection (ID: %s)", self.bits_out_id)
-    device_args: tuple[pth.AnyPathLike,
-                       ...] = ("--service_port", str(self.probe.port))
-    stop_args = (
-        self.probe.bits_path,
-        "--stop",
-        self.bits_out_id,
-        *device_args,
-    )
-    with self._log_files("a") as (stdout, stderr):
-      self.host_platform.sh(*stop_args, stdout=stdout, stderr=stderr)
-    self._save_channel_averages(device_args)
-
-  def _save_channel_averages(self, device_args: tuple[pth.AnyPathLike,
-                                                      ...]) -> None:
-    avg_args = (
-        self.probe.bits_path,
-        "--print_channel_averages",
-        self.bits_out_id,
-        *device_args,
-    )
+    self._run_service_cmd("--stop", self.bits_out_id)
     avg_path = (
         self.local_result_path / self.probe.BITS_CHANNEL_AVERAGES_CSV_NAME)
-    with (
-        avg_path.open("w", encoding="utf-8") as avg_file,
-        self._log_files("a") as (_, stderr),
-    ):
-      self.host_platform.sh(*avg_args, stdout=avg_file, stderr=stderr)
+    with avg_path.open("w", encoding="utf-8") as avg_file:
+      self._run_service_cmd(
+          "--print_channel_averages", self.bits_out_id, stdout_file=avg_file)
+
+  def _run_service_cmd(
+      self,
+      *args: pth.AnyPathLike,
+      stdout_file: IO[str] | None = None,
+  ) -> None:
+    cmd = (
+        self.probe.bits_path,
+        *args,
+        "--service_port",
+        str(self.probe.port),
+    )
+    with self._log_files("a") as (stdout, stderr):
+      self.host_platform.sh(*cmd, stdout=stdout_file or stdout, stderr=stderr)
 
   @override
   def start(self) -> None:
