@@ -171,12 +171,8 @@ class LoadLine2WebApiBenchmark(LoadLineBenchmark):
                   story: BaseStory) -> Flags:
     flags: Flags = super().extra_flags(browser_attributes, story)
     if browser_attributes.is_chromium_based:
-      # By design, Loadline2 wants some stories to always use a new renderer
-      # process and some to use an existing renderer, therefore covering both
-      # cases. The flag here forces a navigation to a new website to create a
-      # new renderer, except when navigating from about:blank. So we can
-      # achieve the goal by passing the flag and navigating to about:blank
-      # before stories that must use an existing renderer.
+      # Makes chrome more consistent regarding whether it creates a new
+      # renderer process or uses an existing one.
       flags.set("--site-per-process")
     return flags
 
