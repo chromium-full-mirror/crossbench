@@ -12,7 +12,8 @@ from crossbench.benchmarks.loadline.loadline_2 import \
     LoadLine2PhoneBenchmark, LoadLine2PhoneDebugBenchmark, \
     LoadLine2TabletBenchmark, LoadLine2TabletDebugBenchmark
 from crossbench.benchmarks.loadline.loadline_2_webapi import \
-    LoadLine2WebApiPhoneBenchmark, LoadLine2WebApiPhoneDebugBenchmark
+    LoadLine2WebApiPhoneBenchmark, LoadLine2WebApiPhoneDebugBenchmark, \
+    LoadLine2WebApiTabletBenchmark, LoadLine2WebApiTabletDebugBenchmark
 
 __all__ = [
     "LoadLine1PhoneBenchmark",
@@ -27,4 +28,6 @@ __all__ = [
     "LoadLine2TabletDebugBenchmark",
     "LoadLine2WebApiPhoneBenchmark",
     "LoadLine2WebApiPhoneDebugBenchmark",
+    "LoadLine2WebApiTabletBenchmark",
+    "LoadLine2WebApiTabletDebugBenchmark",
 ]

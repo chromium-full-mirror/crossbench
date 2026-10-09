@@ -68,4 +68,5 @@ use Ethernet connection.
   running in a separate terminal window for the entire benchmark run.
 * Run `./cb.py loadline2-webapi-phone --browser <browser>`, where browser can
   be one of `android:chrome` or `ios:safari`. This command also requires root on
-  the host.
+  the host. Alternatively, you can run the tablet version with
+  `./cb.py loadline2-webapi-tablet --browser <browser>`.

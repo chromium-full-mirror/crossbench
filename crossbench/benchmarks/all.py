@@ -20,7 +20,8 @@ from crossbench.benchmarks.loadline import LoadLine1PhoneBenchmark, \
     LoadLine1TabletFastBenchmark, LoadLine2PhoneBenchmark, \
     LoadLine2PhoneDebugBenchmark, LoadLine2TabletBenchmark, \
     LoadLine2TabletDebugBenchmark, LoadLine2WebApiPhoneBenchmark, \
-    LoadLine2WebApiPhoneDebugBenchmark
+    LoadLine2WebApiPhoneDebugBenchmark, LoadLine2WebApiTabletBenchmark, \
+    LoadLine2WebApiTabletDebugBenchmark
 from crossbench.benchmarks.manual import ManualBenchmark
 from crossbench.benchmarks.memory.memory_benchmark import MemoryBenchmark
 from crossbench.benchmarks.motionmark import MotionMark10Benchmark, \
@@ -61,6 +62,8 @@ __all__ = [
     "LoadLine2TabletDebugBenchmark",
     "LoadLine2WebApiPhoneBenchmark",
     "LoadLine2WebApiPhoneDebugBenchmark",
+    "LoadLine2WebApiTabletBenchmark",
+    "LoadLine2WebApiTabletDebugBenchmark",
     "ManualBenchmark",
     "MemoryBenchmark",
     "MotionMark10Benchmark",

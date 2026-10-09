@@ -9,6 +9,19 @@ if (window.location.href ===
   const zoom_button_id = 'zoomSelect';
   let complete = false;
 
+  function onFrameRendered(callback) {
+    // The first rAF requests a frame to be rendered. When it's done, the
+    // second rAF is called. So the callback is invoked when the first frame
+    // has been rendered.
+    // This is a poor approximation of when the frame is actually shown on the
+    // device screen, since it ignores all work beyond Renderer process
+    // (GPU process/surfaceflinger). But it's the best we can do using pure
+    // WebAPI.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(callback);
+    });
+  }
+
   const widget_observer = new MutationObserver(unused => {
     // Corresponds to docs.png in crbug.com/372457479#comment9. The historical
     // context is that this story used LCP on loadline v1, and so for v2 we
@@ -16,6 +29,9 @@ if (window.location.href ===
     if (document.querySelector(widget_selector)) {
       widget_observer.disconnect();
       performance.mark('LoadLine2/google_doc/visual')
+      onFrameRendered(() => {
+        performance.mark('LoadLine2/google_doc/visual_raf');
+      });
     }
   });
 
@@ -65,6 +81,9 @@ if (window.location.href ===
     if (menu.style.display !== 'none') {
       performance.mark('LoadLine2/google_doc/interactive');
       complete = true;
+      onFrameRendered(() => {
+        performance.mark('LoadLine2/google_doc/interactive_raf');
+      });
       return;
     }
 
@@ -73,6 +92,9 @@ if (window.location.href ===
         attribute_observer.disconnect();
         performance.mark('LoadLine2/google_doc/interactive');
         complete = true;
+        onFrameRendered(() => {
+          performance.mark('LoadLine2/google_doc/interactive_raf');
+        });
       }
     });
     attribute_observer.observe(menu, {attributes: true});

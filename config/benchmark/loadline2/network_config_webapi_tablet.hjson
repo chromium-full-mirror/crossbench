@@ -1,0 +1,9 @@
+{
+  "type": "wpr"
+  "url": "gs://chrome-partner-loadline/archive_tablet_20250918.wprgo"
+  "persist_server": true
+  "cross_platform_mode": true
+  "host": "192.168.1.1"
+  "response_transformations_file": "webpagereplay_script_injections_tablet.json"
+  "no_archive_certificates": true
+}

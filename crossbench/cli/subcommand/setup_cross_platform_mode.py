@@ -46,7 +46,7 @@ Press Enter when ready.
 """
 
 KEEP_RUNNING_MESSAGE = """
-Network setup complete. You can now run the loadline2-webapi-phone benchmark.
+Network setup complete. You can now run the loadline2 webapi benchmark.
 Keep this script running until the bencmark finishes executing. Then you can
 terminate it via Ctrl+C.
 """

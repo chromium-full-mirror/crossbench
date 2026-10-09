@@ -223,3 +223,51 @@ class LoadLine2WebApiPhoneDebugBenchmark(LoadLine2WebApiPhoneBenchmark):
   @override
   def aliases(cls) -> tuple[str, ...]:
     return ("ld2-webapi-phone-debug",)
+
+
+class LoadLine2WebApiTabletBenchmark(LoadLine2WebApiBenchmark):
+  """A version of LoadLine 2 benchmark that uses pure Web API (no Chromium-only
+   features) to collect metrics, with tablet workloads.
+  """
+  NAME: ClassVar = "loadline2-webapi-tablet"
+
+  @classmethod
+  @override
+  def default_pages_config_path(cls) -> pth.LocalPath:
+    return cls._base_dir() / "page_config_webapi_tablet.hjson"
+
+  @classmethod
+  @override
+  def default_network_config_path(cls) -> pth.LocalPath:
+    return cls._base_dir() / "network_config_webapi_tablet.hjson"
+
+  @classmethod
+  @override
+  def aliases(cls) -> tuple[str, ...]:
+    return ("ld2-webapi-tablet",)
+
+  @classmethod
+  @override
+  def extra_flags(cls, browser_attributes: BrowserAttributes,
+                  story: BaseStory) -> Flags:
+    flags: Flags = super().extra_flags(browser_attributes, story)
+    if browser_attributes.is_chromium_based:
+      flags.set("--request-desktop-sites")
+    return flags
+
+
+class LoadLine2WebApiTabletDebugBenchmark(LoadLine2WebApiTabletBenchmark):
+  """LoadLine 2 WebAPI benchmark, with perfetto tracing for debugging.
+  """
+  NAME: ClassVar = "loadline2-webapi-tablet-debug"
+  DEFAULT_REPETITIONS: ClassVar = 1
+
+  @classmethod
+  @override
+  def default_probe_config_path(cls) -> pth.LocalPath:
+    return cls._base_dir() / "probe_config_webapi_debug.hjson"
+
+  @classmethod
+  @override
+  def aliases(cls) -> tuple[str, ...]:
+    return ("ld2-webapi-tablet-debug",)

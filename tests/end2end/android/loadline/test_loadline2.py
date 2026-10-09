@@ -30,7 +30,8 @@ def _browser_config(device_id, adb_path) -> str:
 class BenchmarkType(enum.StrEnum):
   PHONE = "loadline2-phone"
   TABLET = "loadline2-tablet"
-  WEBAPI = "loadline2-webapi-phone"
+  WEBAPI_PHONE = "loadline2-webapi-phone"
+  WEBAPI_TABLET = "loadline2-webapi-tablet"
   DEBUG = "loadline2-phone-debug"
 
 
@@ -83,8 +84,17 @@ def test_loadline2_tablet(device_id, adb_path, test_env: TestEnv) -> None:
 
 # TODO(crbug.com/489679186): Find a way to test LoadLine 2 WebAPI without root.
 @unittest.skip("LoadLine2 WebAPI requires root to run")
-def test_loadline2_webapi(device_id, adb_path, test_env: TestEnv) -> None:
-  _test_loadline2_default(device_id, adb_path, BenchmarkType.WEBAPI, test_env)
+def test_loadline2_webapi_phone(device_id, adb_path, test_env: TestEnv) -> None:
+  _test_loadline2_default(device_id, adb_path, BenchmarkType.WEBAPI_PHONE,
+                          test_env)
+
+
+# TODO(crbug.com/489679186): Find a way to test LoadLine 2 WebAPI without root.
+@unittest.skip("LoadLine2 WebAPI requires root to run")
+def test_loadline2_webapi_tablet(device_id, adb_path,
+                                 test_env: TestEnv) -> None:
+  _test_loadline2_default(device_id, adb_path, BenchmarkType.WEBAPI_TABLET,
+                          test_env)
 
 
 def test_loadline2_debug(device_id, adb_path, test_env: TestEnv) -> None:

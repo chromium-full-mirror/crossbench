@@ -10,6 +10,19 @@ if (window.location.href ===
       'ytd-consent-bump-v2-lightbox > tp-yt-paper-dialog[id=dialog]';
   const comment_id = 'comment-teaser';
 
+  function onFrameRendered(callback) {
+    // The first rAF requests a frame to be rendered. When it's done, the
+    // second rAF is called. So the callback is invoked when the first frame
+    // has been rendered.
+    // This is a poor approximation of when the frame is actually shown on the
+    // device screen, since it ignores all work beyond Renderer process
+    // (GPU process/surfaceflinger). But it's the best we can do using pure
+    // WebAPI.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(callback);
+    });
+  }
+
   const button_observer = new MutationObserver(mutations => {
     const button = document.querySelector(button_selector);
     if (!button) {
@@ -25,6 +38,9 @@ if (window.location.href ===
         if (m.type === 'attributes' && banner_node.style.display === 'none') {
           banner_observer.disconnect();
           performance.mark('LoadLine2/youtube_video/interactive');
+          onFrameRendered(() => {
+            performance.mark('LoadLine2/youtube_video/interactive_raf');
+          });
           break;
         }
       }
@@ -41,6 +57,9 @@ if (window.location.href ===
     }
     comment_observer.disconnect();
     performance.mark('LoadLine2/youtube_video/visual');
+    onFrameRendered(() => {
+      performance.mark('LoadLine2/youtube_video/visual_raf');
+    });
   });
 
   comment_observer.observe(document, {childList: true, subtree: true});

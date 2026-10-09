@@ -1,0 +1,279 @@
+{
+  "pages": {
+    "amazon_product": [
+      {
+        "action": "get"
+        "url": "about:blank"
+        "target": "_new_tab"
+      }
+      {
+        "action": "wait"
+        "duration": "1s"
+      }
+      {
+        "action": "probe"
+        "probe": "js"
+        "kwargs": {
+          "js":
+            '''
+            const mark = performance.mark('LoadLine2/amazon_product/start');
+            const navigationStart = performance.timeOrigin + mark.startTime;
+            window.location.href = 'https://www.amazon.co.uk/NIVEA-Suncream-Spray-Protect-Moisture/dp/B001B0OJXM';
+            return {'amazon_product_navigation_start_ts': navigationStart};
+            '''
+        }
+      }
+      {
+        "action": "wait_for_condition"
+        "condition":
+          '''
+          return performance.getEntriesByName('LoadLine2/amazon_product/interactive_raf').length > 0
+              && performance.getEntriesByName('LoadLine2/amazon_product/visual_raf').length > 0
+          '''
+        "timeout": "10s"
+      }
+      {
+        "action": "wait"
+        "duration": "100ms"
+      }
+      {
+        "action": "probe"
+        "probe": "js"
+        "kwargs": {
+          "js":
+            '''
+            performance.mark('LoadLine2/amazon_product/finish');
+            const visualEnd = performance.timeOrigin +
+                performance.getEntriesByName('LoadLine2/amazon_product/visual_raf')[0].startTime;
+            const interactiveEnd = performance.timeOrigin +
+                performance.getEntriesByName('LoadLine2/amazon_product/interactive_raf')[0].startTime;
+            return {
+            'amazon_product_visual_end_ts': visualEnd,
+            'amazon_product_interactive_end_ts': interactiveEnd,
+            };
+            '''
+        }
+      }
+    ]
+    "google_doc": [
+      {
+        "action": "get"
+        "url": "about:blank"
+        "target": "_new_tab"
+      }
+      {
+        "action": "wait"
+        "duration": "1s"
+      }
+      {
+        "action": "probe"
+        "probe": "js"
+        "kwargs": {
+          "js":
+            '''
+            const mark = performance.mark('LoadLine2/google_doc/start');
+            const navigationStart = performance.timeOrigin + mark.startTime;
+            window.location.href = 'https://docs.google.com/document/d/13AWeOGqtSkfpPK7meqE_X-GQQggwx4JJ1vc0YGvKg34/edit#heading=h.gjdgxs';
+            return {'google_doc_navigation_start_ts': navigationStart};
+            '''
+        }
+      }
+      {
+        "action": "wait_for_condition"
+        "condition":
+          '''
+          return performance.getEntriesByName('LoadLine2/google_doc/interactive_raf').length > 0
+              && performance.getEntriesByName('LoadLine2/google_doc/visual_raf').length > 0
+          '''
+        "timeout": "10s"
+      }
+      {
+        "action": "wait"
+        "duration": "100ms"
+      }
+      {
+        "action": "probe"
+        "probe": "js"
+        "kwargs": {
+          "js":
+            '''
+            performance.mark('LoadLine2/google_doc/finish');
+            const visualEnd = performance.timeOrigin +
+                performance.getEntriesByName('LoadLine2/google_doc/visual_raf')[0].startTime;
+            const interactiveEnd = performance.timeOrigin +
+                performance.getEntriesByName('LoadLine2/google_doc/interactive_raf')[0].startTime;
+            return {
+            'google_doc_visual_end_ts': visualEnd,
+            'google_doc_interactive_end_ts': interactiveEnd,
+            };
+            '''
+        }
+      }
+    ]
+    "cnn_article": [
+      {
+        "action": "get"
+        "url": "about:blank"
+        "target": "_new_tab"
+      }
+      {
+        "action": "wait"
+        "duration": "1s"
+      }
+      {
+        "action": "probe"
+        "probe": "js"
+        "kwargs": {
+          "js":
+            '''
+            const mark = performance.mark('LoadLine2/cnn_article/start');
+            const navigationStart = performance.timeOrigin + mark.startTime;
+            window.location.href = 'https://edition.cnn.com/2024/04/21/china/china-spy-agency-public-profile-intl-hnk/index.html';
+            return {'cnn_article_navigation_start_ts': navigationStart};
+            '''
+        }
+      }
+      {
+        "action": "wait_for_condition"
+        "condition":
+          '''
+          return performance.getEntriesByName('LoadLine2/cnn_article/interactive_raf').length > 0
+              && performance.getEntriesByName('LoadLine2/cnn_article/visual_raf').length > 0
+          '''
+        "timeout": "10s"
+      }
+      {
+        "action": "wait"
+        "duration": "100ms"
+      }
+      {
+        "action": "probe"
+        "probe": "js"
+        "kwargs": {
+          "js":
+            '''
+            performance.mark('LoadLine2/cnn_article/finish');
+            const visualEnd = performance.timeOrigin +
+                performance.getEntriesByName('LoadLine2/cnn_article/visual_raf')[0].startTime;
+            const interactiveEnd = performance.timeOrigin +
+                performance.getEntriesByName('LoadLine2/cnn_article/interactive_raf')[0].startTime;
+            return {
+            'cnn_article_visual_end_ts': visualEnd,
+            'cnn_article_interactive_end_ts': interactiveEnd,
+            };
+            '''
+        }
+      }
+    ]
+    "google_search_result": [
+      {
+        "action": "get"
+        "url": "about:blank"
+        "target": "_new_tab"
+      }
+      {
+        "action": "wait"
+        "duration": "1s"
+      }
+      {
+        "action": "probe"
+        "probe": "js"
+        "kwargs": {
+          "js":
+            '''
+            const mark = performance.mark('LoadLine2/google_search_result/start');
+            const navigationStart = performance.timeOrigin + mark.startTime;
+            window.location.href = 'https://www.google.com/search?q=cats';
+            return {'google_search_result_navigation_start_ts': navigationStart};
+            '''
+        }
+      }
+      {
+        "action": "wait_for_condition"
+        "condition":
+          '''
+          return performance.getEntriesByName('LoadLine2/google_search_result/interactive_raf').length > 0
+              && performance.getEntriesByName('LoadLine2/google_search_result/visual_raf').length > 0
+          '''
+        "timeout": "10s"
+      }
+      {
+        "action": "wait"
+        "duration": "100ms"
+      }
+      {
+        "action": "probe"
+        "probe": "js"
+        "kwargs": {
+          "js":
+            '''
+            performance.mark('LoadLine2/google_search_result/finish');
+            const visualEnd = performance.timeOrigin +
+                performance.getEntriesByName('LoadLine2/google_search_result/visual_raf')[0].startTime;
+            const interactiveEnd = performance.timeOrigin +
+                performance.getEntriesByName('LoadLine2/google_search_result/interactive_raf')[0].startTime;
+            return {
+            'google_search_result_visual_end_ts': visualEnd,
+            'google_search_result_interactive_end_ts': interactiveEnd,
+            };
+            '''
+        }
+      }
+    ]
+    "youtube_video": [
+      {
+        "action": "get"
+        "url": "about:blank"
+        "target": "_new_tab"
+      }
+      {
+        "action": "wait"
+        "duration": "1s"
+      }
+      {
+        "action": "probe"
+        "probe": "js"
+        "kwargs": {
+          "js":
+            '''
+            const mark = performance.mark('LoadLine2/youtube_video/start');
+            const navigationStart = performance.timeOrigin + mark.startTime;
+            window.location.href = 'https://www.youtube.com/watch?v=WuS9kPNAXHw&themeRefresh=1';
+            return {'youtube_video_navigation_start_ts': navigationStart};
+            '''
+        }
+      }
+      {
+        "action": "wait_for_condition"
+        "condition":
+          '''
+          return performance.getEntriesByName('LoadLine2/youtube_video/interactive_raf').length > 0
+              && performance.getEntriesByName('LoadLine2/youtube_video/visual_raf').length > 0
+          '''
+        "timeout": "10s"
+      }
+      {
+        "action": "wait"
+        "duration": "100ms"
+      }
+      {
+        "action": "probe"
+        "probe": "js"
+        "kwargs": {
+          "js":
+            '''
+            performance.mark('LoadLine2/youtube_video/finish');
+            const visualEnd = performance.timeOrigin +
+                performance.getEntriesByName('LoadLine2/youtube_video/visual_raf')[0].startTime;
+            const interactiveEnd = performance.timeOrigin +
+                performance.getEntriesByName('LoadLine2/youtube_video/interactive_raf')[0].startTime;
+            return {
+            'youtube_video_visual_end_ts': visualEnd,
+            'youtube_video_interactive_end_ts': interactiveEnd,
+            };
+            '''
+        }
+      }
+    ]
+  }
+}
