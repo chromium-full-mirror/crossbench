@@ -25,6 +25,7 @@ from crossbench import path as pth
 from crossbench.cli import exception_formatter
 from crossbench.cli.parser import CBArgumentParser, CBNamespace
 from crossbench.cli.subcommand.benchmark import BenchmarkSubcommand
+from crossbench.cli.subcommand.bits_merge import BitsMergeSubcommand
 from crossbench.cli.subcommand.describe import DescribeSubcommand
 from crossbench.cli.subcommand.devtools_recorder_proxy.subcommand import \
     DevtoolsRecorderProxySubcommand
@@ -229,6 +230,7 @@ class CrossBenchCLI:
     self._add_subcommand(VersionSubcommand)
 
   def _setup_tools_subcommands(self) -> None:
+    self._add_subcommand(BitsMergeSubcommand)
     self._add_subcommand(DevtoolsRecorderProxySubcommand)
     self._add_subcommand(McpSubcommand)
     self._add_subcommand(PerfettoCrossbenchSubcommand)

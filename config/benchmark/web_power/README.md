@@ -156,6 +156,20 @@ Additional supported Bits configuration includes:
   an unbounded recording is used, then terminated when the benchmark completes.
 - `--bits-port`: The Bits service port. This can normally be omitted.
 
+To view the Bits power data alongside a Perfetto trace from the device, run
+both probes (`--bits-path` plus `--probe=perfetto:...`, see above) and
+afterwards:
+
+```bash
+./cb.py bits-merge path/to/results/dir path/to/output/dir
+```
+
+For each run, this writes an archive into the output directory (which must
+not exist yet), combining the Bits trace with the device's trace on a common
+timeline. Archives are named `<browser>_<story>_<repetition>.zip`, e.g.
+`android.5B221FDDV0000K.1_0_web-power-idle-cnn_0.zip`. Open an archive in
+[Perfetto UI](https://ui.perfetto.dev).
+
 #### Uploading Results
 
 To share results with colleagues, you can upload them to a GCS bucket (Google
