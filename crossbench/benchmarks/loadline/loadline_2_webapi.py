@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+from collections import defaultdict
 from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar, Final
 
@@ -16,7 +17,8 @@ from crossbench import path as pth
 from crossbench.benchmarks.loading.page.combined import CombinedPage
 from crossbench.benchmarks.loadline.loadline import LoadLineBenchmark, \
     LoadLineProbe
-from crossbench.benchmarks.loadline.loadline_2 import process_scores
+from crossbench.benchmarks.loadline.loadline_2 import N_EXPECTED_METRICS, \
+    process_scores
 from crossbench.probes.js import JSProbe
 from crossbench.probes.probe_context import ProbeContext
 
@@ -35,14 +37,6 @@ if TYPE_CHECKING:
 VERSION_STRING: Final[str] = "2.4.0"
 
 
-class Story(StrEnum):
-  AMAZON = "amazon_product"
-  CNN = "cnn_article"
-  WIKIPEDIA = "wikipedia_article"
-  GLOBO = "globo_homepage"
-  GOOGLE = "google_search_result"
-
-
 class Event(StrEnum):
   NAVIGATION_START = "navigation_start_ts"
   VISUAL_END = "visual_end_ts"
@@ -54,11 +48,19 @@ class Metric(StrEnum):
   INTERACTIVE = "interactive"
 
 
-def get_event_name(story: Story, event: Event) -> str:
-  return f"{story}_{event}"
+def split_ts_per_story_and_event(
+    j: dict[str, float]) -> dict[str, dict[Event, float]]:
+  ts_per_story_and_event: dict[str, dict[Event, float]] = defaultdict(dict)
+  for key, value in j.items():
+    for event in Event:
+      if key.endswith(event):
+        story = key[:-len(event) - 1]
+        ts_per_story_and_event[story][event] = value
+        break
+  return ts_per_story_and_event
 
 
-def get_metric_name(story: Story, metric: Metric) -> str:
+def get_metric_name(story: str, metric: Metric) -> str:
   return f"{story}_{metric}"
 
 
@@ -95,20 +97,23 @@ class LoadLine2WebApiProbe(LoadLineProbe):
         j = json.load(file)
 
       assert j
+      ts_per_story_and_event: dict[str, dict[Event, float]] = (
+          split_ts_per_story_and_event(j))
+
       new_metrics = []
       new_values = []
       broken_metrics = False
-      for story in Story:
-        if not all(get_event_name(story, e) in j for e in Event):
+      for story, ts_per_event in ts_per_story_and_event.items():
+        if not all(e in ts_per_event for e in Event):
           broken_metrics = True
           break
 
         visual_delay = (
-            j[get_event_name(story, Event.VISUAL_END)] -
-            j[get_event_name(story, Event.NAVIGATION_START)])
+            ts_per_event[Event.VISUAL_END] -
+            ts_per_event[Event.NAVIGATION_START])
         interactive_delay = (
-            j[get_event_name(story, Event.INTERACTIVE_END)] -
-            j[get_event_name(story, Event.NAVIGATION_START)])
+            ts_per_event[Event.INTERACTIVE_END] -
+            ts_per_event[Event.NAVIGATION_START])
         if visual_delay < 0 or interactive_delay < 0:
           broken_metrics = True
           break
@@ -122,6 +127,10 @@ class LoadLine2WebApiProbe(LoadLineProbe):
         continue
 
       assert len(new_metrics) == len(new_values)
+      # TODO(victorvianna): Show scores even when stories are filtered.
+      if len(new_metrics) != N_EXPECTED_METRICS:
+        continue
+
       timings["cb_browser"].extend([browsers[0].unique_name] * len(new_metrics))
       timings["cb_run"].extend([run_number] * len(new_metrics))
       timings["metric"].extend(new_metrics)

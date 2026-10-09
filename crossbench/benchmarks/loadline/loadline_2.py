@@ -67,8 +67,12 @@ def _metric_stats(df: pd.DataFrame) -> dict[str, dict[str, Any]]:
   return metric_stats
 
 
+N_EXPECTED_METRICS: Final[int] = 10
+
+
+# `expected_metrics` is overridden in tests.
 def process_scores(df: pd.DataFrame,
-                   expected_metrics: int = 10) -> pd.DataFrame:
+                   expected_metrics: int = N_EXPECTED_METRICS) -> pd.DataFrame:
   run_metrics = (
       df.groupby(["cb_browser", "metric",
                   "cb_run"])["value"].mean().reset_index())
