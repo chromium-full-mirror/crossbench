@@ -45,6 +45,8 @@ class BlinkAIStory(PressBenchmarkStory):
       "mtp_summary",
       "mtp_flight",
       "mtp_emoji",
+      # Article summary with constrained decoding (responseConstraint).
+      "mtp_constrained_summary",
   )
   SUBSTORIES: ClassVar[tuple[str, ...]] = DEFAULT_SUBSTORIES + MTP_SUBSTORIES
 

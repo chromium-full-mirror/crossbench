@@ -346,6 +346,16 @@ class BlinkAITestCase(helper.SubStoryTestCase):
         self.story_cls.URL + "?stories=mtp_summary%2Cmtp_flight%2Cmtp_emoji",
     )
 
+  def test_mtp_constrained_story(self):
+    name = "mtp_constrained_summary"
+    self.assertIn(name, self.story_cls.MTP_SUBSTORIES)
+    self.assertNotIn(name, self.story_cls.default_story_names())
+    story = self.story_cls.from_names([name])[0]
+    self.assertTrue(story.has_mtp_substory)
+    self.assertDictEqual(story.url_params, {"stories": name})
+    flags = self.benchmark_cls.extra_flags(self.browsers[0].attributes(), story)
+    self.assertIn("OnDeviceModelSpeculativeDecoding", str(flags))
+
   def test_vram_probe_context_single_gpu(self):
     samples = [
         {
