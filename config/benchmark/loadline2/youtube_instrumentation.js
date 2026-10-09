@@ -16,12 +16,12 @@ if (window.location.href ===
       return;
     }
     const banner_node = document.querySelector(banner_selector);
-    if (!banner_node) {
+    if (!banner_node || banner_node.style.display === 'none') {
       return;
     }
     button_observer.disconnect();
     const banner_observer = new MutationObserver(function(e) {
-      for (m of e) {
+      for (const m of e) {
         if (m.type === 'attributes' && banner_node.style.display === 'none') {
           banner_observer.disconnect();
           performance.mark('LoadLine2/youtube_video/interactive');
@@ -44,5 +44,6 @@ if (window.location.href ===
   });
 
   comment_observer.observe(document, {childList: true, subtree: true});
-  button_observer.observe(document, {childList: true, subtree: true});
+  button_observer.observe(
+      document, {childList: true, subtree: true, attributeFilter: ['style']});
 }
