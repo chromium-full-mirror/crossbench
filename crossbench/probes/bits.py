@@ -9,6 +9,7 @@ import datetime as dt
 import json
 import logging
 import subprocess
+import time
 from typing import IO, TYPE_CHECKING, ClassVar, Iterator, Self
 
 from typing_extensions import override
@@ -21,12 +22,57 @@ from crossbench.probes.probe_error import ProbeValidationError
 
 if TYPE_CHECKING:
   from crossbench import path as pth
+  from crossbench import plt
   from crossbench.browsers.browser import Browser
   from crossbench.env.runner_env import RunnerEnv
   from crossbench.probes.results import ProbeResult
   from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.runner.run import Run
   from crossbench.runner.runner import Runner
+  from crossbench.types import JsonDict
+
+
+class _ClockSync:
+  """Relates the device's CLOCK_BOOTTIME to the host's CLOCK_REALTIME by
+  reading both at the same instant.
+
+  Reading the device's clock (e.g. over adb) can take tens of milliseconds,
+  so each reading is bracketed by host readings and the sample with the
+  shortest round trip is kept, with the host time taken as the midpoint.
+  That round trip bounds the error of the pairing.
+  """
+  SAMPLE_COUNT: ClassVar[int] = 3
+
+  def __init__(self, device: plt.Platform) -> None:
+    samples = [self._sample(device) for _ in range(self.SAMPLE_COUNT)]
+    round_trip_ns, host_realtime_ns, device_boottime_ns = min(samples)
+    self.round_trip_ns: int = round_trip_ns
+    self.host_realtime_ns: int = host_realtime_ns
+    self.device_boottime_ns: int = device_boottime_ns
+
+  @staticmethod
+  def _sample(device: plt.Platform) -> tuple[int, int, int]:
+    """Returns (round trip, host CLOCK_REALTIME, device CLOCK_BOOTTIME) in
+    ns, with the host time being the midpoint of the device read's bracket.
+    """
+    before_ns = time.time_ns()
+    device_boottime_ns = device.clock_boottime_ns()
+    after_ns = time.time_ns()
+    return after_ns - before_ns, (before_ns + after_ns) // 2, device_boottime_ns
+
+  @property
+  def offset_ns(self) -> int:
+    """Added to a host CLOCK_REALTIME timestamp, moves it onto the device's
+    CLOCK_BOOTTIME timeline."""
+    return self.device_boottime_ns - self.host_realtime_ns
+
+  def to_json(self) -> JsonDict:
+    return {
+        "host_realtime_ns": self.host_realtime_ns,
+        "device_boottime_ns": self.device_boottime_ns,
+        "offset_ns": self.offset_ns,
+        "round_trip_ns": self.round_trip_ns,
+    }
 
 
 class BitsProbe(Probe):
@@ -34,8 +80,28 @@ class BitsProbe(Probe):
   Probe for the external BITS/Kibble power measurement tool.
   Starts BITS in the background on the host during the run
   and stops it afterwards.
+
+  Besides the channel averages and the Perfetto trace, each run gets a
+  BITS_JSON_NAME file:
+    {
+      "bits_out_id": "20260702_170055",
+      "clock_sync": {
+        "host_realtime_ns": 1791367605185683067,
+        "device_boottime_ns": 505175536601118,
+        "offset_ns": -1790862429649081949,
+        "round_trip_ns": 61034512
+      }
+    }
+  BITS stamps its Perfetto trace with the host's CLOCK_REALTIME, whereas
+  Perfetto traces recorded on the device use its CLOCK_BOOTTIME. "clock_sync"
+  pairs readings of the two clocks taken at the same instant, just before
+  the story's setup so that the adb round trips stay out of the measured
+  phase; "offset_ns" (device - host) is what has to be added to the BITS
+  timestamps to place them on the device's timeline, and "round_trip_ns" is
+  how long the device read took, bounding the error of the pairing.
   """
   NAME: ClassVar[str] = "bits"
+  BITS_JSON_NAME: ClassVar[str] = "bits.json"
   BITS_CHANNEL_AVERAGES_CSV_NAME: ClassVar[str] = "bits_channel_averages.csv"
   PERFETTO_CHANNELS: ClassVar[str] = "CPU:mW,SOC_TOTAL:mW"
   DEFAULT_DURATION: ClassVar[dt.timedelta] = dt.timedelta(seconds=99999)
@@ -245,6 +311,7 @@ class BitsProbeContext(ProbeContext[BitsProbe]):
     self._process: subprocess.Popen | None = None
     self._bits_out_id = self.probe.bits_out or dt.datetime.now().strftime(
         "%Y%m%d_%H%M%S")
+    self._clock_sync: _ClockSync | None = None
 
   @property
   def bits_out_id(self) -> str:
@@ -258,15 +325,18 @@ class BitsProbeContext(ProbeContext[BitsProbe]):
          stderr_path.open(mode, encoding="utf-8") as stderr:
       yield stdout, stderr
 
+  def _write_bits_json(self) -> None:
+    bits_json: JsonDict = {"bits_out_id": self.bits_out_id}
+    if self._clock_sync is not None:
+      bits_json["clock_sync"] = self._clock_sync.to_json()
+    self.host_platform.write_text(
+        self.local_result_path / self.probe.BITS_JSON_NAME,
+        json.dumps(bits_json, indent=2))
+
   def _start_collection(self) -> None:
     logging.info("Starting BITS collection (ID: %s)", self.bits_out_id)
     self.host_platform.mkdir(self.local_result_path)
-
-    json_path = self.local_result_path / "bits.json"
-    self.host_platform.write_text(
-        json_path,
-        json.dumps({"bits_out_id": self.bits_out_id}, indent=2),
-    )
+    self._write_bits_json()
 
     device_args: tuple[str, ...] = ("--service_port", str(self.probe.port))
     if self.probe.bits_device:
@@ -306,6 +376,14 @@ class BitsProbeContext(ProbeContext[BitsProbe]):
     if not self.host_platform.is_file(perfetto_path):
       logging.critical("Missing BITS Perfetto trace: %s", perfetto_path)
 
+  def _sync_clocks(self) -> _ClockSync:
+    """Reads how the device's CLOCK_BOOTTIME relates to the host's
+    CLOCK_REALTIME, see BitsProbe."""
+    sync = _ClockSync(self.browser_platform)
+    logging.info("BITS clock sync: device - host = %d ns (+/- %d ns)",
+                 sync.offset_ns, sync.round_trip_ns // 2)
+    return sync
+
   def _run_service_cmd(
       self,
       *args: pth.AnyPathLike,
@@ -323,6 +401,12 @@ class BitsProbeContext(ProbeContext[BitsProbe]):
   @override
   def start(self) -> None:
     pass
+
+  @override
+  def start_story_setup(self) -> None:
+    # Ahead of the story, so that the clock sync's adb round trips stay out
+    # of the measured phase.
+    self._clock_sync = self._sync_clocks()
 
   @override
   def start_story_run(self) -> None:

@@ -8,13 +8,14 @@ import argparse
 import datetime as dt
 import json
 import subprocess
+import unittest
 from typing import Any
 from unittest import mock
 
 from typing_extensions import override
 
 from crossbench import path as pth
-from crossbench.probes.bits import BitsProbe, BitsProbeContext
+from crossbench.probes.bits import BitsProbe, BitsProbeContext, _ClockSync
 from crossbench.probes.probe import ProbeIncompatibleBrowser
 from crossbench.probes.probe_error import ProbeValidationError
 from crossbench.probes.results import EmptyProbeResult, LocalProbeResult
@@ -197,6 +198,7 @@ class BitsProbeTestCase(BaseProbeTestCase):
     )
     run = self.mock_run()
     run.browser_session.browser.platform.serial_id = "serial"
+    run.browser_session.browser.platform.clock_boottime_ns.return_value = 1
 
     host_platform = run.browser_session.browser.host_platform
     host_platform.popen = mock.MagicMock()
@@ -204,8 +206,9 @@ class BitsProbeTestCase(BaseProbeTestCase):
 
     context = probe.create_context(run)
 
-    # 1. start() should be a no-op
+    # 1. start() and start_story_setup() should not touch BITS
     context.start()
+    context.start_story_setup()
     host_platform.popen.assert_not_called()
 
     # 2. start_story_run() should spawn BITS
@@ -323,7 +326,49 @@ class BitsProbeTestCase(BaseProbeTestCase):
     self.assertTrue(avg_path.exists())
 
 
+class ClockSyncTestCase(unittest.TestCase):
+
+  def setUp(self) -> None:
+    super().setUp()
+    patcher = mock.patch("crossbench.probes.bits.time")
+    self.addCleanup(patcher.stop)
+    self.time_ns = patcher.start().time_ns
+    self.device = mock.Mock()
+
+  def test_offset_ns(self) -> None:
+    self.time_ns.return_value = 1_000
+    self.device.clock_boottime_ns.return_value = 5_000
+    self.assertEqual(_ClockSync(self.device).offset_ns, 4_000)
+    self.device.clock_boottime_ns.return_value = 500
+    self.assertEqual(_ClockSync(self.device).offset_ns, -500)
+
+  def test_to_json(self) -> None:
+    self.time_ns.side_effect = [900, 1_100] * _ClockSync.SAMPLE_COUNT
+    self.device.clock_boottime_ns.return_value = 5_000
+    self.assertDictEqual(
+        _ClockSync(self.device).to_json(), {
+            "host_realtime_ns": 1_000,
+            "device_boottime_ns": 5_000,
+            "offset_ns": 4_000,
+            "round_trip_ns": 200,
+        })
+
+  def test_best_of_three(self) -> None:
+    # Round trips of 200, 100 and 400 host ticks: the second sample wins,
+    # with the host time taken as the midpoint of its bracket.
+    self.time_ns.side_effect = [100, 300, 1000, 1100, 2000, 2400]
+    self.device.clock_boottime_ns.side_effect = [10, 20, 30]
+    sync = _ClockSync(self.device)
+    self.assertEqual(
+        (sync.round_trip_ns, sync.host_realtime_ns, sync.device_boottime_ns),
+        (100, 1050, 20))
+    self.assertEqual(self.device.clock_boottime_ns.call_count,
+                     _ClockSync.SAMPLE_COUNT)
+
+
 class BitsProbePerfettoTestCase(BaseProbeTestCase):
+  HOST_REALTIME_NS = 1_791_367_605_185_683_067
+  DEVICE_BOOTTIME_NS = 505_175_536_601_118
 
   @override
   def setUp(self) -> None:
@@ -331,38 +376,86 @@ class BitsProbePerfettoTestCase(BaseProbeTestCase):
     self.bits_path = pth.LocalPath(self.platform.default_tmp_dir) / "bits"
     self.fs.create_file(self.bits_path)
     self.run = self.mock_run()
+    self.device = self.run.browser_session.browser.platform
+    self.device.clock_boottime_ns.return_value = self.DEVICE_BOOTTIME_NS
     self.host_platform = self.run.browser_session.browser.host_platform
     self.host_platform.popen = mock.MagicMock()
     self.host_platform.sh = mock.MagicMock()
+    time_patcher = mock.patch("crossbench.probes.bits.time")
+    self.addCleanup(time_patcher.stop)
+    time_patcher.start().time_ns.return_value = self.HOST_REALTIME_NS
 
-  def test_save_perfetto(self) -> None:
+  def _create_context(
+      self,
+      trace_bytes: bytes | None = None,
+  ) -> tuple[BitsProbeContext, pth.LocalPath]:
     probe = BitsProbe(self.bits_path, "test_run_id", port=1234)
     context = probe.create_context(self.run)
     perfetto_path = context.local_result_path / "test_run_id.pftrace"
 
     def sh_side_effect(*args: Any, **_: Any) -> None:
-      if "--write_perfetto" in args:
-        self.fs.create_file(perfetto_path, contents=b"perfetto-bytes")
+      if "--write_perfetto" in args and trace_bytes is not None:
+        self.fs.create_file(perfetto_path, contents=trace_bytes)
 
     self.host_platform.sh.side_effect = sh_side_effect
+    return context, perfetto_path
 
+  def _read_bits_json(self, context: BitsProbeContext) -> Any:
+    json_path = context.local_result_path / BitsProbe.BITS_JSON_NAME
+    with json_path.open(encoding="utf-8") as f:
+      return json.load(f)
+
+  def test_save_perfetto(self) -> None:
+    context, perfetto_path = self._create_context(b"perfetto-bytes")
+    context.start_story_setup()
     context.start_story_run()
     context.stop_story_run()
-    self.assertTrue(perfetto_path.exists())
+    self.assertEqual(perfetto_path.read_bytes(), b"perfetto-bytes")
+    self.assertEqual(
+        self._read_bits_json(context), {
+            "bits_out_id": "test_run_id",
+            "clock_sync": {
+                "host_realtime_ns": self.HOST_REALTIME_NS,
+                "device_boottime_ns": self.DEVICE_BOOTTIME_NS,
+                "offset_ns": self.DEVICE_BOOTTIME_NS - self.HOST_REALTIME_NS,
+                "round_trip_ns": 0,
+            },
+        })
 
     result = context.teardown()
     self.assertEqual(result.get_all("pftrace"), [perfetto_path])
 
   def test_save_perfetto_missing_file(self) -> None:
-    probe = BitsProbe(self.bits_path, "test_run_id", port=1234)
-    context = probe.create_context(self.run)
-    perfetto_path = context.local_result_path / "test_run_id.pftrace"
-
+    context, perfetto_path = self._create_context()
     context.start_story_run()
     with mock.patch("logging.critical") as mock_critical:
       context.stop_story_run()
       mock_critical.assert_called_once_with("Missing BITS Perfetto trace: %s",
                                             perfetto_path)
+
+  def test_clock_sync_failure_keeps_bits_out_id(self) -> None:
+    context, _ = self._create_context(b"perfetto-bytes")
+    self.device.clock_boottime_ns.side_effect = subprocess.SubprocessError()
+    with self.assertRaises(subprocess.SubprocessError):
+      context.start_story_setup()
+    context.start_story_run()
+    context.stop_story_run()
+    self.assertEqual(
+        self._read_bits_json(context), {"bits_out_id": "test_run_id"})
+
+  def test_clock_sync_is_read_during_story_setup(self) -> None:
+    context, _ = self._create_context(b"perfetto-bytes")
+    with mock.patch("logging.info") as mock_info:
+      context.start_story_setup()
+      mock_info.assert_any_call(
+          "BITS clock sync: device - host = %d ns (+/- %d ns)",
+          self.DEVICE_BOOTTIME_NS - self.HOST_REALTIME_NS, 0)
+    self.assertEqual(self.device.clock_boottime_ns.call_count,
+                     _ClockSync.SAMPLE_COUNT)
+    context.start_story_run()
+    context.stop_story_run()
+    self.assertEqual(self.device.clock_boottime_ns.call_count,
+                     _ClockSync.SAMPLE_COUNT)
 
   def test_log_results(self) -> None:
     probe = BitsProbe(self.bits_path, "test_run_id")
@@ -620,6 +713,8 @@ class BitsProbeServiceTestCase(BaseProbeTestCase):
 class BitsProbeResultsFileTestCase(BaseProbeTestCase):
   MOCK_NOW = dt.datetime(2026, 7, 2, 17, 0, 55)
   MOCK_NOW_STR = "20260702_170055"
+  HOST_REALTIME_NS = 1_000
+  DEVICE_BOOTTIME_NS = 5_000
 
   @override
   def setUp(self) -> None:
@@ -628,9 +723,14 @@ class BitsProbeResultsFileTestCase(BaseProbeTestCase):
     self.bits_path = tmp_dir / "bits"
     self.fs.create_file(self.bits_path)
     self.run = self.mock_run(result_path=tmp_dir / "bits.json")
+    device = self.run.browser_session.browser.platform
+    device.clock_boottime_ns.return_value = self.DEVICE_BOOTTIME_NS
     self.host_platform = self.run.browser_session.browser.host_platform
     self.host_platform.popen = mock.MagicMock()
     self.host_platform.sh = mock.MagicMock()
+    time_patcher = mock.patch("crossbench.probes.bits.time")
+    self.addCleanup(time_patcher.stop)
+    time_patcher.start().time_ns.return_value = self.HOST_REALTIME_NS
 
   def _create_context(self, bits_out: str) -> BitsProbeContext:
     probe = BitsProbe(self.bits_path, bits_out=bits_out)
@@ -648,6 +748,7 @@ class BitsProbeResultsFileTestCase(BaseProbeTestCase):
   def _test_output(self, bits_out: str) -> Any:
     context = self._create_context(bits_out)
     self.assertFalse(context.local_result_path.exists())
+    context.start_story_setup()
     context.start_story_run()
     self.assertTrue(context.local_result_path.exists())
     result = self._teardown(context)
@@ -655,12 +756,28 @@ class BitsProbeResultsFileTestCase(BaseProbeTestCase):
       return json.load(f)
 
   def test_explicit_out_id(self) -> None:
-    output = self._test_output("explicit_id")
-    self.assertEqual(output, {"bits_out_id": "explicit_id"})
+    self.assertEqual(
+        self._test_output("explicit_id"), {
+            "bits_out_id": "explicit_id",
+            "clock_sync": {
+                "host_realtime_ns": 1_000,
+                "device_boottime_ns": 5_000,
+                "offset_ns": 4_000,
+                "round_trip_ns": 0,
+            },
+        })
 
   def test_auto_generated_out_id(self) -> None:
-    output = self._test_output("")
-    self.assertEqual(output, {"bits_out_id": self.MOCK_NOW_STR})
+    self.assertEqual(
+        self._test_output(""), {
+            "bits_out_id": self.MOCK_NOW_STR,
+            "clock_sync": {
+                "host_realtime_ns": 1_000,
+                "device_boottime_ns": 5_000,
+                "offset_ns": 4_000,
+                "round_trip_ns": 0,
+            },
+        })
 
   def test_without_start(self) -> None:
     context = self._create_context("test_run_id")
@@ -668,6 +785,12 @@ class BitsProbeResultsFileTestCase(BaseProbeTestCase):
     result = context.teardown()
     self.assertIsInstance(result, EmptyProbeResult)
     self.assertFalse(context.local_result_path.exists())
+
+  def test_story_setup_without_start(self) -> None:
+    context = self._create_context("test_run_id")
+    context.start_story_setup()
+    self.assertFalse(context.local_result_path.exists())
+    self.assertIsInstance(context.teardown(), EmptyProbeResult)
 
 
 if __name__ == "__main__":
