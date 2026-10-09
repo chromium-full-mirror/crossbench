@@ -236,8 +236,8 @@ class BitsProbeTestCase(BaseProbeTestCase):
     context.stop_story_run()
     expected_stop_args = ["--service_port", str(expected_port)]
 
-    self.assertEqual(len(host_platform.sh.call_args_list), 2)
-    stop_call, _ = host_platform.sh.call_args_list
+    self.assertEqual(len(host_platform.sh.call_args_list), 3)
+    stop_call, _, export_call = host_platform.sh.call_args_list
     self.assertSequenceEqual(
         stop_call.args,
         (
@@ -249,6 +249,23 @@ class BitsProbeTestCase(BaseProbeTestCase):
     )
     self.assertIn("stdout", stop_call.kwargs)
     self.assertIn("stderr", stop_call.kwargs)
+
+    expected_perfetto_path = context.local_result_path / "test_run_id.pftrace"
+    self.assertSequenceEqual(
+        export_call.args,
+        (
+            self.bits_path,
+            "--collection",
+            "test_run_id",
+            "--channels",
+            BitsProbe.PERFETTO_CHANNELS,
+            "--write_perfetto",
+            expected_perfetto_path,
+            *expected_stop_args,
+        ),
+    )
+    self.assertIn("stdout", export_call.kwargs)
+    self.assertIn("stderr", export_call.kwargs)
 
     # Reset mocks to verify that the final stop phase is a clean no-op
     host_platform.popen.reset_mock()
@@ -288,8 +305,8 @@ class BitsProbeTestCase(BaseProbeTestCase):
     context.start_story_run()
     context.stop_story_run()
 
-    self.assertEqual(len(host_platform.sh.call_args_list), 2)
-    _stop_call, avg_call = host_platform.sh.call_args_list
+    self.assertEqual(len(host_platform.sh.call_args_list), 3)
+    _stop_call, avg_call, _export_call = host_platform.sh.call_args_list
     self.assertEqual(
         avg_call.args,
         (
@@ -304,6 +321,74 @@ class BitsProbeTestCase(BaseProbeTestCase):
     avg_path = (
         context.local_result_path / BitsProbe.BITS_CHANNEL_AVERAGES_CSV_NAME)
     self.assertTrue(avg_path.exists())
+
+
+class BitsProbePerfettoTestCase(BaseProbeTestCase):
+
+  @override
+  def setUp(self) -> None:
+    super().setUp()
+    self.bits_path = pth.LocalPath(self.platform.default_tmp_dir) / "bits"
+    self.fs.create_file(self.bits_path)
+    self.run = self.mock_run()
+    self.host_platform = self.run.browser_session.browser.host_platform
+    self.host_platform.popen = mock.MagicMock()
+    self.host_platform.sh = mock.MagicMock()
+
+  def test_save_perfetto(self) -> None:
+    probe = BitsProbe(self.bits_path, "test_run_id", port=1234)
+    context = probe.create_context(self.run)
+    perfetto_path = context.local_result_path / "test_run_id.pftrace"
+
+    def sh_side_effect(*args: Any, **_: Any) -> None:
+      if "--write_perfetto" in args:
+        self.fs.create_file(perfetto_path, contents=b"perfetto-bytes")
+
+    self.host_platform.sh.side_effect = sh_side_effect
+
+    context.start_story_run()
+    context.stop_story_run()
+    self.assertTrue(perfetto_path.exists())
+
+    result = context.teardown()
+    self.assertEqual(result.get_all("pftrace"), [perfetto_path])
+
+  def test_save_perfetto_missing_file(self) -> None:
+    probe = BitsProbe(self.bits_path, "test_run_id", port=1234)
+    context = probe.create_context(self.run)
+    perfetto_path = context.local_result_path / "test_run_id.pftrace"
+
+    context.start_story_run()
+    with mock.patch("logging.critical") as mock_critical:
+      context.stop_story_run()
+      mock_critical.assert_called_once_with("Missing BITS Perfetto trace: %s",
+                                            perfetto_path)
+
+  def test_log_results(self) -> None:
+    probe = BitsProbe(self.bits_path, "test_run_id")
+    trace_path = pth.LocalPath(
+        self.platform.default_tmp_dir) / "test_run_id.pftrace"
+    self.fs.create_file(trace_path, contents=b"perfetto-bytes")
+    run = mock.MagicMock()
+    run.results = {probe: LocalProbeResult(file=(trace_path,))}
+
+    group = mock.MagicMock()
+    group.runs = [run]
+    with mock.patch("logging.critical") as mock_critical:
+      probe.log_browsers_result(group)
+      mock_critical.assert_any_call("BITS Perfetto trace results:")
+      mock_critical.assert_any_call("  - %s : %s", trace_path, "14.00 B")
+
+  def test_log_results_empty(self) -> None:
+    probe = BitsProbe(self.bits_path, "test_run_id")
+    run = mock.MagicMock()
+    run.results = {probe: EmptyProbeResult()}
+
+    group = mock.MagicMock()
+    group.runs = [run]
+    with mock.patch("logging.critical") as mock_critical:
+      probe.log_browsers_result(group)
+      mock_critical.assert_not_called()
 
 
 class BitsProbeServiceTestCase(BaseProbeTestCase):

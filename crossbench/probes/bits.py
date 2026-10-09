@@ -13,6 +13,7 @@ from typing import IO, TYPE_CHECKING, ClassVar, Iterator, Self
 
 from typing_extensions import override
 
+from crossbench.helper import fs_helper
 from crossbench.parse import DurationParser, NumberParser, PathParser
 from crossbench.probes.probe import Probe, ProbeConfigParser, ProbeContext, \
     ProbeIncompatibleBrowser
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
   from crossbench.browsers.browser import Browser
   from crossbench.env.runner_env import RunnerEnv
   from crossbench.probes.results import ProbeResult
+  from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.runner.run import Run
   from crossbench.runner.runner import Runner
 
@@ -35,6 +37,7 @@ class BitsProbe(Probe):
   """
   NAME: ClassVar[str] = "bits"
   BITS_CHANNEL_AVERAGES_CSV_NAME: ClassVar[str] = "bits_channel_averages.csv"
+  PERFETTO_CHANNELS: ClassVar[str] = "CPU:mW,SOC_TOTAL:mW"
   DEFAULT_DURATION: ClassVar[dt.timedelta] = dt.timedelta(seconds=99999)
   DEFAULT_PORT: ClassVar[int] = 15909
 
@@ -221,6 +224,19 @@ class BitsProbe(Probe):
   def get_context_cls(self) -> type[BitsProbeContext]:
     return BitsProbeContext
 
+  @override
+  def log_browsers_result(self, group: BrowsersRunGroup) -> None:
+    traces = [
+        trace for run in group.runs if self in run.results
+        for trace in run.results[self].get_all("pftrace")
+    ]
+    if not traces:
+      return
+    logging.info("-" * 80)
+    logging.critical("BITS Perfetto trace results:")
+    for trace in traces:
+      logging.critical("  - %s : %s", trace, fs_helper.get_file_size(trace))
+
 
 class BitsProbeContext(ProbeContext[BitsProbe]):
 
@@ -273,9 +289,22 @@ class BitsProbeContext(ProbeContext[BitsProbe]):
     self._run_service_cmd("--stop", self.bits_out_id)
     avg_path = (
         self.local_result_path / self.probe.BITS_CHANNEL_AVERAGES_CSV_NAME)
+
     with avg_path.open("w", encoding="utf-8") as avg_file:
       self._run_service_cmd(
           "--print_channel_averages", self.bits_out_id, stdout_file=avg_file)
+
+    perfetto_path = self.local_result_path / f"{self.bits_out_id}.pftrace"
+    self._run_service_cmd(
+        "--collection",
+        self.bits_out_id,
+        "--channels",
+        self.probe.PERFETTO_CHANNELS,
+        "--write_perfetto",
+        perfetto_path,
+    )
+    if not self.host_platform.is_file(perfetto_path):
+      logging.critical("Missing BITS Perfetto trace: %s", perfetto_path)
 
   def _run_service_cmd(
       self,
