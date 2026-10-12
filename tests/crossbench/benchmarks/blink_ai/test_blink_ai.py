@@ -313,12 +313,18 @@ class BlinkAITestCase(helper.SubStoryTestCase):
             "multimodal_audio",
         ),
     )
-    for mtp_story in ("mtp_summary", "mtp_flight", "mtp_emoji"):
-      self.assertIn(mtp_story, self.story_cls.SUBSTORIES)
-      self.assertNotIn(mtp_story, default_stories)
+    for opt_in_story in (
+        "mtp_summary",
+        "mtp_flight",
+        "mtp_emoji",
+        "tool_calling",
+    ):
+      self.assertIn(opt_in_story, self.story_cls.SUBSTORIES)
+      self.assertNotIn(opt_in_story, default_stories)
 
     default_story = self.story_cls.default()[0]
     self.assertFalse(default_story.has_mtp_substory)
+    self.assertFalse(default_story.has_tool_use_substory)
     default_flags = self.benchmark_cls.extra_flags(
         self.browsers[0].attributes(), default_story)
     self.assertIn(
@@ -326,12 +332,28 @@ class BlinkAITestCase(helper.SubStoryTestCase):
         str(default_flags),
     )
     self.assertNotIn("OnDeviceModelSpeculativeDecoding", str(default_flags))
+    self.assertNotIn("AIPromptAPIToolUse", str(default_flags))
 
     mtp_story_obj = self.story_cls.from_names(["mtp_summary"])[0]
     self.assertTrue(mtp_story_obj.has_mtp_substory)
+    self.assertFalse(mtp_story_obj.has_tool_use_substory)
     mtp_flags = self.benchmark_cls.extra_flags(self.browsers[0].attributes(),
                                                mtp_story_obj)
     self.assertIn("OnDeviceModelSpeculativeDecoding", str(mtp_flags))
+    self.assertNotIn("AIPromptAPIToolUse", str(mtp_flags))
+
+    tool_use_story_obj = self.story_cls.from_names(["tool_calling"])[0]
+    self.assertTrue(tool_use_story_obj.has_tool_use_substory)
+    self.assertFalse(tool_use_story_obj.has_mtp_substory)
+    tool_use_flags = self.benchmark_cls.extra_flags(
+        self.browsers[0].attributes(), tool_use_story_obj)
+    self.assertIn("AIPromptAPIToolUse", str(tool_use_flags))
+    self.assertIn("OnDeviceModelConversationBackend", str(tool_use_flags))
+    self.assertIn(
+        "AIApiFoundationalModel:model_version/v4",
+        str(tool_use_flags),
+    )
+    self.assertNotIn("OnDeviceModelSpeculativeDecoding", str(tool_use_flags))
 
   def test_mtp_stories(self):
     stories = self.story_cls.from_names(
@@ -355,6 +377,17 @@ class BlinkAITestCase(helper.SubStoryTestCase):
     self.assertDictEqual(story.url_params, {"stories": name})
     flags = self.benchmark_cls.extra_flags(self.browsers[0].attributes(), story)
     self.assertIn("OnDeviceModelSpeculativeDecoding", str(flags))
+
+  def test_tool_use_stories(self):
+    stories = self.story_cls.from_names(["tool_calling"])
+    self.assertEqual(len(stories), 1)
+    story = stories[0]
+    self.assertTrue(story.has_tool_use_substory)
+    self.assertDictEqual(story.url_params, {"stories": "tool_calling"})
+    self.assertEqual(
+        story.test_url,
+        self.story_cls.URL + "?stories=tool_calling",
+    )
 
   def test_vram_probe_context_single_gpu(self):
     samples = [

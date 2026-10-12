@@ -48,7 +48,10 @@ class BlinkAIStory(PressBenchmarkStory):
       # Article summary with constrained decoding (responseConstraint).
       "mtp_constrained_summary",
   )
-  SUBSTORIES: ClassVar[tuple[str, ...]] = DEFAULT_SUBSTORIES + MTP_SUBSTORIES
+  TOOL_USE_SUBSTORIES: ClassVar[tuple[str, ...]] = ("tool_calling",)
+  SUBSTORIES: ClassVar[tuple[str, ...]] = (
+      DEFAULT_SUBSTORIES + MTP_SUBSTORIES + TOOL_USE_SUBSTORIES
+  )
 
   @classmethod
   @override
@@ -58,6 +61,12 @@ class BlinkAIStory(PressBenchmarkStory):
   @property
   def has_mtp_substory(self) -> bool:
     return any(substory in self.MTP_SUBSTORIES for substory in self.substories)
+
+  @property
+  def has_tool_use_substory(self) -> bool:
+    return any(
+        substory in self.TOOL_USE_SUBSTORIES for substory in self.substories
+    )
 
   def __init__(self,
                substories: Sequence[str] = (),
@@ -179,6 +188,14 @@ class BlinkAIBenchmark(PressBenchmark):
         "AIRewriterAPI",
     ):
       chrome_flags.features.enable(feature)
-    if isinstance(story, BlinkAIStory) and story.has_mtp_substory:
-      chrome_flags.features.enable("OnDeviceModelSpeculativeDecoding")
+    if isinstance(story, BlinkAIStory):
+      if story.has_mtp_substory:
+        chrome_flags.features.enable("OnDeviceModelSpeculativeDecoding")
+      if story.has_tool_use_substory:
+        for tool_feature in (
+            "AIPromptAPIToolUse",
+            "OnDeviceModelConversationBackend",
+            "AIApiFoundationalModel:model_version/v4",
+        ):
+          chrome_flags.features.enable(tool_feature)
     return chrome_flags
