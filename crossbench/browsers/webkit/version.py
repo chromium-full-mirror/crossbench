@@ -5,14 +5,11 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from crossbench.browsers.version import BrowserVersion, BrowserVersionChannel
-
-if TYPE_CHECKING:
-  VersionParseResult = tuple[tuple[int, ...], BrowserVersionChannel, str]
+from crossbench.browsers.version import BrowserVersion, \
+    BrowserVersionChannel, VersionParseResult
 
 _SIMPLE_VERSION_RE = re.compile(
     r"webkit(?:[ -]nightly)?[ -]?"
@@ -29,7 +26,8 @@ class WebKitVersion(BrowserVersion):
     full_version = full_version.strip()
     if matches := _SIMPLE_VERSION_RE.fullmatch(full_version):
       part = int(matches["parts"])
-      return (part,), BrowserVersionChannel.PRE_ALPHA, f"WebKit Nightly {part}"
+      return VersionParseResult((part,), BrowserVersionChannel.PRE_ALPHA,
+                                f"WebKit Nightly {part}")
     raise cls.parse_error("Invalid version", full_version)
 
   @property

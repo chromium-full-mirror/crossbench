@@ -5,14 +5,12 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Final
+from typing import Final
 
 from typing_extensions import override
 
-from crossbench.browsers.version import BrowserVersion, BrowserVersionChannel
-
-if TYPE_CHECKING:
-  VersionParseResult = tuple[tuple[int, ...], BrowserVersionChannel, str]
+from crossbench.browsers.version import BrowserVersion, \
+    BrowserVersionChannel, VersionParseResult
 
 _SIMPLE_VERSION_RE: Final[re.Pattern] = re.compile(
     r"(?P<name>Safari(?: Technology Preview)?) "
@@ -59,7 +57,8 @@ class SafariVersion(BrowserVersion):
       release = int(release_str)
     parts = cls._parse_parts(full_version, parts_str)
     parts = (*major_parts, release, *parts)
-    return parts, channel, f"{major_parts_str} ({version_str})"
+    return VersionParseResult(parts, channel,
+                              f"{major_parts_str} ({version_str})")
 
   @classmethod
   def _parse_simple_version(cls, full_version: str,
@@ -67,7 +66,7 @@ class SafariVersion(BrowserVersion):
     channel: BrowserVersionChannel = cls._parse_channel(full_version)
     parts = cls._parse_parts(full_version, matches["parts"])
     parts += (0,)
-    return parts, channel, full_version
+    return VersionParseResult(parts, channel, full_version)
 
   @classmethod
   def _parse_parts(cls, full_version: str, parts_str: str) -> tuple[int, ...]:

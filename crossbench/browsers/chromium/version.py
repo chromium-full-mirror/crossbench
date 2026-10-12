@@ -10,7 +10,7 @@ from typing import Final
 from typing_extensions import override
 
 from crossbench.browsers.version import BrowserVersion, \
-    BrowserVersionChannel, PartialBrowserVersionError
+    BrowserVersionChannel, PartialBrowserVersionError, VersionParseResult
 
 
 class ChromiumVersion(BrowserVersion):
@@ -36,9 +36,7 @@ class ChromiumVersion(BrowserVersion):
 
   @classmethod
   @override
-  def _parse(
-      cls,
-      full_version: str) -> tuple[tuple[int, ...], BrowserVersionChannel, str]:
+  def _parse(cls, full_version: str) -> VersionParseResult:
     matches = cls._VERSION_RE.fullmatch(full_version.strip())
     if not matches:
       raise cls.parse_error("Could not extract version number.", full_version)
@@ -64,17 +62,15 @@ class ChromiumVersion(BrowserVersion):
     return ""
 
   @classmethod
-  def _channel_version(
-      cls, channel_str: str,
-      full_version: str) -> tuple[tuple[int, ...], BrowserVersionChannel, str]:
+  def _channel_version(cls, channel_str: str,
+                       full_version: str) -> VersionParseResult:
     channel = cls._parse_exact_channel(channel_str, full_version)
     version_str = ""
-    return (), channel, version_str
+    return VersionParseResult((), channel, version_str)
 
   @classmethod
-  def _numbered_version(
-      cls, version_str: str,
-      full_version: str) -> tuple[tuple[int, ...], BrowserVersionChannel, str]:
+  def _numbered_version(cls, version_str: str,
+                        full_version: str) -> VersionParseResult:
     channel: BrowserVersionChannel = cls._parse_default_channel(full_version)
 
     parts_str = version_str.split(".")
@@ -100,7 +96,7 @@ class ChromiumVersion(BrowserVersion):
     else:
       padding = ("X",) * (cls._PARTS_LEN - len(parts))
       version_str = ".".join(map(str, parts + padding))
-    return parts, channel, version_str
+    return VersionParseResult(parts, channel, version_str)
 
   @classmethod
   def _validate_prefix(cls, prefix: str | None) -> bool:

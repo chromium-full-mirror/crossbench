@@ -9,7 +9,7 @@ import dataclasses
 import enum
 import functools
 import re
-from typing import Final, Iterable, Self
+from typing import Final, Iterable, NamedTuple, Self
 
 from typing_extensions import override
 
@@ -48,6 +48,12 @@ class BrowserVersionChannel(_BrowserVersionChannelMixin, enum.Enum):
     return self == other
 
 
+class VersionParseResult(NamedTuple):
+  parts: tuple[int, ...]
+  channel: BrowserVersionChannel
+  version_str: str
+
+
 class PartialBrowserVersionError(ValueError):
 
   def __init__(self, version: BrowserVersion):
@@ -80,9 +86,9 @@ class BrowserVersion(Version, metaclass=abc.ABCMeta):
   def parse(cls,
             value: str,
             channel: BrowserVersionChannel | None = None) -> Self:
-    (parts, parsed_channel, version_str) = cls._parse(value)
-    parts = cls._validate_parts(parts, value)
-    return cls(parts, channel or parsed_channel, version_str)
+    parsed = cls._parse(value)
+    parts = cls._validate_parts(parsed.parts, value)
+    return cls(parts, channel or parsed.channel, parsed.version_str)
 
   @classmethod
   def is_valid_unique(cls, value: str) -> bool:
@@ -94,9 +100,7 @@ class BrowserVersion(Version, metaclass=abc.ABCMeta):
 
   @classmethod
   @abc.abstractmethod
-  def _parse(
-      cls,
-      full_version: str) -> tuple[tuple[int, ...], BrowserVersionChannel, str]:
+  def _parse(cls, full_version: str) -> VersionParseResult:
     pass
 
   @classmethod
@@ -272,9 +276,7 @@ class UnknownBrowserVersion(BrowserVersion):
 
   @classmethod
   @override
-  def _parse(
-      cls,
-      full_version: str) -> tuple[tuple[int, ...], BrowserVersionChannel, str]:
+  def _parse(cls, full_version: str) -> VersionParseResult:
     raise RuntimeError("UnknownBrowserVersion does not support parsing")
 
   @override

@@ -9,7 +9,8 @@ from typing import Final
 
 from typing_extensions import override
 
-from crossbench.browsers.version import BrowserVersion, BrowserVersionChannel
+from crossbench.browsers.version import BrowserVersion, \
+    BrowserVersionChannel, VersionParseResult
 
 
 class D8Version(BrowserVersion):
@@ -21,9 +22,7 @@ class D8Version(BrowserVersion):
 
   @classmethod
   @override
-  def _parse(
-      cls,
-      full_version: str) -> tuple[tuple[int, ...], BrowserVersionChannel, str]:
+  def _parse(cls, full_version: str) -> VersionParseResult:
     matches = cls._VERSION_RE.fullmatch(full_version.strip())
     if not matches:
       raise cls.parse_error("Could not extract version number", full_version)
@@ -37,7 +36,7 @@ class D8Version(BrowserVersion):
       raise cls.parse_error("Invalid number of version number parts",
                             full_version)
     version_str: str = f"{prefix} {parts}"
-    return parts, BrowserVersionChannel.ALPHA, version_str
+    return VersionParseResult(parts, BrowserVersionChannel.ALPHA, version_str)
 
   @classmethod
   def _validate_prefix(cls, prefix: str | None) -> bool:
