@@ -14,7 +14,7 @@ import math
 import re
 import shlex
 from typing import TYPE_CHECKING, Any, Callable, Final, Iterable, Sequence, \
-    TypeVar
+    TypeGuard, TypeVar
 from urllib import parse as urlparse
 
 import google.protobuf.message
@@ -55,7 +55,9 @@ class PathParser(BaseParser):
                                                    r")(\\|/)[^\\/]")
 
   @classmethod
-  def value_has_path_prefix(cls, value: str) -> bool:
+  def value_has_path_prefix(cls, value: object) -> TypeGuard[str]:
+    if not isinstance(value, str):
+      return False
     return cls.PATH_PREFIX.match(value) is not None
 
   @classmethod
@@ -291,7 +293,9 @@ class ObjectParser(BaseParser):
     return [cls.enum(label, enum_cls, item, choices) for item in data]
 
   @classmethod
-  def is_hjson_like(cls, value: str) -> bool:
+  def is_hjson_like(cls, value: object) -> TypeGuard[str]:
+    if not isinstance(value, str):
+      return False
     value = value.strip()
     if len(value) < 2:
       return False

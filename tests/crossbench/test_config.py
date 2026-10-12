@@ -530,7 +530,7 @@ class ConfigObjectTestCase(CrossbenchFakeFsTestCase):
     for value in ("foo/bar", "foo:bar", "foo", "{foo:'/foo/bar'}", "http://foo",
                   "c://", "c://bar", "C:../bar", "..//foo", "..//foo/bar",
                   "~:bar", "~.bar", "~//df", "foo/~bar", "foo~bar/foo",
-                  "http://someurl.com/~myproject/index.html"):
+                  "http://someurl.com/~myproject/index.html", None, 123, {}):
       with self.subTest(value=value):
         self.assertFalse(CustomConfigObject.has_path_prefix(value))
 
@@ -539,7 +539,8 @@ class ConfigObjectTestCase(CrossbenchFakeFsTestCase):
       with self.subTest(value=value):
         self.assertFalse(CustomConfigObject.has_path_prefix(value))
         self.assertTrue(CustomConfigObject.is_path_like(value))
-    for value in ("adb:foo/bar", "adb:foo\\bar:local", "http://foo/bar"):
+    for value in ("adb:foo/bar", "adb:foo\\bar:local", "http://foo/bar", None,
+                  123, {}):
       with self.subTest(value=value):
         self.assertFalse(CustomConfigObject.has_path_prefix(value))
         self.assertFalse(CustomConfigObject.is_path_like(value))
@@ -548,7 +549,7 @@ class ConfigObjectTestCase(CrossbenchFakeFsTestCase):
     for value in ("{}", " {}", " { foo: 2} "):
       with self.subTest(value=value):
         self.assertTrue(CustomConfigObject.is_hjson_like(value))
-    for value in ("{", "2", " bar/foo{}asdf"):
+    for value in ("{", "2", " bar/foo{}asdf", None, 123, {}):
       with self.subTest(value=value):
         self.assertFalse(CustomConfigObject.is_hjson_like(value))
 

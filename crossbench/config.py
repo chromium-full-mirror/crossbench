@@ -17,7 +17,7 @@ import logging
 import re
 import textwrap
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Final, Generic, \
-    Iterable, Sequence, TypeAlias, TypeVar, cast
+    Iterable, Sequence, TypeAlias, TypeGuard, TypeVar, cast
 
 import tabulate
 from typing_extensions import Self, override
@@ -221,7 +221,7 @@ class ConfigArgParser:
     if self.is_enum:
       raise ValueError(f"Enum '{self.name}' cannot have argument dependencies")
 
-  def _is_iterable_non_str(self, value: object) -> bool:
+  def _is_iterable_non_str(self, value: object) -> TypeGuard[Iterable[object]]:
     if isinstance(value, str):
       return False
     return isinstance(value, collections.abc.Iterable)
@@ -518,9 +518,9 @@ class ConfigObject(abc.ABC):
       return cls.parse_hjson_path(valid_hjson_path, **kwargs)
     if isinstance(original_value, pth.LocalPath):
       return cls.parse_any_path(path, **kwargs)
+    if cls.is_path_like(original_value):
+      return cls.parse_path_like(original_value, path, **kwargs)
     if isinstance(original_value, str):
-      if cls.is_path_like(original_value):
-        return cls.parse_path_like(original_value, path, **kwargs)
       return cls.parse_str(original_value, **kwargs)
     raise argparse.ArgumentTypeError(
         f"Unsupported path type {type(original_value)}: {original_value}")
@@ -543,19 +543,21 @@ class ConfigObject(abc.ABC):
     return None
 
   @classmethod
-  def has_path_prefix(cls, value: str) -> bool:
+  def has_path_prefix(cls, value: object) -> TypeGuard[str]:
     return PathParser.value_has_path_prefix(value)
 
   @classmethod
-  def is_path_like(cls, value: str) -> bool:
+  def is_path_like(cls, value: object) -> TypeGuard[str]:
     """ Return True on strings that have a valid path-prefix
     or contains simple path parts (with path separators) and no ':"
     (to filter out URLs)."""
+    if not isinstance(value, str):
+      return False
     return cls.has_path_prefix(value) or (bool(
         HAS_PATH_SEPARATORS_RE.search(value)) and ":" not in value)
 
   @classmethod
-  def is_hjson_like(cls, value: str) -> bool:
+  def is_hjson_like(cls, value: object) -> TypeGuard[str]:
     return ObjectParser.is_hjson_like(value)
 
   @classmethod
@@ -848,7 +850,8 @@ class _TemplatedConfigParser(ConfigObject):
             "template, add the argument name to the 'unbound_args' field.")
 
   @classmethod
-  def is_template_invocation(cls, value: object) -> bool:
+  def is_template_invocation(cls,
+                             value: object) -> TypeGuard[dict[str, object]]:
     if not isinstance(value, dict):
       return False
 

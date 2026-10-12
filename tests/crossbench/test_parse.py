@@ -732,6 +732,9 @@ class PathParserTestCase(BaseFileParserTestCase):
     self.assertFalse(PathParser.value_has_path_prefix("foo/bar"))
     self.assertFalse(PathParser.value_has_path_prefix(""))
     self.assertFalse(PathParser.value_has_path_prefix("/"))
+    self.assertFalse(PathParser.value_has_path_prefix(None))
+    self.assertFalse(PathParser.value_has_path_prefix(123))
+    self.assertFalse(PathParser.value_has_path_prefix(pth.LocalPath("/foo")))
 
   def test_file_path(self):
     with self.assertRaises(argparse.ArgumentTypeError):
@@ -986,6 +989,9 @@ class ObjectParserTestCase(BaseFileParserTestCase):
     self.assertFalse(ObjectParser.is_hjson_like("}"))
     self.assertFalse(ObjectParser.is_hjson_like("[]"))
     self.assertFalse(ObjectParser.is_hjson_like("abc"))
+    self.assertFalse(ObjectParser.is_hjson_like(None))
+    self.assertFalse(ObjectParser.is_hjson_like(123))
+    self.assertFalse(ObjectParser.is_hjson_like({}))
 
   def test_inline_hjson(self):
     with self.assertRaisesRegex(argparse.ArgumentTypeError,
