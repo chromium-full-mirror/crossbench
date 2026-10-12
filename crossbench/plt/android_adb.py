@@ -62,7 +62,8 @@ if TYPE_CHECKING:
   from crossbench.device_config import DeviceConfigKeyPath
   from crossbench.plt.base import Platform
   from crossbench.plt.display_info import DisplayInfo
-  from crossbench.plt.types import CmdArg, ListCmdArgs, ProcessIo, TupleCmdArgs
+  from crossbench.plt.types import CmdArg, ListCmdArgs, PlatformKey, \
+      ProcessIo, TupleCmdArgs
   from crossbench.types import JsonDict
 
 
@@ -990,7 +991,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
 
   @property
   @override
-  def key(self) -> tuple[Any, ...]:
+  def key(self) -> PlatformKey:
     return ("android", self.serial_id)
 
   def _uiautomator_device(

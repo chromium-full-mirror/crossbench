@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, Any, ClassVar, Self
+from typing import TYPE_CHECKING, ClassVar, Self
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -38,7 +38,7 @@ class DumpHtmlAction(BaseProbeAction):
              timeout: dt.timedelta = ACTION_TIMEOUT,
              index: int = 0) -> Self:
     if suffix:
-      kwargs: immutabledict[str, Any] = immutabledict({"suffix": suffix})
+      kwargs: immutabledict[str, str] = immutabledict({"suffix": suffix})
     else:
       kwargs = immutabledict()
     return cls(kwargs=kwargs, timeout=timeout, index=index)

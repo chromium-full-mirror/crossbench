@@ -7,7 +7,7 @@ from __future__ import annotations
 import abc
 import dataclasses
 import functools
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Self
+from typing import TYPE_CHECKING, ClassVar, Final, Self
 
 from typing_extensions import override
 
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
   from crossbench.types import JsonDict
 
 
-class VirtualDeviceTypeConfigParser(ConfigParser):
+class VirtualDeviceTypeConfigParser(ConfigParser[VirtualDeviceType]):
 
   def __init__(self) -> None:
     super().__init__(
@@ -33,7 +33,7 @@ class VirtualDeviceTypeConfigParser(ConfigParser):
         required=True)
 
   def new_instance_from_kwargs(self, kwargs: dict[str,
-                                                  Any]) -> VirtualDeviceType:
+                                                  object]) -> VirtualDeviceType:
     return VirtualDeviceType(kwargs["device_type"])  # type: ignore
 
 
@@ -60,7 +60,7 @@ class VirtualDeviceConfig(ConfigObject, metaclass=abc.ABCMeta):
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict[str, Any], **kwargs) -> Self:
+  def parse_dict(cls, config: dict[str, object], **kwargs) -> Self:
     device_type: VirtualDeviceType = _DEVICE_TYPE_CONFIG_PARSER.parse(config)
     target_cls: type[Self] = VIRTUAL_DEVICES[device_type]  # type: ignore
 

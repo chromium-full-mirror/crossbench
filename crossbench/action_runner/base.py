@@ -9,7 +9,7 @@ import datetime as dt
 import logging
 import sys
 import time
-from typing import TYPE_CHECKING, Any, Callable, Final, Iterable, Iterator, \
+from typing import TYPE_CHECKING, Callable, Final, Iterable, Iterator, \
     Sequence, cast
 
 from crossbench import exception
@@ -692,7 +692,7 @@ class ActionRunner:
   def _rate_limit_keystrokes(
       self,
       action: i_action.TextInputAction,
-      do_type_function: Callable[[Actions, str], Any],
+      do_type_function: Callable[[Actions, str], object],
   ) -> None:
     action_text = cast(str, action.text)
     character_delay_s = (action.duration / len(action_text)).total_seconds()

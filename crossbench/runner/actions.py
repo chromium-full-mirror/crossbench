@@ -31,7 +31,7 @@ if TYPE_CHECKING:
   from crossbench.runner.timing import AnyTimeUnit, Timing
 
 
-def _default_success_condition(js_result: Any) -> bool:
+def _default_success_condition(js_result: object) -> bool:
   if js_result is True:
     return True
   ObjectParser.bool(js_result, strict=True)

@@ -19,3 +19,5 @@ CmdArgs: TypeAlias = ListCmdArgs | TupleCmdArgs
 ProcessLike: TypeAlias = Popen | Process | int
 
 ProcessIo: TypeAlias = int | IO[Any] | None
+
+PlatformKey: TypeAlias = tuple[str, ...]

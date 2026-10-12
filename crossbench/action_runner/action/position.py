@@ -7,7 +7,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import functools
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Self
 
 from typing_extensions import override
 
@@ -96,8 +96,8 @@ class UiSelectorConfig(ConfigObject):
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict[str, Any],
-                 **kwargs: Any) -> UiSelectorConfig:
+  def parse_dict(cls, config: dict[str, object],
+                 **kwargs: object) -> UiSelectorConfig:
     return cls.config_parser().parse(config)
 
   @classmethod

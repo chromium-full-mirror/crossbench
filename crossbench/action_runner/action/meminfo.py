@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
-from typing import TYPE_CHECKING, Any, ClassVar, Iterable, Self
+from typing import TYPE_CHECKING, ClassVar, Iterable, Self
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -50,7 +50,7 @@ class MeminfoAction(BaseProbeAction):
              timeout: dt.timedelta = ACTION_TIMEOUT,
              index: int = 0) -> Self:
     packages = tuple(packages)
-    kwargs: immutabledict[str, Any] = immutabledict({
+    kwargs: immutabledict[str, object] = immutabledict({
         "browser": browser,
         "system": system,
         "packages": packages,

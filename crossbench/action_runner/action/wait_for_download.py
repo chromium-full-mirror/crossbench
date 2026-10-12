@@ -6,8 +6,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
-import re
-from typing import TYPE_CHECKING, Any, ClassVar, Self
+from typing import TYPE_CHECKING, ClassVar, Self
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -19,6 +18,7 @@ from crossbench.parse import ObjectParser
 
 if TYPE_CHECKING:
   import datetime as dt
+  import re
 
   from crossbench.config import ConfigParser
   from crossbench.types import JsonDict
@@ -32,7 +32,7 @@ class WaitForDownloadAction(BaseProbeAction):
   TYPE: ClassVar[ActionType] = ActionType.WAIT_FOR_DOWNLOAD
   PROBE: ClassVar[str] = "downloads"
 
-  pattern: re.Pattern | None = None
+  pattern: re.Pattern[str] | None = None
 
   @property
   @override
@@ -42,11 +42,12 @@ class WaitForDownloadAction(BaseProbeAction):
   @classmethod
   @override
   def create(cls: type[Self],
-             pattern: re.Pattern | None = None,
+             pattern: re.Pattern[str] | None = None,
              timeout: dt.timedelta = ACTION_TIMEOUT,
              index: int = 0) -> Self:
     if pattern:
-      kwargs: immutabledict[str, Any] = immutabledict({"pattern": pattern})
+      kwargs: immutabledict[str, re.Pattern[str]] = immutabledict(
+          {"pattern": pattern})
     else:
       kwargs = immutabledict()
     return cls(kwargs=kwargs, pattern=pattern, timeout=timeout, index=index)
@@ -65,7 +66,7 @@ class WaitForDownloadAction(BaseProbeAction):
 
   @override
   def kwargs_to_json(self) -> JsonDict:
-    pattern = self.pattern
-    if isinstance(pattern, re.Pattern):
-      pattern = pattern.pattern
+    pattern: str | None = None
+    if self.pattern:
+      pattern = self.pattern.pattern
     return {"pattern": pattern}

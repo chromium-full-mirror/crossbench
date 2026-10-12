@@ -7,7 +7,7 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import functools
-from typing import TYPE_CHECKING, Any, ClassVar, Self
+from typing import TYPE_CHECKING, ClassVar, Self
 
 from typing_extensions import override
 
@@ -30,12 +30,9 @@ class ScrollAction(InputSourceAction):
   distance: float = 500.0
   selector: str | None = None
   required: bool = False
-
-  @classmethod
-  @override
-  def create(cls: type[Self], *args: Any, **kwargs: Any) -> Self:
-    kwargs.setdefault("duration", cls.DEFAULT_DURATION)
-    return super().create(*args, **kwargs)
+  # Overrides BaseDurationAction.duration:
+  duration: dt.timedelta = dataclasses.field(
+      default=DEFAULT_DURATION, kw_only=True)
 
   @classmethod
   @override

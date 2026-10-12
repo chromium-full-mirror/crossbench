@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import abc
 import dataclasses
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, cast
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -23,8 +23,8 @@ if TYPE_CHECKING:
 
 @dataclasses.dataclass(frozen=True, eq=False)
 class BaseProbeAction(Action, metaclass=abc.ABCMeta):
-  kwargs: immutabledict[str,
-                        Any] = dataclasses.field(default_factory=immutabledict)
+  kwargs: immutabledict[str, object] = dataclasses.field(
+      default_factory=immutabledict)
 
   @property
   @abc.abstractmethod
@@ -51,7 +51,7 @@ class BaseProbeAction(Action, metaclass=abc.ABCMeta):
     action_runner.invoke_probe(self)
 
   def kwargs_to_json(self) -> JsonDict:
-    return dict(self.kwargs)
+    return cast("JsonDict", dict(self.kwargs))
 
   @override
   def to_json(self) -> JsonDict:

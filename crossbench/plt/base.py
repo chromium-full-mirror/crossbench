@@ -57,7 +57,8 @@ if TYPE_CHECKING:
   from crossbench.plt.display_info import DisplayInfo, DisplayResolution
   from crossbench.plt.process_meminfo import ProcessMeminfo
   from crossbench.plt.signals import AnySignals, Signals
-  from crossbench.plt.types import CmdArg, ProcessIo, ProcessLike, TupleCmdArgs
+  from crossbench.plt.types import CmdArg, PlatformKey, ProcessIo, \
+      ProcessLike, TupleCmdArgs
   from crossbench.plt.version import PlatformVersion
   from crossbench.plt.version_details import VersionDetails
   from crossbench.types import JsonDict
@@ -230,7 +231,7 @@ class Platform(abc.ABC):
     return self.unique_name
 
   @property
-  def key(self) -> tuple[Any, ...]:
+  def key(self) -> PlatformKey:
     return ("local", self.name, str(self.machine))
 
   @property

@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, Any, Final, Mapping
+from typing import TYPE_CHECKING, Final, Mapping
 
 from crossbench.plt.port_manager import PortManager
 from crossbench.plt.remote import RemotePlatformMixin
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
   from crossbench import path as pth
   from crossbench.plt.base import Platform
-  from crossbench.plt.types import CmdArg, ListCmdArgs, ProcessIo
+  from crossbench.plt.types import CmdArg, ListCmdArgs, PlatformKey, ProcessIo
 
 
 class SshPortManager(PortManager):
@@ -57,7 +57,7 @@ class SshPlatformMixin(RemotePlatformMixin, metaclass=abc.ABCMeta):
     return True
 
   @property
-  def key(self) -> tuple[Any, ...]:
+  def key(self) -> PlatformKey:
     return ("ssh", self.host, str(self.port))
 
   @abc.abstractmethod

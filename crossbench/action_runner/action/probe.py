@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
-from typing import TYPE_CHECKING, Any, ClassVar, Mapping, Self
+from typing import TYPE_CHECKING, ClassVar, Mapping, Self
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -28,17 +28,17 @@ class ProbeAction(BaseProbeAction):
   TYPE: ClassVar[ActionType] = ActionType.PROBE
 
   probe: str = dataclasses.field(default="", kw_only=True)
-  kwargs: immutabledict[str,
-                        Any] = dataclasses.field(default_factory=immutabledict)
+  kwargs: immutabledict[str, object] = dataclasses.field(
+      default_factory=immutabledict)
 
   @classmethod
   @override
   def create(cls: type[Self],
              probe: str = "",
-             kwargs: Mapping[str, Any] | None = None,
+             kwargs: Mapping[str, object] | None = None,
              timeout: dt.timedelta = ACTION_TIMEOUT,
              index: int = 0) -> Self:
-    kwargs_immutable: immutabledict[str, Any]
+    kwargs_immutable: immutabledict[str, object]
     if kwargs is None:
       kwargs_immutable = immutabledict()
     elif isinstance(kwargs, immutabledict):

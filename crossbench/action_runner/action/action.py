@@ -9,7 +9,7 @@ import dataclasses
 import datetime as dt
 import functools
 import json
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Self, cast
+from typing import TYPE_CHECKING, ClassVar, Final, Self, cast
 
 from typing_extensions import override
 
@@ -36,9 +36,8 @@ class ActionTypeConfigParser(ConfigParser[ActionType]):
     self.add_argument(
         "action", aliases=("type",), type=ActionType.parse, required=True)
 
-  def new_instance_from_kwargs(self, kwargs: dict[str, Any]) -> ActionType:
-    action_type: ActionType = kwargs["action"]
-    return action_type
+  def new_instance_from_kwargs(self, kwargs: dict[str, object]) -> ActionType:
+    return cast(ActionType, kwargs["action"])
 
 
 _ACTION_TYPE_CONFIG_PARSER: Final = ActionTypeConfigParser()
@@ -69,7 +68,7 @@ class Action(ConfigObject, metaclass=abc.ABCMeta):
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict[str, Any], **kwargs) -> Self:
+  def parse_dict(cls, config: dict[str, object], **kwargs) -> Self:
     action_type: ActionType = _ACTION_TYPE_CONFIG_PARSER.parse(config)
     action_cls: type[Action] = ACTIONS[action_type]
     # Drop _ACTION_TYPE_CONFIG_PARSER arguments/aliases and avoid warnings

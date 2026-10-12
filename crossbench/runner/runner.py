@@ -9,7 +9,7 @@ import contextlib
 import datetime as dt
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Final, Iterable, Iterator
+from typing import TYPE_CHECKING, Final, Iterable, Iterator, TypedDict
 
 from crossbench import exception
 from crossbench import path as pth
@@ -47,10 +47,28 @@ if TYPE_CHECKING:
   from crossbench.action_runner.base import ActionRunner
   from crossbench.benchmarks.base import Benchmark
   from crossbench.browsers.browser import Browser
+  from crossbench.plt.types import PlatformKey
   from crossbench.probes.thermal_monitor import ThermalStatus
   from crossbench.runner.groups.base import RunGroup
   from crossbench.runner.timing import AnyTimeUnit
   from crossbench.stories.story import Story
+
+
+class RunnerCliKwargs(TypedDict):
+  out_dir: pth.LocalPath
+  browsers: Iterable[Browser]
+  repetitions: int
+  warmup_repetitions: int
+  cache_temperatures: Iterable[CacheTemperature]
+  thread_mode: ThreadMode
+  throw: bool
+  create_symlinks: bool
+  cool_down_threshold: ThermalStatus | None
+  step_by_step_mode: bool
+  ignore_partial_failures: bool
+  disabled_probes: Iterable[str]
+  required_device_config_mode: RequiredDeviceConfigMode
+  pause_on_error: bool
 
 
 class RunnerException(exception.MultiException):
@@ -88,21 +106,26 @@ class ThreadMode(StrEnumWithHelp):
   def group(self, runs: list[Run]) -> list[RunThreadGroup]:
     if self == ThreadMode.NONE:
       return [RunMainGroup(runs)]
-    groups: dict[Any, list[Run]] = {}
+    group_values: Iterable[list[Run]]
     if self == ThreadMode.SESSION:
-      groups = collection_helper.group_by(
-          runs, key=lambda run: run.browser_session, sort_key=None)
+      session_groups: dict[BrowserSessionRunGroup, list[Run]] = (
+          collection_helper.group_by(
+              runs, key=lambda run: run.browser_session, sort_key=None))
+      group_values = session_groups.values()
     elif self == ThreadMode.PLATFORM:
-      groups = collection_helper.group_by(
-          runs, key=lambda run: run.browser_platform.key, sort_key=None)
+      platform_groups: dict[PlatformKey, list[Run]] = (
+          collection_helper.group_by(
+              runs, key=lambda run: run.browser_platform.key, sort_key=None))
+      group_values = platform_groups.values()
     elif self == ThreadMode.BROWSER:
-      groups = collection_helper.group_by(
+      browser_groups: dict[Browser, list[Run]] = collection_helper.group_by(
           runs, key=lambda run: run.browser, sort_key=None)
+      group_values = browser_groups.values()
     else:
       raise ValueError(f"Unexpected thread mode: {self}")
     return [
         RunThreadGroup(runs, index=index)
-        for index, runs in enumerate(groups.values())
+        for index, runs in enumerate(group_values)
     ]
 
 
@@ -224,7 +247,7 @@ class Runner:
               f"{results_uploader.supported_schemes_str()}."))
 
   @classmethod
-  def kwargs_from_cli(cls, args: argparse.Namespace) -> dict[str, Any]:
+  def kwargs_from_cli(cls, args: argparse.Namespace) -> RunnerCliKwargs:
     if args.out_dir:
       out_dir = args.out_dir
     else:
@@ -726,9 +749,8 @@ class Runner:
   def has_only_single_run_platforms(self) -> bool:
     if not self.runs:
       raise RuntimeError(f"{type(self)} has no runs")
-    platform_runs: dict[tuple[Any, ...],
-                        list[Run]] = collection_helper.group_by(
-                            self.runs, key=lambda run: run.browser_platform.key)
+    platform_runs: dict[PlatformKey, list[Run]] = collection_helper.group_by(
+        self.runs, key=lambda run: run.browser_platform.key)
     return all(len(runs) <= 1 for runs in platform_runs.values())
 
   def _get_runs(self) -> Iterable[Run]:
