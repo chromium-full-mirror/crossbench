@@ -136,6 +136,14 @@ class WebPowerStory(Story):
               archive_md5_hash=ObjectParser.md5_hash(
                   "25ce6da90f35259679183edb6c118f7c"),
           ),
+      "sfgate":
+          WebPowerSiteConfig(
+              url="https://www.sfgate.com",
+              archive=(f"{_WEB_POWER_GCS}/"
+                       "sfgate_2026_09_29.wprgo#1791811360926572"),
+              archive_md5_hash=ObjectParser.md5_hash(
+                  "5e285774f55bf5f29e7e58b196954705"),
+          ),
       "telegraph":
           WebPowerSiteConfig(
               url="https://www.telegraph.co.uk",
