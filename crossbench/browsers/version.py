@@ -9,7 +9,7 @@ import dataclasses
 import enum
 import functools
 import re
-from typing import Final, NamedTuple, Self
+from typing import Final, Generic, NamedTuple, Self, TypeVar
 
 from typing_extensions import override
 
@@ -252,14 +252,13 @@ class BrowserVersion(Version, metaclass=abc.ABCMeta):
     return self.key <= other.key
 
   def contains(self, other: BrowserVersion) -> bool:
-    if not isinstance(other, type(self)):
+    if not self.is_compatible_type(other):
       raise TypeError("Cannot compare versions from different browsers: "
                       f"{self} vs. {other}.")
     if self == other:
       return True
-    if self.has_channel and other.has_channel:
-      if self.channel != other.channel:
-        return False
+    if other.has_channel and not self.matches_channel(other.channel):
+      return False
     # A less precise version (e.g. channel or partial version) can never be
     # part of a more complete version.
     other_parts = other.parts
@@ -298,3 +297,95 @@ class UnknownBrowserVersion(BrowserVersion):
   @override
   def is_unknown(self) -> bool:
     return True
+
+
+BrowserVersionT = TypeVar("BrowserVersionT", bound=BrowserVersion)
+
+
+class BrowserVersionRange(Generic[BrowserVersionT], metaclass=abc.ABCMeta):
+
+  @classmethod
+  @abc.abstractmethod
+  def version_cls(cls) -> type[BrowserVersionT]:
+    pass
+
+  @classmethod
+  def any(
+      cls,
+      min_parts: VersionPartsData,
+      max_parts: VersionPartsData,
+  ) -> Self:
+    version_cls = cls.version_cls()
+    return cls(
+        version_cls.any(min_parts),
+        version_cls.any(max_parts),
+    )
+
+  def __init__(self, min: BrowserVersionT, max: BrowserVersionT) -> None:
+    self._min: Final[BrowserVersionT] = self._validate_bound(min, "min")
+    self._max: Final[BrowserVersionT] = self._validate_bound(max, "max")
+    self._validate_min_max()
+
+  @property
+  def min(self) -> BrowserVersionT:
+    return self._min
+
+  @property
+  def max(self) -> BrowserVersionT:
+    return self._max
+
+  @property
+  def key(self) -> tuple[BrowserVersionT, BrowserVersionT]:
+    return (self._min, self._max)
+
+  def __hash__(self) -> int:
+    return hash(self.key)
+
+  def __eq__(self, other: object) -> bool:
+    if not isinstance(other, type(self)):
+      return False
+    return self.key == other.key
+
+  def _validate_bound(self, bound: BrowserVersionT,
+                      name: str) -> BrowserVersionT:
+    version_cls = self.version_cls()
+    if not isinstance(bound, version_cls):
+      raise TypeError(f"Expected {version_cls.__name__} for {name} bound, "
+                      f"but got {type(bound).__name__}: {bound}")
+    if bound.has_channel:
+      raise ValueError(
+          f"Cannot use channel-specific version as {name} bound: {bound}")
+    if not bound.parts:
+      raise ValueError(f"Cannot use empty version as {name} bound: {bound}")
+    return bound
+
+  def _validate_min_max(self) -> None:
+    if not self.is_compatible_type(self._max):
+      raise TypeError("Cannot compare versions from different browsers: "
+                      f"{self._min} vs. {self._max}.")
+    if self._min.parts <= self._max.parts or self._min <= self._max:
+      return
+    raise ValueError(
+        f"Invalid version range: min ({self._min}) > max ({self._max})")
+
+  def is_compatible_type(self, other: object) -> bool:
+    return self._min.is_compatible_type(other)
+
+  def __contains__(self, other: BrowserVersion) -> bool:
+    return self.contains(other)
+
+  def contains(self, other: BrowserVersion) -> bool:
+    if other.is_unknown:
+      return False
+    if not self.is_compatible_type(other):
+      raise TypeError("Cannot compare versions from different browsers: "
+                      f"{self} vs. {other}.")
+    if other.is_channel_version:
+      return False
+    return self._min.parts <= other.parts and other <= self._max
+
+  def __str__(self) -> str:
+    return f"[{self._min}, {self._max}]"
+
+  def __repr__(self) -> str:
+    return f"{type(self).__name__}({self._min!r}, {self._max!r})"

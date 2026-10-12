@@ -12,7 +12,7 @@ from typing_extensions import override
 
 from crossbench.browsers.chrome.version import ChromeVersion
 from crossbench.browsers.chromium.version import ChromeDriverVersion, \
-    ChromiumVersion
+    ChromiumVersion, ChromiumVersionRange
 from crossbench.browsers.edge.version import EdgeVersion
 from crossbench.browsers.firefox.version import FirefoxVersion
 from crossbench.browsers.safari.version import SafariVersion
@@ -305,6 +305,16 @@ class _BrowserVersionTestCase(VersionTestCase, metaclass=abc.ABCMeta):
     self.assertFalse(any_copy.has_channel)
     self.assertEqual(any_copy.parts, version.parts)
     self.assertEqual(any_copy.version_str, version.version_str)
+
+  def test_matches_channel(self):
+    stable = self.VERSION_CLS.stable(120)
+    any_v = self.VERSION_CLS.any(120)
+    self.assertTrue(stable.matches_channel(BrowserVersionChannel.STABLE))
+    self.assertTrue(stable.matches_channel(BrowserVersionChannel.ANY))
+    self.assertFalse(stable.matches_channel(BrowserVersionChannel.BETA))
+    self.assertTrue(any_v.matches_channel(BrowserVersionChannel.STABLE))
+    self.assertTrue(any_v.matches_channel(BrowserVersionChannel.BETA))
+    self.assertTrue(any_v.matches_channel(BrowserVersionChannel.ANY))
 
   def test_sorting(self):
     version_a = self.VERSION_CLS.any((90, 0, 4947, 3))
@@ -1250,6 +1260,133 @@ class WebKitBrowserVersionTestCase(_BrowserVersionTestCase):
   def _check_minor_version(self, version: BrowserVersion) -> None:
     with self.assertRaises(PartialBrowserVersionError):
       _ = version.minor
+
+
+class ChromiumVersionRangeTestCase(unittest.TestCase):
+
+  def test_init_invalid(self) -> None:
+    with self.assertRaises(TypeError):
+      ChromiumVersionRange()  # type: ignore
+    with self.assertRaises(TypeError):
+      ChromiumVersionRange.any()  # type: ignore
+    with self.assertRaises(VersionParseError):
+      ChromiumVersionRange.any(None, 120)  # type: ignore
+    with self.assertRaises(VersionParseError):
+      ChromiumVersionRange.any(120, None)  # type: ignore
+    with self.assertRaisesRegex(ValueError, "min .* > max"):
+      ChromiumVersionRange.any(126, 120)
+    with self.assertRaisesRegex(ValueError, "min .* > max"):
+      ChromiumVersionRange.any((120, 0, 6099, 50), (120, 0, 6099, 10))
+    with self.assertRaisesRegex(TypeError, "Expected ChromiumVersion"):
+      ChromiumVersionRange(UnknownBrowserVersion(),
+                           ChromeVersion.any(126))  # type: ignore
+    with self.assertRaisesRegex(TypeError, "Expected ChromiumVersion"):
+      ChromiumVersionRange(ChromeVersion.any(120),
+                           UnknownBrowserVersion())  # type: ignore
+    safari_version = SafariVersion.parse(
+        SafariBrowserVersionTestCase.STABLE_VERSION_STR)
+    with self.assertRaisesRegex(TypeError, "Expected ChromiumVersion"):
+      ChromiumVersionRange(safari_version,
+                           ChromeVersion.any(126))  # type: ignore
+    with self.assertRaisesRegex(ValueError, "channel-specific version"):
+      ChromiumVersionRange(
+          ChromeVersion.parse("Chrome Stable"), ChromeVersion.any(126))
+    with self.assertRaisesRegex(ValueError, "channel-specific version"):
+      ChromiumVersionRange(ChromeVersion.stable(120), ChromeVersion.any(126))
+    with self.assertRaisesRegex(ValueError, "channel-specific version"):
+      ChromiumVersionRange(ChromeVersion.any(120), ChromeVersion.beta(126))
+    with self.assertRaisesRegex(ValueError, "empty version"):
+      ChromiumVersionRange.any((), 120)
+    with self.assertRaisesRegex(ValueError, "empty version"):
+      ChromiumVersionRange.any(120, ())
+    with self.assertRaisesRegex(TypeError, "different browsers"):
+      ChromiumVersionRange(ChromeVersion.any(120), ChromeDriverVersion.any(126))
+
+  def test_equal_and_hash(self) -> None:
+    range_a = ChromiumVersionRange.any(120, 126)
+    range_b = ChromiumVersionRange.any(120, 126)
+    range_c = ChromiumVersionRange.any(120, 127)
+    self.assertEqual(range_a, range_b)
+    self.assertEqual(hash(range_a), hash(range_b))
+    self.assertNotEqual(range_a, range_c)
+    self.assertNotEqual(range_a, "120-126")
+    self.assertEqual(
+        repr(range_a), "ChromiumVersionRange(ChromiumVersion(120, any, ''), "
+        "ChromiumVersion(126, any, ''))")
+
+  def test_milestone_range(self) -> None:
+    version_range = ChromiumVersionRange.any(120, 126)
+    self.assertEqual(str(version_range), "[120 any, 126 any]")
+    self.assertNotIn(ChromeVersion.parse("119.0.9999.99"), version_range)
+    self.assertNotIn(ChromeVersion.parse("M119"), version_range)
+    self.assertIn(ChromeVersion.parse("M120"), version_range)
+    self.assertIn(ChromeVersion.parse("120.0.0.0"), version_range)
+    self.assertIn(ChromeVersion.parse("123.0.1234.56"), version_range)
+    self.assertIn(ChromeVersion.parse("126.0.9999.99"), version_range)
+    self.assertIn(ChromeVersion.parse("M126"), version_range)
+    self.assertNotIn(ChromeVersion.parse("127.0.0.0"), version_range)
+    self.assertNotIn(ChromeVersion.parse("M127"), version_range)
+    self.assertIn(ChromiumVersion.parse("Chromium 120.0.0.0"), version_range)
+    self.assertIn(ChromiumVersion.parse("Chromium 126.0.0.0"), version_range)
+
+  def test_single_milestone_range(self) -> None:
+    version_range = ChromiumVersionRange.any(120, 120)
+    self.assertNotIn(ChromeVersion.parse("119.0.9999.99"), version_range)
+    self.assertIn(ChromeVersion.parse("120.0.0.0"), version_range)
+    self.assertIn(ChromeVersion.parse("120.0.9999.99"), version_range)
+    self.assertIn(ChromeVersion.parse("M120"), version_range)
+    self.assertNotIn(ChromeVersion.parse("121.0.0.0"), version_range)
+
+  def test_full_version_range(self) -> None:
+    version_range = ChromiumVersionRange.any((120, 0, 6099, 10),
+                                             (126, 0, 6478, 50))
+    self.assertNotIn(ChromeVersion.parse("120.0.6099.9"), version_range)
+    self.assertNotIn(ChromeVersion.parse("M120"), version_range)
+    self.assertIn(ChromeVersion.parse("120.0.6099.10"), version_range)
+    self.assertIn(ChromeVersion.parse("120.0.6099.11"), version_range)
+    self.assertIn(ChromeVersion.parse("M121"), version_range)
+    self.assertIn(ChromeVersion.parse("123.0.0.0"), version_range)
+    self.assertIn(ChromeVersion.parse("M125"), version_range)
+    self.assertIn(ChromeVersion.parse("126.0.6478.49"), version_range)
+    self.assertIn(ChromeVersion.parse("126.0.6478.50"), version_range)
+    self.assertNotIn(ChromeVersion.parse("M126"), version_range)
+    self.assertNotIn(ChromeVersion.parse("126.0.6478.51"), version_range)
+
+  def test_mixed_specificity_same_milestone_range(self) -> None:
+    min_milestone_range = ChromiumVersionRange.any(120, (120, 0, 6099, 50))
+    self.assertIn(ChromeVersion.parse("120.0.0.0"), min_milestone_range)
+    self.assertIn(ChromeVersion.parse("120.0.6099.50"), min_milestone_range)
+    self.assertNotIn(ChromeVersion.parse("120.0.6099.51"), min_milestone_range)
+    self.assertNotIn(ChromeVersion.parse("M120"), min_milestone_range)
+
+    max_milestone_range = ChromiumVersionRange.any((120, 0, 6099, 10), 120)
+    self.assertNotIn(ChromeVersion.parse("120.0.6099.9"), max_milestone_range)
+    self.assertIn(ChromeVersion.parse("120.0.6099.10"), max_milestone_range)
+    self.assertIn(ChromeVersion.parse("120.0.9999.99"), max_milestone_range)
+    self.assertNotIn(ChromeVersion.parse("M120"), max_milestone_range)
+
+  def test_channel_ignored_range(self) -> None:
+    version_range = ChromiumVersionRange.any(120, 126)
+    self.assertFalse(version_range.min.has_channel)
+    self.assertFalse(version_range.max.has_channel)
+    for channel in BrowserVersionChannel:
+      self.assertIn(ChromeVersion((120, 0, 0, 0), channel), version_range)
+      self.assertIn(ChromeVersion((126, 0, 9999, 99), channel), version_range)
+      self.assertNotIn(ChromeVersion((119, 0, 0, 0), channel), version_range)
+      self.assertNotIn(ChromeVersion((127, 0, 0, 0), channel), version_range)
+
+  def test_contains_special_types(self) -> None:
+    version_range = ChromiumVersionRange.any(120, 126)
+    self.assertTrue(version_range.is_compatible_type(ChromeVersion.stable(120)))
+    self.assertFalse(version_range.is_compatible_type(UnknownBrowserVersion()))
+    self.assertFalse(version_range.is_compatible_type("120.0.0.0"))
+    self.assertNotIn(UnknownBrowserVersion(), version_range)
+    self.assertNotIn(ChromeVersion.parse("Chrome Stable"), version_range)
+    safari_version = SafariVersion.parse(
+        SafariBrowserVersionTestCase.STABLE_VERSION_STR)
+    self.assertFalse(version_range.is_compatible_type(safari_version))
+    with self.assertRaises(TypeError):
+      _ = safari_version in version_range
 
 
 # Hide the abstract base test class from all test runner

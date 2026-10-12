@@ -10,7 +10,8 @@ from typing import Final
 from typing_extensions import override
 
 from crossbench.browsers.version import BrowserVersion, \
-    BrowserVersionChannel, PartialBrowserVersionError, VersionParseResult
+    BrowserVersionChannel, BrowserVersionRange, PartialBrowserVersionError, \
+    VersionParseResult
 
 
 class ChromiumVersion(BrowserVersion):
@@ -164,6 +165,14 @@ class ChromiumVersion(BrowserVersion):
     if name := self._CHANNEL_NAME_LOOKUP[channel]:
       return name
     raise ValueError(f"Unsupported channel: {channel}")
+
+
+class ChromiumVersionRange(BrowserVersionRange[ChromiumVersion]):
+
+  @classmethod
+  @override
+  def version_cls(cls) -> type[ChromiumVersion]:
+    return ChromiumVersion
 
 
 class ChromeDriverVersion(ChromiumVersion):

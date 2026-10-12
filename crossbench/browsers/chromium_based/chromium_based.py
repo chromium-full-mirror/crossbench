@@ -13,6 +13,7 @@ from typing_extensions import override
 from crossbench import path as pth
 from crossbench.browsers.browser import Browser
 from crossbench.browsers.browser_helper import convert_flags_to_label
+from crossbench.browsers.chromium.version import ChromiumVersionRange
 from crossbench.browsers.chromium_based import helper
 from crossbench.browsers.version import BrowserVersionChannel
 from crossbench.browsers.viewport import Viewport
@@ -26,31 +27,116 @@ if TYPE_CHECKING:
   from crossbench.flags.base import Flags, FlagsData
   from crossbench.flags.chrome import ChromeFeatures
   from crossbench.flags.js_flags import JSFlags
+  from crossbench.helper.version import VersionPartsData
   from crossbench.runner.groups.session import BrowserSessionRunGroup
+
+
+class VersionedFlag:
+  """Chrome flags restricted to an inclusive ChromiumVersionRange."""
+
+  def __init__(
+      self,
+      *,
+      min: VersionPartsData,
+      max: VersionPartsData,
+      flags: FlagsData | str,
+      comment: str,
+  ) -> None:
+    if not comment.strip():
+      raise ValueError("VersionedFlag requires a non-empty comment.")
+    self._comment: Final[str] = comment
+    self._version_range: Final[ChromiumVersionRange] = ChromiumVersionRange.any(
+        min, max)
+    self._flags: Final[ChromeFlags] = ChromeFlags.parse(flags).freeze()
+    if not self._flags:
+      raise ValueError("VersionedFlag requires at least one flag.")
+
+  @property
+  def version_range(self) -> ChromiumVersionRange:
+    return self._version_range
+
+  @property
+  def min(self) -> ChromiumVersion:
+    return self._version_range.min
+
+  @property
+  def max(self) -> ChromiumVersion:
+    return self._version_range.max
+
+  @property
+  def flags(self) -> ChromeFlags:
+    return self._flags
+
+  @property
+  def comment(self) -> str:
+    return self._comment
+
+  def __str__(self) -> str:
+    return f"{self._version_range}: {self._flags}"
+
+  def __contains__(self, version: BrowserVersion) -> bool:
+    return self.contains(version)
+
+  def contains(self, version: BrowserVersion) -> bool:
+    return self._version_range.contains(version)
+
+
+# Short-term workarounds only: limit temporary flags to specific Chrome
+# version ranges. Prefer feature flags (--disable-features / --enable-features)
+# as they do not require explicit command-line flags for enabling or disabling.
+# Features that interfere with benchmarking should instead use
+# --enable-benchmarking and/or --no-first-run in Chromium as signals to be
+# disabled by default.
+VERSIONED_DEFAULT_FLAGS: Final[tuple[VersionedFlag, ...]] = (
+    VersionedFlag(
+        min=98,
+        max=100,
+        flags="--disable-features=ChromeWhatsNewUI",
+        comment="Versions [M98, M100] don't respect the --no-first-run flag "
+        "and always display a 'What's New' tab on startup.",
+    ),
+    VersionedFlag(
+        min=120,
+        max=126,
+        flags="--disable-search-engine-choice-screen",
+        comment="This could be enabled via feature-flags as well.",
+    ),
+    VersionedFlag(
+        min=141,
+        max=147,
+        flags="--disable-optimization-guide-model-downloads-for-benchmarking",
+        comment="Disable background optimization guide model downloads.",
+    ),
+    VersionedFlag(
+        min=145,
+        max=147,
+        flags="--disable-crashpad-metrics",
+        comment="We do not need crashpad metrics.",
+    ),
+    VersionedFlag(
+        min=156,
+        max=157,
+        flags="--disable-translate-trigger",
+        comment="Disable translate trigger during benchmarking.",
+    ),
+)
 
 
 class ChromiumBased(Browser):
   MIN_HEADLESS_NEW_VERSION: int = 112
   MIN_BENCHMARKING_EXTENSION_FLAG_MILESTONE: Final[int] = 139
+  # Do not add temporary workarounds here; use VERSIONED_DEFAULT_FLAGS instead.
   DEFAULT_FLAGS: tuple[str, ...] = (
       "--no-default-browser-check",
-      "--disable-optimization-guide-model-downloads-for-benchmarking",
       "--disable-component-update",
       "--disable-sync",
       "--no-first-run",
-      # This could be enabled via feature-flags as well.
-      "--disable-search-engine-choice-screen",
-      # We do not need cashpad metrics
-      "--disable-crashpad-metrics",
-      "--disable-translate-trigger",
   )
+  # Do not add temporary workarounds here; use VERSIONED_DEFAULT_FLAGS instead.
   FLAGS_FOR_DISABLING_BACKGROUND_INTERVENTIONS: tuple[str, ...] = (
       "--disable-background-timer-throttling",
       "--disable-renderer-backgrounding",
   )
-  # Versions [M98, M100] don't respect the --no-first-run flag and always
-  # display a "What's New" tab on startup.
-  WHATS_NEW_UI_VERSION_RANGE: Final[range] = range(98, 100 + 1)
 
   @classmethod
   @abc.abstractmethod
@@ -91,19 +177,11 @@ class ChromiumBased(Browser):
     flags: Flags = settings.flags
     js_flags: Flags = settings.js_flags
     self._flags = self.default_flags(self.DEFAULT_FLAGS, self.version.major)
+    self._init_version_flags()
     self._flags.update(flags)
 
     if not settings.extensions:
       self._flags.set("--disable-extensions")
-
-    if self.version.major in self.WHATS_NEW_UI_VERSION_RANGE:
-      whatsnew_ui_feature = "ChromeWhatsNewUI"
-      if not self._flags.features:
-        logging.warning("Disabling %s", whatsnew_ui_feature)
-        self._flags.features.disable(whatsnew_ui_feature)
-      elif whatsnew_ui_feature not in self._flags.features:
-        logging.warning("Browser might show %s, hiding the main tab",
-                        whatsnew_ui_feature)
 
     # Explicitly disable field-trials by default on all chrome flavours:
     # By default field-trials are disabled on non-Chrome branded builds, but
@@ -122,6 +200,11 @@ class ChromiumBased(Browser):
     # Run early validation for conflicting command-line flags.
     self.validate_flags()
     return self._flags
+
+  def _init_version_flags(self) -> None:
+    for version_flag in VERSIONED_DEFAULT_FLAGS:
+      if self.version in version_flag:
+        self._flags.update(version_flag.flags)
 
   def _maybe_disable_gpu_compositing(self) -> None:
     # Chrome Remote Desktop provides no GPU and older chrome versions
