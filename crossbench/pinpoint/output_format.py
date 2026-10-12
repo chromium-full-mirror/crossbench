@@ -7,7 +7,7 @@ from __future__ import annotations
 import csv
 import io
 from enum import StrEnum
-from typing import Any, Iterable, Sequence, TextIO
+from typing import Iterable, Sequence, TextIO
 
 
 class OutputFormat(StrEnum):
@@ -32,7 +32,7 @@ class OutputFormat(StrEnum):
 
 def write_delimited(stream: TextIO,
                     headers: Sequence[str],
-                    rows: Iterable[Sequence[Any]],
+                    rows: Iterable[Sequence[object]],
                     delimiter: str = ",") -> None:
   """Writes rows with headers to stream as delimited CSV/TSV data."""
   writer = csv.writer(stream, delimiter=delimiter)
@@ -41,7 +41,7 @@ def write_delimited(stream: TextIO,
 
 
 def format_delimited(headers: Sequence[str],
-                     rows: Iterable[Sequence[Any]],
+                     rows: Iterable[Sequence[object]],
                      delimiter: str = ",") -> str:
   """Formats rows with headers as a delimited CSV/TSV string."""
   buffer = io.StringIO()

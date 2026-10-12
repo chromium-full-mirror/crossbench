@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from typing import Any, Self
+from typing import TYPE_CHECKING, Self
 
 from typing_extensions import override
 
@@ -14,7 +14,7 @@ from crossbench.cli.config.flags import FlagsConfig
 from crossbench.cli.ui import ui
 from crossbench.config import ConfigObject, ConfigParser
 from crossbench.helper.collection_helper import close_matches_message
-from crossbench.parse import NumberParser
+from crossbench.parse import NumberParser, ObjectParser
 from crossbench.pinpoint import patch_resolver
 from crossbench.pinpoint.benchmarks import all_stories, default_story, \
     is_crossbench_benchmark
@@ -23,6 +23,9 @@ from crossbench.pinpoint.list_benchmarks import fetch_benchmarks
 from crossbench.pinpoint.list_bots import fetch_bots
 from crossbench.pinpoint.list_builds import fetch_builds
 from crossbench.pinpoint.list_stories import fetch_stories
+
+if TYPE_CHECKING:
+  from crossbench.types import JsonDict
 
 
 @dataclasses.dataclass(frozen=True)
@@ -404,7 +407,7 @@ class PinpointTryJobConfig(PinpointJobConfigMixin, ConfigObject):
         bug=resolved_bug,
     )
 
-  def to_request_dict(self) -> dict[str, Any]:
+  def to_request_dict(self) -> JsonDict:
     return {
         "comparison_mode":
             "try",
@@ -439,43 +442,50 @@ class PinpointTryJobConfig(PinpointJobConfigMixin, ConfigObject):
     }
 
   @classmethod
-  def from_response_dict(cls, raw_dict: dict[str, Any]) -> PinpointTryJobConfig:
+  def from_response_dict(cls, raw_dict: JsonDict) -> PinpointTryJobConfig:
     """Returns a valid PinpointTryJobConfig if the server response is valid."""
     comparison_mode = raw_dict.get("comparison_mode")
     if comparison_mode != "try":
       raise ValueError(
           'Invalid comparison mode {comparison_mode} expected "try".')
-    arguments = raw_dict["arguments"]
-
-    def value_or_none(value: Any) -> Any:
-      return value if value else None
+    arguments = ObjectParser.dict(raw_dict["arguments"], "arguments")
 
     # An empty field created from the Web UI is an empty string. Such empty
     # fields are replaced with None to make it possible to convert the result
     # config to JSON and back to PinpointTryJobConfig for creating new jobs.
     return PinpointTryJobConfig(
-        benchmark=arguments["benchmark"],
-        bot=arguments["configuration"],
-        story=value_or_none(arguments.get("story")),
-        story_tags=value_or_none(arguments.get("story_tags")),
+        benchmark=ObjectParser.non_empty_str(arguments["benchmark"],
+                                             "benchmark"),
+        bot=ObjectParser.non_empty_str(arguments["configuration"],
+                                       "configuration"),
+        story=ObjectParser.optional_str(arguments.get("story"), "story"),
+        story_tags=ObjectParser.optional_str(
+            arguments.get("story_tags"), "story_tags"),
         repeat=NumberParser.positive_int(arguments["initial_attempt_count"],
                                          "repeat"),
-        bug=value_or_none(arguments.get("bug_id")),
+        bug=NumberParser.optional_positive_int(arguments.get("bug_id"), "bug"),
         base=VariantConfig(
-            commit=arguments.get("base_git_hash"),
-            patch=value_or_none(arguments.get("base_patch")),
+            commit=ObjectParser.any_str(
+                arguments.get("base_git_hash", ""), "base_git_hash"),
+            patch=ObjectParser.optional_str(
+                arguments.get("base_patch"), "base_patch"),
             flags=cls.parse_extra_browser_args(
-                arguments.get("base_extra_args")),
+                ObjectParser.optional_str(
+                    arguments.get("base_extra_args"), "base_extra_args")),
         ),
         experiment=VariantConfig(
-            commit=arguments.get("end_git_hash"),
-            patch=value_or_none(arguments.get("experiment_patch")),
+            commit=ObjectParser.any_str(
+                arguments.get("end_git_hash", ""), "end_git_hash"),
+            patch=ObjectParser.optional_str(
+                arguments.get("experiment_patch"), "experiment_patch"),
             flags=cls.parse_extra_browser_args(
-                arguments.get("experiment_extra_args")),
+                ObjectParser.optional_str(
+                    arguments.get("experiment_extra_args"),
+                    "experiment_extra_args")),
         ),
     )
 
-  def to_dict(self) -> dict[str, Any]:
+  def to_dict(self) -> JsonDict:
     result = dataclasses.asdict(self)
     result["base"]["flags"] = self.base.flags_as_str()
     result["experiment"]["flags"] = self.experiment.flags_as_str()
@@ -654,7 +664,7 @@ class PinpointBisectJobConfig(PinpointJobConfigMixin, ConfigObject):
         bug=resolved_bug,
     )
 
-  def to_request_dict(self) -> dict[str, Any]:
+  def to_request_dict(self) -> JsonDict:
     return {
         "comparison_mode":
             "performance",
@@ -684,40 +694,43 @@ class PinpointBisectJobConfig(PinpointJobConfigMixin, ConfigObject):
     }
 
   @classmethod
-  def from_response_dict(cls, raw_dict: dict[str,
-                                             Any]) -> PinpointBisectJobConfig:
+  def from_response_dict(cls, raw_dict: JsonDict) -> PinpointBisectJobConfig:
     """Returns a valid PinpointBisectJobConfig if the server response is
     valid."""
     comparison_mode = raw_dict.get("comparison_mode")
     if comparison_mode != "performance":
       raise ValueError(
           f'Invalid comparison mode {comparison_mode} expected "performance".')
-    arguments = raw_dict["arguments"]
-
-    def value_or_none(value: Any) -> Any:
-      return value if value else None
+    arguments = ObjectParser.dict(raw_dict["arguments"], "arguments")
 
     # An empty field created from the Web UI is an empty string. Such empty
     # fields are replaced with None to make it possible to convert the result
     # config to JSON and back to PinpointBisectJobConfig for creating new jobs.
     return PinpointBisectJobConfig(
-        benchmark=arguments["benchmark"],
-        bot=arguments["configuration"],
-        chart=arguments["chart"],
-        story=value_or_none(arguments.get("story")),
-        story_tags=value_or_none(arguments.get("story_tags")),
+        benchmark=ObjectParser.non_empty_str(arguments["benchmark"],
+                                             "benchmark"),
+        bot=ObjectParser.non_empty_str(arguments["configuration"],
+                                       "configuration"),
+        chart=ObjectParser.non_empty_str(arguments["chart"], "chart"),
+        story=ObjectParser.optional_str(arguments.get("story"), "story"),
+        story_tags=ObjectParser.optional_str(
+            arguments.get("story_tags"), "story_tags"),
         repeat=NumberParser.positive_int(arguments["initial_attempt_count"],
                                          "repeat"),
-        bug=value_or_none(arguments.get("bug_id")),
+        bug=NumberParser.optional_positive_int(arguments.get("bug_id"), "bug"),
         start=BisectStartVariantConfig(
-            commit=arguments.get("start_git_hash"),
+            commit=ObjectParser.any_str(
+                arguments.get("start_git_hash", ""), "start_git_hash"),
             flags=cls.parse_extra_browser_args(
-                arguments.get("extra_test_args")),
+                ObjectParser.optional_str(
+                    arguments.get("extra_test_args"), "extra_test_args")),
         ),
-        end=BisectEndVariantConfig(commit=arguments.get("end_git_hash")),
+        end=BisectEndVariantConfig(
+            commit=ObjectParser.any_str(
+                arguments.get("end_git_hash", ""), "end_git_hash")),
     )
 
-  def to_dict(self) -> dict[str, Any]:
+  def to_dict(self) -> JsonDict:
     result = dataclasses.asdict(self)
     result["start"]["flags"] = self.start.flags_as_str()
     result["end"]["flags"] = self.end.flags_as_str()

@@ -5,15 +5,18 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING
 
 from crossbench.pinpoint import http_requests
 from crossbench.pinpoint.api import PINPOINT_JOB_API_URL_TEMPLATE
 from crossbench.pinpoint.config import PinpointTryJobConfig
 from crossbench.pinpoint.helper import annotate
 
+if TYPE_CHECKING:
+  from crossbench.types import JsonDict
 
-def fetch_job_config(job_id: str, full: bool = False) -> dict[str, Any]:
+
+def fetch_job_config(job_id: str, full: bool = False) -> JsonDict:
   """Fetches the configuration for a specific Pinpoint job."""
   url = PINPOINT_JOB_API_URL_TEMPLATE.format(job_id=job_id)
   params = {}
@@ -25,8 +28,7 @@ def fetch_job_config(job_id: str, full: bool = False) -> dict[str, Any]:
     return response.json()
 
 
-def convert_job_config(config_dict: dict[str, Any],
-                       raw: bool = False) -> dict[str, Any]:
+def convert_job_config(config_dict: JsonDict, raw: bool = False) -> JsonDict:
   if raw or config_dict.get("comparison_mode") != "try":
     return config_dict
 

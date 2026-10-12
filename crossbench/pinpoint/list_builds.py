@@ -7,7 +7,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Sequence, TypedDict
 
 import requests
 from tabulate import tabulate
@@ -21,6 +21,21 @@ from crossbench.pinpoint.list_bots import fetch_bots
 
 if TYPE_CHECKING:
   from crossbench.types import TableData
+
+  class GitilesCommitJson(TypedDict, total=False):
+    id: str
+
+  class BuildInputJson(TypedDict, total=False):
+    gitilesCommit: GitilesCommitJson
+
+  class BuildJson(TypedDict, total=False):
+    status: str
+    number: int
+    input: BuildInputJson
+    endTime: str
+
+  class BuildsResponseJson(TypedDict):
+    builds: Sequence[BuildJson]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -63,7 +78,7 @@ def fetch_builds(bot: str) -> list[Build]:
       raise
 
 
-def _convert_json_to_builds(builds_json: dict[str, Any]) -> list[Build]:
+def _convert_json_to_builds(builds_json: BuildsResponseJson) -> list[Build]:
   builds = []
   for build in builds_json["builds"]:
     if build.get("status") != "SUCCESS":

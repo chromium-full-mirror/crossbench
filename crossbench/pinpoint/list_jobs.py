@@ -8,7 +8,7 @@ import itertools
 import json
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Final, Sequence
 
 import yaml
 from immutabledict import immutabledict
@@ -24,7 +24,7 @@ from crossbench.pinpoint.output_format import OutputFormat, write_delimited
 from crossbench.pinpoint.user import UserEnum
 
 if TYPE_CHECKING:
-  from crossbench.types import TableData
+  from crossbench.types import JsonDict, TableData
 
 
 class Column:
@@ -98,7 +98,7 @@ def list_jobs(
                            emails_to_query)
     jobs = list(itertools.chain.from_iterable(results))
 
-  jobs.sort(key=lambda job: job.get("created", ""), reverse=True)
+  jobs.sort(key=lambda job: str(job.get("created", "")), reverse=True)
 
   if not jobs:
     print("No jobs found.")
@@ -125,8 +125,8 @@ def _get_user_email() -> str:
     return response.json()["email"]
 
 
-def _fetch_jobs(number: int, email: str | None = None) -> list[dict[str, Any]]:
-  jobs = []
+def _fetch_jobs(number: int, email: str | None = None) -> list[JsonDict]:
+  jobs: list[JsonDict] = []
   next_cursor = None
   params = {}
   if email:
@@ -151,7 +151,7 @@ def _fetch_jobs(number: int, email: str | None = None) -> list[dict[str, Any]]:
 
 
 def _prepare_job_list_data(
-    jobs: list[dict[str, Any]],
+    jobs: Sequence[JsonDict],
     all_users: bool,
     extra_columns: OrderedSet[str],
     url_source: UrlSource = UrlSource.LESZEK_PERF,
@@ -201,7 +201,7 @@ def _prepare_job_row(
 
 
 def _display_jobs(
-    jobs: list[dict[str, Any]],
+    jobs: Sequence[JsonDict],
     output_format: OutputFormat,
     all_users: bool,
     truncate: int | None,
@@ -226,7 +226,7 @@ def _display_jobs(
 
 
 def _display_jobs_as_table(headers: list[str], rows: TableData,
-                           job_infos: list[PinpointJobInfo],
+                           job_infos: Sequence[PinpointJobInfo],
                            max_length: int | None) -> None:
   table_data: TableData = [
       [truncate(cell, max_length) for cell in row] for row in rows
@@ -251,6 +251,7 @@ def _format_link(url: str) -> str:
   osc8_start = "\x1b]8;;"
   osc8_end = "\x1b\\"
   return f"{osc8_start}{url}{osc8_end}{text}{osc8_start}{osc8_end}"
+
 
 def truncate(text: str, max_length: int | None = None) -> str:
   text = str(text)

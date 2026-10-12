@@ -8,7 +8,7 @@ import datetime as dt
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import cache, partial
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Callable
 from urllib.parse import urlparse
 
 import google.cloud.storage as gcloud_storage  # type: ignore
@@ -16,11 +16,13 @@ import google.cloud.storage as gcloud_storage  # type: ignore
 from crossbench import path as pth
 from crossbench import plt
 from crossbench.cli.ui import ui
+from crossbench.parse import ObjectParser
 from crossbench.pinpoint.helper import annotate
 from crossbench.pinpoint.job_config import fetch_job_config
 
 if TYPE_CHECKING:
   from crossbench.helper.spinner import Spinner
+  from crossbench.types import JsonDict
 
 
 class PinpointJobResults:
@@ -30,16 +32,18 @@ class PinpointJobResults:
       job_id: str,
   ) -> None:
     self.job_id: str = job_id
-    self.data: dict[str, Any] = fetch_job_config(job_id, full=True)
+    self.data: JsonDict = fetch_job_config(job_id, full=True)
     with annotate("Parsing job results"):
       if self.status.lower() != "completed":
         raise ValueError(f"Job is not completed. Status: {self.status}")
 
       self.name: str = f"pinpoint_{self.benchmark}_{self.bot}"
-      self.results_url: str | None = self.data.get("results_url")
+      self.results_url: str | None = ObjectParser.optional_str(
+          self.data.get("results_url"), "results_url")
+      state = ObjectParser.sequence(self.data.get("state", ()), "state")
       self.variants: list[PinpointVariantResults] = [
-          PinpointVariantResults(v, i)
-          for i, v in enumerate(self.data.get("state", []))
+          PinpointVariantResults(ObjectParser.dict(v, f"state[{i}]"), i)
+          for i, v in enumerate(state)
       ]
 
       self.download_index = 0
@@ -47,25 +51,27 @@ class PinpointJobResults:
       self.download_count += sum(v.download_count for v in self.variants)
 
   @property
-  def arguments(self) -> dict[str, Any]:
-    return self.data.get("arguments", {})
+  def arguments(self) -> JsonDict:
+    return ObjectParser.dict(self.data.get("arguments", {}), "arguments")
 
   @property
   def benchmark(self) -> str:
-    return self.arguments.get("benchmark", "")
+    return ObjectParser.any_str(
+        self.arguments.get("benchmark", ""), "benchmark")
 
   @property
   def bot(self) -> str:
-    return self.arguments.get("configuration", "")
+    return ObjectParser.any_str(
+        self.arguments.get("configuration", ""), "configuration")
 
   @property
   def status(self) -> str:
-    return self.data["status"]
+    return ObjectParser.non_empty_str(self.data["status"], "status")
 
   @property
   @cache
   def created_date(self) -> str:
-    time_str = self.data.get("created", "")
+    time_str = ObjectParser.any_str(self.data.get("created", ""), "created")
     try:
       dt_object = dt.datetime.fromisoformat(time_str.replace("Z", "+00:00"))
       return dt_object.strftime("%Y-%m-%d_%H%M%S")
@@ -167,39 +173,43 @@ class PinpointJobResults:
 
 class PinpointVariantResults:
 
-  def __init__(self, data: dict[str, Any], index: int) -> None:
+  def __init__(self, data: JsonDict, index: int) -> None:
     self.data = data
     self.index = index
     self.name = self.form_variant_name()
+    attempts = ObjectParser.sequence(data.get("attempts", ()), "attempts")
     self.attempts = [
-        PinpointAttemptResults(attempt, index)
-        for index, attempt in enumerate(data.get("attempts", []))
+        PinpointAttemptResults(
+            ObjectParser.dict(attempt, f"attempts[{attempt_index}]"),
+            attempt_index) for attempt_index, attempt in enumerate(attempts)
     ]
     self.download_count = sum(a.download_count for a in self.attempts)
 
   @property
-  def change(self) -> dict[str, Any]:
-    return self.data.get("change", {})
+  def change(self) -> JsonDict:
+    return ObjectParser.dict(self.data.get("change", {}), "change")
 
   def form_variant_name(self) -> str:
-    if label := self.change.get("label"):
+    if label := ObjectParser.optional_str(self.change.get("label"), "label"):
       return label
 
     parts = []
-    for commit in self.change.get("commits", []):
+    commits = ObjectParser.sequence(self.change.get("commits", ()), "commits")
+    for i, raw_commit in enumerate(commits):
+      commit = ObjectParser.dict(raw_commit, f"commits[{i}]")
       parts.append(commit.get("repository"))
       parts.append(commit.get("commit_position"))
 
-    parts = [str(part) for part in parts if part]
-    if parts:
-      return "_".join(parts)
+    str_parts = [str(part) for part in parts if part]
+    if str_parts:
+      return "_".join(str_parts)
 
     return f"variant_{self.index}"
 
 
 class PinpointAttemptResults:
 
-  def __init__(self, data: dict[str, Any], index: int) -> None:
+  def __init__(self, data: JsonDict, index: int) -> None:
     self.data = data
     self.index = index
     self.cas_isolate = self.find_results_isolate()
@@ -210,16 +220,27 @@ class PinpointAttemptResults:
       self.download_count += 1
 
   @property
-  def executions(self) -> list[dict[str, Any]]:
-    return self.data.get("executions", [])
+  def executions(self) -> list[JsonDict]:
+    raw_executions = ObjectParser.sequence(
+        self.data.get("executions", ()), "executions")
+    return [
+        ObjectParser.dict(e, f"executions[{i}]")
+        for i, e in enumerate(raw_executions)
+    ]
 
   def find_results_isolate(self) -> str | None:
     if len(self.executions) < 2:
       return None
 
-    for details in self.executions[1].get("details", []):
-      if details.get("key") == "isolate" and details.get("value"):
-        return details.get("value")
+    raw_details = ObjectParser.sequence(self.executions[1].get("details", ()),
+                                        "details")
+    for i, raw_detail in enumerate(raw_details):
+      details = ObjectParser.dict(raw_detail, f"details[{i}]")
+      if details.get("key") != "isolate":
+        continue
+      if value := ObjectParser.optional_str(
+          details.get("value"), "isolate value"):
+        return value
 
     return None
 
@@ -228,12 +249,17 @@ class PinpointAttemptResults:
     if len(self.executions) < 3:
       return url_by_name
 
-    for index, details in enumerate(self.executions[2].get("details", [])):
-      if details.get("key") == "trace" and details.get("url"):
+    raw_details = ObjectParser.sequence(self.executions[2].get("details", ()),
+                                        "details")
+    for index, raw_detail in enumerate(raw_details):
+      details = ObjectParser.dict(raw_detail, f"details[{index}]")
+      if details.get("key") != "trace":
+        continue
+      if url := ObjectParser.optional_str(details.get("url"), "trace url"):
         name = str(details.get("value", index))
         if not name.endswith(".pb"):
           name += ".pb"
-        url_by_name[name] = details.get("url")
+        url_by_name[name] = url
     return url_by_name
 
 

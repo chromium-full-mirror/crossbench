@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from crossbench.pinpoint import http_requests
 from crossbench.pinpoint.api import PINPOINT_START_JOB_API_URL
@@ -15,15 +15,16 @@ from crossbench.pinpoint.job_info import UrlSource
 if TYPE_CHECKING:
   from crossbench.pinpoint.config import PinpointBisectJobConfig, \
       PinpointTryJobConfig
+  from crossbench.types import JsonDict
 
 
 def _print_started_job(
-    data: dict[str, Any],
+    data: JsonDict,
     url_source: UrlSource = UrlSource.LESZEK_PERF,
 ) -> None:
   if job_id := data.get("jobId"):
     data = dict(data)
-    data.setdefault("shortJobUrl", url_source.format_short_job_url(job_id))
+    data.setdefault("shortJobUrl", url_source.format_short_job_url(str(job_id)))
   print(json.dumps(data, indent=2))
 
 

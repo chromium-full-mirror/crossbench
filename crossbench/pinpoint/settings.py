@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, replace
-from typing import Any
+from typing import TYPE_CHECKING
 
 import platformdirs
 
@@ -14,6 +14,9 @@ from crossbench import path as pth
 from crossbench.config import ConfigObject, ConfigParser
 from crossbench.parse import ObjectParser
 from crossbench.pinpoint.helper import annotate
+
+if TYPE_CHECKING:
+  from crossbench.types import JsonDict
 
 
 class Settings:
@@ -52,10 +55,10 @@ class Settings:
     self._update_dirty(self._config.collect_metrics, value)
     self._config = replace(self._config, collect_metrics=value)
 
-  def _update_dirty(self, before: Any, after: Any) -> None:
+  def _update_dirty(self, before: object, after: object) -> None:
     self._dirty = before != after or self._dirty
 
-  def to_dict(self) -> dict[str, Any]:
+  def to_dict(self) -> JsonDict:
     return self._config.to_dict()
 
   def save(self) -> None:
@@ -102,5 +105,5 @@ class _SettingsConfig(ConfigObject):
   def parse_str(cls, value: str) -> _SettingsConfig:
     raise NotImplementedError
 
-  def to_dict(self) -> dict[str, Any]:
+  def to_dict(self) -> JsonDict:
     return asdict(self)

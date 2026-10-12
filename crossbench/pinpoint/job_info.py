@@ -8,7 +8,7 @@ import argparse
 import contextlib
 import dataclasses
 import enum
-from typing import TYPE_CHECKING, Any, Final, TypeVar, cast
+from typing import TYPE_CHECKING, Final, Sequence, TypeVar
 
 from immutabledict import immutabledict
 
@@ -36,7 +36,7 @@ class JobStatus(enum.StrEnum):
   FAILED = "failed"
 
   @classmethod
-  def parse(cls, value: Any) -> JobStatus | None:
+  def parse(cls, value: object) -> JobStatus | None:
     if isinstance(value, cls):
       return value
     if not isinstance(value, str):
@@ -87,7 +87,7 @@ class ComparisonMode(enum.StrEnum):
   TRY = "try"
 
   @classmethod
-  def parse(cls, value: Any) -> ComparisonMode | None:
+  def parse(cls, value: object) -> ComparisonMode | None:
     if isinstance(value, cls):
       return value
     if not isinstance(value, str):
@@ -157,7 +157,7 @@ class PinpointJobInfo:
   differences: int | None = None
   results_url: str | None = None
   cancel_reason: str | None = None
-  raw_data: dict[str, Any] = dataclasses.field(
+  raw_data: JsonDict = dataclasses.field(
       default_factory=dict, repr=False, compare=False)
 
   @classmethod
@@ -172,8 +172,8 @@ class PinpointJobInfo:
       cls,
       data: JsonDict,
       *keys: str,
-      default: _DefaultT = cast(Any, None),
-  ) -> str | _DefaultT:
+      default: _DefaultT | None = None,
+  ) -> str | _DefaultT | None:
     arguments = cls._parse_arguments(data)
     for key in keys:
       val = arguments.get(key)
@@ -186,7 +186,7 @@ class PinpointJobInfo:
     return default
 
   @classmethod
-  def _is_execution_completed(cls, execution: Any) -> bool:
+  def _is_execution_completed(cls, execution: object) -> bool:
     if not isinstance(execution, dict):
       return False
     return bool(execution.get("completed") or execution.get("result"))
@@ -201,7 +201,7 @@ class PinpointJobInfo:
     return any(cls._is_execution_completed(e) for e in executions)
 
   @classmethod
-  def _parse_completed_attempts_counts(cls, state: list[Any]) -> int:
+  def _parse_completed_attempts_counts(cls, state: Sequence[object]) -> int:
     completed_attempts = 0
     for variant in state:
       if not isinstance(variant, dict):
@@ -279,7 +279,7 @@ class PinpointJobInfo:
                                    completed_attempts)
 
   @classmethod
-  def _parse_datetime(cls, value: Any) -> dt.datetime | None:
+  def _parse_datetime(cls, value: object) -> dt.datetime | None:
     with contextlib.suppress(argparse.ArgumentTypeError):
       return ObjectParser.optional_datetime(value)
     return None
