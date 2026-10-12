@@ -25,16 +25,22 @@ code and look for better approaches.
 
 ## Multi-Line Imports
 
-- Multi-line imports **must** use backslash (`\`) line continuations, not
-  parentheses.
+- Multi-line imports use backslash (`\`) line continuations (`isort`
+  `multi_line_output = 2`), not parentheses. You can rely 100% on `isort` in
+  `PRESUBMIT.py` to enforce this.
 - **Never** suggest parentheses `(...)` for multi-line imports, and never cite
-  PEP 8 or the Google Python Style Guide to do so. Crossbench conventions
-  strictly enforce backslashes for multi-line imports.
+  PEP 8 or the Google Python Style Guide to do so.
+- **Never** flag indented import continuation lines (e.g.
+  `    Iterable, Sequence, TypeAlias, TypeGuard, TypeVar, cast`) or assume that
+  unseen surrounding lines use parentheses: review diffs only show modified
+  lines (omitting the preceding `from ... import ..., \` line), and the final
+  line of a backslash-continued import does not end with `\`.
 
 ```python
-# GOOD: Crossbench convention uses backslashes for multi-line imports
-from crossbench.plt.display_info import \
-    DisplayRefreshRateResult, \
+# GOOD: Crossbench convention (isort multi_line_output = 2) uses backslashes
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Final, Generic, \
+    Iterable, Sequence, TypeAlias, TypeGuard, TypeVar, cast
+from crossbench.plt.display_info import DisplayRefreshRateResult, \
     DisplayResolution
 
 # BAD: Do NOT use or suggest parentheses for multi-line imports
