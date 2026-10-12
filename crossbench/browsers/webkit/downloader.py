@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, ClassVar, Final, Iterable, Mapping
 
 from typing_extensions import override
 
-from crossbench.browsers.downloader import Downloader
+from crossbench.browsers.downloader import ArchiveUrlCandidate, Downloader
 from crossbench.browsers.webkit.version import WebKitVersion
 
 if TYPE_CHECKING:
@@ -95,7 +95,7 @@ class WebKitDownloaderMacOS(WebKitDownloader):
     pass
 
   @override
-  def _find_archive_url(self) -> tuple[BrowserVersion, str | None]:
+  def _find_archive_url(self) -> ArchiveUrlCandidate:
     if not self.requested_version.is_complete:
       raise NotImplementedError(
           "Only full webkit version identifiers are supported.")
@@ -118,11 +118,10 @@ class WebKitDownloaderMacOS(WebKitDownloader):
     shutil.move(os.fspath(candidate), os.fspath(self._archive_path))
 
   @override
-  def _archive_urls(
-      self, folder_url: str,
-      version: BrowserVersion) -> Iterable[tuple[BrowserVersion, str]]:
+  def _archive_urls(self, folder_url: str,
+                    version: BrowserVersion) -> Iterable[ArchiveUrlCandidate]:
     archive_name = f"{version.parts_str}@main{self.ARCHIVE_SUFFIX}"
-    return ((version, f"{folder_url}{archive_name}"),)
+    return (ArchiveUrlCandidate(version, f"{folder_url}{archive_name}"),)
 
   @override
   def _installed_app_path(self) -> pth.LocalPath:

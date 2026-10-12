@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING, ClassVar, Final, Iterable
 
 from typing_extensions import override
 
-from crossbench.browsers.downloader import DMGArchiveHelper, Downloader
+from crossbench.browsers.downloader import ArchiveUrlCandidate, \
+    DMGArchiveHelper, Downloader
 from crossbench.browsers.firefox.version import FirefoxVersion
 from crossbench.helper import url_helper
 
@@ -91,13 +92,13 @@ class FirefoxDownloader(Downloader):
     pass
 
   @override
-  def _find_archive_url(self) -> tuple[BrowserVersion, str | None]:
+  def _find_archive_url(self) -> ArchiveUrlCandidate:
     # Quick probe for complete versions
     if self.requested_version.is_complete:
       return self._find_exact_archive_url()
     raise NotImplementedError("Only full-release versions supported.")
 
-  def _find_exact_archive_url(self) -> tuple[BrowserVersion, str | None]:
+  def _find_exact_archive_url(self) -> ArchiveUrlCandidate:
     folder_url = (
         f"{self.STORAGE_URL}{self.requested_version.parts_str}/mac/en-GB")
     return next(iter(self._archive_urls(folder_url, self.requested_version)))
@@ -136,10 +137,10 @@ class FirefoxDownloaderLinux(FirefoxDownloader):
     return self._extracted_path() / "firefox-bin"
 
   @override
-  def _archive_urls(
-      self, folder_url: str,
-      version: BrowserVersion) -> Iterable[tuple[BrowserVersion, str]]:
-    return ((version, f"{folder_url}/firefox-{version.parts_str}.tar.bz2"),)
+  def _archive_urls(self, folder_url: str,
+                    version: BrowserVersion) -> Iterable[ArchiveUrlCandidate]:
+    return (ArchiveUrlCandidate(
+        version, f"{folder_url}/firefox-{version.parts_str}.tar.bz2"),)
 
   @override
   def _install_archive(self, archive_path: pth.LocalPath) -> None:
@@ -177,11 +178,10 @@ class FirefoxDownloaderMacOS(FirefoxDownloader):
     super()._download_archive(archive_url, tmp_dir)
 
   @override
-  def _archive_urls(
-      self, folder_url: str,
-      version: BrowserVersion) -> Iterable[tuple[BrowserVersion, str]]:
+  def _archive_urls(self, folder_url: str,
+                    version: BrowserVersion) -> Iterable[ArchiveUrlCandidate]:
     archive_name = url_helper.quote(f"firefox {version.parts_str}.dmg")
-    return ((version, f"{folder_url}/{archive_name}"),)
+    return (ArchiveUrlCandidate(version, f"{folder_url}/{archive_name}"),)
 
   @override
   def _extracted_path(self) -> pth.LocalPath:

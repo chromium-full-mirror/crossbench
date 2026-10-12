@@ -11,7 +11,7 @@ import plistlib
 import re
 import shutil
 import tempfile
-from typing import TYPE_CHECKING, ClassVar, Final, Iterable
+from typing import TYPE_CHECKING, ClassVar, Final, Iterable, NamedTuple
 
 from typing_extensions import override
 
@@ -21,6 +21,11 @@ from crossbench.cli.ui import ui
 
 if TYPE_CHECKING:
   from crossbench.plt.base import Platform
+
+
+class ArchiveUrlCandidate(NamedTuple):
+  version: BrowserVersion
+  url: str | None = None
 
 
 class IncompatibleVersionError(ValueError):
@@ -251,7 +256,7 @@ class Downloader(abc.ABC):
              "might have been auto-updated.\n")
     else:
       logging.debug("Validating installed milestone %s", requested_version)
-      latest_milestone_version, _ = self._find_archive_url()
+      latest_milestone_version = self._find_archive_url().version
       if cached_version == latest_milestone_version:
         return cached_version
       msg = (f"Previously downloaded browser at {app_path} "
@@ -264,13 +269,12 @@ class Downloader(abc.ABC):
     raise IncompatibleVersionError(msg)
 
   @abc.abstractmethod
-  def _find_archive_url(self) -> tuple[BrowserVersion, str | None]:
+  def _find_archive_url(self) -> ArchiveUrlCandidate:
     pass
 
   @abc.abstractmethod
-  def _archive_urls(
-      self, folder_url: str,
-      version: BrowserVersion) -> Iterable[tuple[BrowserVersion, str]]:
+  def _archive_urls(self, folder_url: str,
+                    version: BrowserVersion) -> Iterable[ArchiveUrlCandidate]:
     pass
 
   @abc.abstractmethod
