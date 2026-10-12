@@ -7,7 +7,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import enum
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Self
 
 from typing_extensions import override
 
@@ -54,7 +54,7 @@ class NetworkSpeedConfig(ConfigObject):
 
   @classmethod
   @override
-  def parse(cls, value: Any, **kwargs) -> Self:
+  def parse(cls, value: object, **kwargs) -> Self:
     if isinstance(value, NetworkSpeedPreset):
       return cls.parse_preset(value)
     return super().parse(value, **kwargs)

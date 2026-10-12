@@ -9,8 +9,8 @@ import argparse
 import contextlib
 import dataclasses
 import logging
-from typing import TYPE_CHECKING, Any, Final, Iterator, Mapping, Self, \
-    Sequence, TextIO
+from typing import TYPE_CHECKING, Final, Iterator, Mapping, Self, Sequence, \
+    TextIO
 
 from typing_extensions import override
 
@@ -162,7 +162,7 @@ class BaseBrowserVariantsConfig(abc.ABC):
     return f"{name}_{convert_flags_to_label(*flags)}"
 
   def _create_unique_variant_labels(
-      self, name: str, raw_browser_data: str | dict[str, Any],
+      self, name: str, raw_browser_data: str | dict[str, object],
       flag_variants: FlagsGroupConfig) -> dict[FlagsVariantConfig, str]:
     labels_lookup: dict[FlagsVariantConfig, str] = {}
     group_labels: set[str] = {variant.label for variant in flag_variants}
@@ -171,7 +171,7 @@ class BaseBrowserVariantsConfig(abc.ABC):
     for variant in flag_variants:
       label = name
       if isinstance(raw_browser_data, dict):
-        label = raw_browser_data.get("label", name)
+        label = str(raw_browser_data.get("label", name))
       if len(flag_variants) > 1:
         if use_unique_variant_label:
           label = f"{name}_{variant.label}"
@@ -188,12 +188,12 @@ class BaseBrowserVariantsConfig(abc.ABC):
     return True
 
   def _validate_flags(self, browser_name: str,
-                      flag_group_names: list[str]) -> None:
+                      flag_group_names: object) -> list[str]:
     if isinstance(flag_group_names, str):
       flag_group_names = [flag_group_names]
     if not isinstance(flag_group_names, list):
       raise ConfigError(f"'flags' is not a list for browser={browser_name!r}")
-    ObjectParser.unique_sequence(flag_group_names, error_cls=ConfigError)
+    return ObjectParser.unique_sequence(flag_group_names, error_cls=ConfigError)
 
   @classmethod
   def get_browser_cls(cls, browser_config: BrowserConfig) -> type[Browser]:
@@ -453,7 +453,7 @@ class BrowserVariantsConfigDict(BaseBrowserVariantsConfig):
     return config_variants
 
   def __init__(self,
-               raw_config_data: dict[str, Any] | None = None,
+               raw_config_data: dict[str, object] | None = None,
                browser_lookup_override: BrowserLookupTableT | None = None,
                args: argparse.Namespace | None = None) -> None:
     super().__init__(browser_lookup_override)
@@ -475,7 +475,7 @@ class BrowserVariantsConfigDict(BaseBrowserVariantsConfig):
       with exception.annotate(f"Parsing config file: {f.name}"):
         self.parse_dict(config, args)
 
-  def parse_dict(self, config: dict[str, Any],
+  def parse_dict(self, config: dict[str, object],
                  args: argparse.Namespace) -> None:
     with exception.annotate(
         f"Parsing {type(self).__name__} dict", throw_cls=ConfigError):
@@ -487,29 +487,31 @@ class BrowserVariantsConfigDict(BaseBrowserVariantsConfig):
       if not config["browsers"]:
         raise ConfigError("Config contains empty 'browsers' dict.")
       with exception.annotate("Parsing config['browsers']"):
-        self._parse_browsers(config["browsers"], args)
+        browsers_data = ObjectParser.dict(config["browsers"], "browsers")
+        self._parse_browsers(browsers_data, args)
 
-  def _parse_browsers(self, data: dict[str, Any],
+  def _parse_browsers(self, data: dict[str, object],
                       args: argparse.Namespace) -> None:
     for name, browser_config in data.items():
       with exception.annotate(f"Parsing browsers[{name!r}]"):
         self._parse_browser(name, browser_config, args)
 
-  def _parse_browser(self, name: str, raw_browser_data: Any,
+  def _parse_browser(self, name: str, raw_browser_data: object,
                      args: argparse.Namespace) -> None:
     if not isinstance(raw_browser_data, (dict, str)):
       raise argparse.ArgumentTypeError(
           f"Expected str or dict, got {type(raw_browser_data).__name__}: "
           f"{raw_browser_data!r}")
 
-    path_or_identifier: str | None = None
+    path_or_identifier: object = None
     if isinstance(raw_browser_data, dict):
       path_or_identifier = raw_browser_data.get("path")
     else:
       path_or_identifier = raw_browser_data
     browser_cls: type[Browser] | None = None
-    if path_or_identifier and (path_or_identifier
-                               in self._browser_lookup_override):
+    if isinstance(path_or_identifier,
+                  str) and (path_or_identifier
+                            in self._browser_lookup_override):
       browser_cls, browser_config = self._browser_lookup_override[
           path_or_identifier]
     else:
@@ -538,7 +540,7 @@ class BrowserVariantsConfigDict(BaseBrowserVariantsConfig):
 
   def _get_browser_variants(
       self, args: argparse.Namespace, browser_name: str,
-      raw_browser_data: str | dict[str, Any]) -> FlagsGroupConfig:
+      raw_browser_data: str | dict[str, object]) -> FlagsGroupConfig:
     default_variant = FlagsVariantConfig(DEFAULT_LABEL)
     flag_variants = FlagsGroupConfig((default_variant,))
     if not isinstance(raw_browser_data, dict):
@@ -561,11 +563,9 @@ class BrowserVariantsConfigDict(BaseBrowserVariantsConfig):
     return flag_variants
 
   def _parse_browser_flags(self, browser_name: str,
-                           data: dict[str, Any]) -> list[FlagsGroupConfig]:
-    flag_group_names = data.get("flags", [])
-    if isinstance(flag_group_names, str):
-      flag_group_names = [flag_group_names]
-    self._validate_flags(browser_name, flag_group_names)
+                           data: dict[str, object]) -> list[FlagsGroupConfig]:
+    raw_flag_group_names = data.get("flags", [])
+    flag_group_names = self._validate_flags(browser_name, raw_flag_group_names)
     inline_flags = Flags()
     flag_groups: list[FlagsGroupConfig] = []
     for flag_group_name in flag_group_names:

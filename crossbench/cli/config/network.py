@@ -8,7 +8,7 @@ import argparse
 import dataclasses
 import enum
 import functools
-from typing import TYPE_CHECKING, Any, ClassVar, Self
+from typing import TYPE_CHECKING, ClassVar, Self
 
 from typing_extensions import override
 
@@ -162,14 +162,14 @@ class NetworkConfig(ConfigObject):
     return cls.default()
 
   @classmethod
-  def parse_wpr(cls, value: Any) -> Self:
+  def parse_wpr(cls, value: object) -> Self:
     config = cls.parse(value)
     if config.type != NetworkType.WPR:
       raise argparse.ArgumentTypeError(f"Expected wpr, but got {config.type}")
     return config
 
   @classmethod
-  def parse_local(cls, value: Any) -> Self:
+  def parse_local(cls, value: object) -> Self:
     config: Self = cls.parse(value, type=NetworkType.LOCAL)
     if config.type != NetworkType.LOCAL:
       raise argparse.ArgumentTypeError(
@@ -193,7 +193,7 @@ class NetworkConfig(ConfigObject):
     return cls.parse_live(value)
 
   @classmethod
-  def parse_live(cls, value: Any) -> Self:
+  def parse_live(cls, value: object) -> Self:
     with exception.annotate_argparsing("Live network with speed config"):
       speed = NetworkSpeedConfig.parse(value)
       return cls(NetworkType.LIVE, speed)

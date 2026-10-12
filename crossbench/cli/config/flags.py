@@ -8,7 +8,7 @@ import argparse
 import dataclasses
 import functools
 import logging
-from typing import TYPE_CHECKING, Any, Final, Iterable, Self, Sequence
+from typing import TYPE_CHECKING, Final, Iterable, Self, Sequence, TypeAlias
 
 from immutabledict import immutabledict
 from ordered_set import OrderedSet
@@ -24,10 +24,12 @@ from crossbench.parse import ObjectParser
 if TYPE_CHECKING:
   from crossbench.flags.base import Flags, FlagsData
 
+  RawFlagsData: TypeAlias = str | list | tuple | FlagsData | None
+
 DEFAULT_LABEL: Final[str] = "default"
 
 
-def _parse_flags(flag_data: str | list | tuple | FlagsData | None) -> Flags:
+def _parse_flags(flag_data: RawFlagsData) -> Flags:
   if not flag_data:
     return ChromeFlags().freeze()
   if isinstance(flag_data, str):
@@ -55,7 +57,8 @@ class FlagsVariantConfig:
       default_factory=lambda: ChromeFlags().freeze())
 
   @classmethod
-  def parse(cls, name: str, index: int, data: Any) -> FlagsVariantConfig:
+  def parse(cls, name: str, index: int,
+            data: RawFlagsData) -> FlagsVariantConfig:
     return cls(name, index, _parse_flags(data))
 
   def merge_copy(self,
@@ -88,7 +91,7 @@ class FlagsGroupConfig(tuple[FlagsVariantConfig, ...]):
   """
 
   @classmethod
-  def parse(cls, data: Any) -> Self:
+  def parse(cls, data: object) -> Self:
     if data is None:
       return cls()
     if isinstance(data, str):
@@ -133,7 +136,7 @@ class FlagsGroupConfig(tuple[FlagsVariantConfig, ...]):
     return cls(variants)
 
   @classmethod
-  def _parse_variants_dict(cls: type[Self], data: dict[str, Any]) -> Self:
+  def _parse_variants_dict(cls: type[Self], data: dict[str, object]) -> Self:
     # data == {
     #  "--flag": None,
     #  "--flag-b": "custom flag value",
@@ -152,7 +155,7 @@ class FlagsGroupConfig(tuple[FlagsVariantConfig, ...]):
     return variants
 
   @classmethod
-  def _validate_variants_dict(cls, data: dict[str, Any]) -> None:
+  def _validate_variants_dict(cls, data: dict[str, object]) -> None:
     flags = ChromeFlags()
     for flag_name, flag_value in data.items():
       with exception.annotate_argparsing(
@@ -178,7 +181,7 @@ class FlagsGroupConfig(tuple[FlagsVariantConfig, ...]):
 
   @classmethod
   def _validate_variants_value(cls, flags: ChromeFlags, flag_name: str,
-                               flag_value: Any) -> None:
+                               flag_value: object) -> None:
     if flag_value is None:
       flags.set(flag_name)
       return
@@ -189,7 +192,7 @@ class FlagsGroupConfig(tuple[FlagsVariantConfig, ...]):
                       f"{flag_name}={flag_value!r}")
 
   @classmethod
-  def _dict_variant_to_group(cls, flag_name: str, data: Any) -> Self:
+  def _dict_variant_to_group(cls, flag_name: str, data: object) -> Self:
     if data is None:
       return cls.parse_str(flag_name)
     if isinstance(data, str):
@@ -214,7 +217,7 @@ class FlagsGroupConfig(tuple[FlagsVariantConfig, ...]):
     return cls.parse_sequence(flags)
 
   @classmethod
-  def _validate_variant_flag(cls, flag_name: str, flag_value: Any) -> None:
+  def _validate_variant_flag(cls, flag_name: str, flag_value: object) -> None:
     if flag_value == "None,":
       raise ConfigError("Please use null (from json) instead of "
                         f"None (from python) for flag {flag_name!r}")
@@ -346,7 +349,7 @@ class FlagsConfig(ConfigObject, immutabledict[str, FlagsGroupConfig]):
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict[str, Any], **kwargs) -> Self:
+  def parse_dict(cls, config: dict[str, object], **kwargs) -> Self:
     groups: dict[str, FlagsGroupConfig] = {}
     for group_name, group_data in config.items():
       with exception.annotate(f"Parsing flag-group: flags[{group_name!r}]"):

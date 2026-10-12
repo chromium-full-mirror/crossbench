@@ -8,7 +8,7 @@ import argparse
 import dataclasses
 import datetime as dt
 import enum
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Self, TypeAlias
+from typing import TYPE_CHECKING, ClassVar, Self, TypeVar
 
 from typing_extensions import override
 
@@ -17,7 +17,7 @@ from crossbench.parse import DurationParser, NumberParser, ObjectParser
 from crossbench.str_enum_with_help import StrEnumWithHelp
 
 if TYPE_CHECKING:
-  Number: TypeAlias = float | int
+  NumberT = TypeVar("NumberT", int, float)
 
 
 @enum.unique
@@ -40,8 +40,8 @@ def merge_bool(name: str, left: bool | None, right: bool | None) -> bool | None:
   return left
 
 
-def merge_number_max(name: str, left: Number | None,
-                     right: Number | None) -> Number | None:
+def merge_number_max(name: str, left: NumberT | None,
+                     right: NumberT | None) -> NumberT | None:
   del name
   if left is None:
     return right
@@ -50,8 +50,8 @@ def merge_number_max(name: str, left: Number | None,
   return max(left, right)
 
 
-def merge_number_min(name: str, left: Number | None,
-                     right: Number | None) -> Number | None:
+def merge_number_min(name: str, left: NumberT | None,
+                     right: NumberT | None) -> NumberT | None:
   del name
   if left is None:
     return right
@@ -136,9 +136,9 @@ class EnvConfig(ConfigObject):
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict[str, Any], **kwargs) -> Self:
+  def parse_dict(cls, config: dict[str, object], **kwargs) -> Self:
     if "env" in config:
-      config = config["env"]
+      config = ObjectParser.dict(config["env"], "env")
     return super().parse_dict(config, **kwargs)
 
   @classmethod
@@ -185,29 +185,53 @@ class EnvConfig(ConfigObject):
     return parser
 
   def merge(self, other: EnvConfig) -> EnvConfig:
-    mergers: dict[str, Callable[[str, Any, Any], Any]] = {
-        "browser_allow_background": merge_bool,
-        "browser_allow_existing_process": merge_bool,
-        "browser_is_headless": merge_bool,
-        "cpu_max_usage_percent": merge_number_min,
-        "cpu_min_relative_speed": merge_number_max,
-        "cpu_power_mode": merge_str,
-        "disk_min_free_space_gib": merge_number_max,
-        "power_use_battery": merge_bool,
-        "require_probes": merge_bool,
-        "screen_allow_autobrightness": merge_bool,
-        "screen_brightness_percent": merge_number_max,
-        "screen_refresh_rate": merge_number_max,
-        "system_allow_monitoring": merge_bool,
-        "system_forbidden_process_names": merge_str_list,
-        "system_min_uptime": merge_duration_max,
-    }
-    kwargs = {}
-    for name, merger in mergers.items():
-      self_value = getattr(self, name)
-      other_value = getattr(other, name)
-      kwargs[name] = merger(name, self_value, other_value)
-    return EnvConfig(**kwargs)
+    return EnvConfig(
+        browser_allow_background=merge_bool("browser_allow_background",
+                                            self.browser_allow_background,
+                                            other.browser_allow_background),
+        browser_allow_existing_process=merge_bool(
+            "browser_allow_existing_process",
+            self.browser_allow_existing_process,
+            other.browser_allow_existing_process),
+        browser_is_headless=merge_bool("browser_is_headless",
+                                       self.browser_is_headless,
+                                       other.browser_is_headless),
+        cpu_max_usage_percent=merge_number_min("cpu_max_usage_percent",
+                                               self.cpu_max_usage_percent,
+                                               other.cpu_max_usage_percent),
+        cpu_min_relative_speed=merge_number_max("cpu_min_relative_speed",
+                                                self.cpu_min_relative_speed,
+                                                other.cpu_min_relative_speed),
+        cpu_power_mode=merge_str("cpu_power_mode", self.cpu_power_mode,
+                                 other.cpu_power_mode),
+        disk_min_free_space_gib=merge_number_max("disk_min_free_space_gib",
+                                                 self.disk_min_free_space_gib,
+                                                 other.disk_min_free_space_gib),
+        power_use_battery=merge_bool("power_use_battery",
+                                     self.power_use_battery,
+                                     other.power_use_battery),
+        require_probes=merge_bool("require_probes", self.require_probes,
+                                  other.require_probes),
+        screen_allow_autobrightness=merge_bool(
+            "screen_allow_autobrightness", self.screen_allow_autobrightness,
+            other.screen_allow_autobrightness),
+        screen_brightness_percent=merge_number_max(
+            "screen_brightness_percent", self.screen_brightness_percent,
+            other.screen_brightness_percent),
+        screen_refresh_rate=merge_number_max("screen_refresh_rate",
+                                             self.screen_refresh_rate,
+                                             other.screen_refresh_rate),
+        system_allow_monitoring=merge_bool("system_allow_monitoring",
+                                           self.system_allow_monitoring,
+                                           other.system_allow_monitoring),
+        system_forbidden_process_names=merge_str_list(
+            "system_forbidden_process_names",
+            self.system_forbidden_process_names,
+            other.system_forbidden_process_names),
+        system_min_uptime=merge_duration_max("system_min_uptime",
+                                             self.system_min_uptime,
+                                             other.system_min_uptime),
+    )
 
 
 _config_default = EnvConfig()

@@ -7,7 +7,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Final, Self
+from typing import TYPE_CHECKING, Final, Self
 
 from typing_extensions import override
 
@@ -18,6 +18,8 @@ from crossbench.parse import ObjectParser
 from crossbench.probes.all import PROBE_LOOKUP
 
 if TYPE_CHECKING:
+  from collections.abc import Mapping
+
   from crossbench.probes.probe import Probe
 
 
@@ -42,7 +44,7 @@ class ProbeConfig(ConfigObject):
   # 2. "presetName"
   config_str: str | None = None
   # Config dict passed to the probe_cls ConfigParser.parse_dict.
-  config_dict: dict[str, Any] | None = None
+  config_dict: Mapping[str, object] | None = None
 
   def __post_init__(self) -> None:
     if not self.probe_cls:
@@ -74,7 +76,7 @@ class ProbeConfig(ConfigObject):
     probe_cls: type[Probe] | None = PROBE_LOOKUP.get(probe_name)
     if not probe_cls:
       return None
-    config = {"name": probe_name}
+    config: dict[str, object] = {"name": probe_name}
     inline_config: dict = {}
     if cls.is_path_like(config_str) and config_str.endswith(
         (".json", ".hjson")):
@@ -92,12 +94,12 @@ class ProbeConfig(ConfigObject):
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict[str, Any], **kwargs) -> Self:
+  def parse_dict(cls, config: dict[str, object], **kwargs) -> Self:
     probe_name = ObjectParser.non_empty_str(config.pop("name"), "name")
     return cls.parse_probe_dict(probe_name, config, **kwargs)
 
   @classmethod
-  def parse_probe_dict(cls, probe_name: str, config: dict[str, Any],
+  def parse_probe_dict(cls, probe_name: str, config: dict[str, object],
                        **kwargs) -> Self:
     if direct_probe_cls := PROBE_LOOKUP.get(probe_name):
       return cls(direct_probe_cls, config_dict=config, **kwargs)
@@ -129,7 +131,8 @@ class ProbeConfig(ConfigObject):
     with exception.annotate_argparsing(*info):
       if config_str := self.config_str:
         return self.probe_cls.parse_str(config_str)
-      return self.probe_cls.parse_dict(self.config_dict or {})
+      return self.probe_cls.parse_dict(
+          dict(self.config_dict) if self.config_dict else {})
     raise exception.UnreachableError
 
   @property

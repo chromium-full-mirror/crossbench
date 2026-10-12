@@ -10,7 +10,7 @@ import enum
 import logging
 import os
 import re
-from typing import Any, Final, Self
+from typing import Final, Self
 
 from typing_extensions import override
 
@@ -143,7 +143,7 @@ class BrowserConfig(ConfigObject):
     return cls(path, driver, network, env)
 
   @classmethod
-  def parse_with_range(cls, value: Any) -> tuple[Self, ...]:
+  def parse_with_range(cls, value: object) -> tuple[Self, ...]:
     if isinstance(value, str):
       return cls._parse_with_range(value)
     return (cls.parse(value),)

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import argparse
 import enum
-from typing import Any
 
 from crossbench.parse import ObjectParser
 from crossbench.str_enum_with_help import StrEnumWithHelp
@@ -33,7 +32,7 @@ class BrowserDriverType(StrEnumWithHelp):
     return cls.WEB_DRIVER
 
   @classmethod
-  def parse(cls, value: Any) -> BrowserDriverType:
+  def parse(cls, value: object) -> BrowserDriverType:
     if isinstance(value, cls):
       return value
     if value == "":

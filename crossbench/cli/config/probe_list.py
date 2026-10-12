@@ -7,7 +7,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import logging
-from typing import TYPE_CHECKING, Any, Iterable, Self, Sequence
+from typing import TYPE_CHECKING, Iterable, Self, Sequence
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -66,13 +66,13 @@ class ProbeListConfig(ConfigObject):
     raise exception.UnreachableError
 
   @classmethod
-  def parse_other(cls, value: Any) -> Self:
+  def parse_other(cls, value: object) -> Self:
     if isinstance(value, (tuple, list)):
       return cls.parse_sequence(value)
     return super().parse_other(value)
 
   @classmethod
-  def parse_sequence(cls, config: Sequence[dict[str, Any]]) -> Self:
+  def parse_sequence(cls, config: Sequence[dict[str, object]]) -> Self:
     probe_configs: list[ProbeConfig] = []
     for index, probe_config in enumerate(config):
       with exception.annotate(f"Parsing probes[{index}]"):
@@ -81,20 +81,23 @@ class ProbeListConfig(ConfigObject):
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict[str, Any], **kwargs) -> Self:
+  def parse_dict(cls, config: dict[str, object], **kwargs) -> Self:
     # Support global configs with {"probes": ...}
     if "probes" in config:
-      config = config["probes"]
-      if isinstance(config, (tuple, list)):
-        return cls.parse_sequence(config)
+      probes_config = config["probes"]
+      if isinstance(probes_config, (tuple, list)):
+        return cls.parse_sequence(probes_config)
+      config = ObjectParser.dict(probes_config, "probes")
     elif "browsers" in config or "flags" in config:
       raise ProbeConfigError("Missing 'probes' property in global config.")
-    config = ObjectParser.dict(config, "probes")
+    else:
+      config = ObjectParser.dict(config, "probes")
     probe_configs: list[ProbeConfig] = []
     for probe_name, config_data in config.items():
       with exception.annotate(f"Parsing probe config probes['{probe_name}']"):
+        probe_dict = ObjectParser.dict(config_data, f"probes[{probe_name!r}]")
         probe_configs.append(
-            ProbeConfig.parse_probe_dict(probe_name, config_data))
+            ProbeConfig.parse_probe_dict(probe_name, probe_dict))
     return cls.from_probes(probe_configs)
 
   @classmethod

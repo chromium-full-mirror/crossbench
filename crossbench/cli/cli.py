@@ -12,8 +12,7 @@ import os
 import sys
 import textwrap
 import traceback
-from typing import IO, TYPE_CHECKING, Any, Iterator, Sequence, TypeAlias, \
-    TypeVar
+from typing import TYPE_CHECKING, Iterator, Sequence, TypeAlias, TypeVar
 
 import tabulate as tbl
 from typing_extensions import override
@@ -44,6 +43,8 @@ from crossbench.probes.all import GENERAL_PURPOSE_PROBES
 from crossbench.runner.runner import Runner
 
 if TYPE_CHECKING:
+  from _typeshed import SupportsWrite
+
   from crossbench.benchmarks.base import Benchmark
   from crossbench.browsers.browser import Browser
   from crossbench.cli.subcommand.base import CrossbenchSubcommand
@@ -60,11 +61,11 @@ class CrossBenchArgumentError(argparse.ArgumentError):
   """Custom class that also prints the argument.help if available.
   """
 
-  def __init__(self, argument: Any, message: str) -> None:
+  def __init__(self, argument: argparse.Action | None, message: str) -> None:
     self.help: str = ""
     super().__init__(argument, message)
-    if self.argument_name:
-      self.help = getattr(argument, "help", "")
+    if self.argument_name and argument and argument.help:
+      self.help = argument.help
 
   def __str__(self) -> str:
     formatted = super().__str__()
@@ -84,7 +85,7 @@ class EnableDebuggingAction(argparse.Action):
   def __call__(self,
                parser: argparse.ArgumentParser,
                namespace: argparse.Namespace,
-               values: str | Sequence[Any] | None,
+               values: str | Sequence[object] | None,
                option_string: str | None = None) -> None:
     del parser, values, option_string
     namespace.throw = True
@@ -95,14 +96,14 @@ class EnableDebuggingAction(argparse.Action):
 class MainCrossBenchArgumentParser(CBArgumentParser):
 
   @override
-  def print_help(self, file: Any = None) -> None:
+  def print_help(self, file: SupportsWrite[str] | None = None) -> None:
     file = file or sys.stdout
     super().print_help(file=file)
     self.print_probes(file=file)
     self.print_urls(file=file)
     self.print_example(file=file)
 
-  def print_probes(self, file: IO[str] = sys.stdout) -> None:
+  def print_probes(self, file: SupportsWrite[str] = sys.stdout) -> None:
     lines = [
         "Probes can be added and configured for each benchmark.",
         f"Use `{sys.argv[0]} describe probe $PROBE` for the full help.",
@@ -123,14 +124,14 @@ class MainCrossBenchArgumentParser(CBArgumentParser):
     file.write(textwrap.indent(contents, "    "))
     file.write("\n")
 
-  def print_urls(self, file: IO[str] = sys.stdout) -> None:
+  def print_urls(self, file: SupportsWrite[str] = sys.stdout) -> None:
     file.write("\n")
     file.write("URLS:\n")
     file.write("  Source: https://chromium.googlesource.com/crossbench\n")
     file.write("  Bugs:   "
                "https://issues.chromium.org/u/1/issues/new?component=1456712\n")
 
-  def print_example(self, file: IO[str] = sys.stdout) -> None:
+  def print_example(self, file: SupportsWrite[str] = sys.stdout) -> None:
     file.write("\n")
     file.write("EXAMPLE:\n")
     file.write("  ./cb.py speedometer --browser=chrome-m131 "

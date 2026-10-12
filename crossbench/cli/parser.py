@@ -8,7 +8,7 @@ import argparse
 import logging
 import sys
 import types
-from typing import Any, Never, Sequence
+from typing import Any, Mapping, Never, Sequence
 
 import colorama
 from typing_extensions import Self, override
@@ -47,7 +47,7 @@ class CBNamespace(argparse.Namespace):
 
   _is_frozen: bool
 
-  def __init__(self, **kwargs: Any) -> None:
+  def __init__(self, **kwargs: object) -> None:
     # Avoid AttributeError in __setattr__ before _is_frozen is set.
     super().__setattr__("_is_frozen", False)
     super().__init__(**kwargs)
@@ -61,7 +61,7 @@ class CBNamespace(argparse.Namespace):
     self._is_frozen = True
     return self
 
-  def __setattr__(self, name: str, value: Any) -> None:
+  def __setattr__(self, name: str, value: object) -> None:
     if self._is_frozen:
       raise TypeError(f"Cannot modify immutable {type(self).__name__}: "
                       f"attempted to set {name}={value!r}")
@@ -83,8 +83,8 @@ class CBArgumentParser(argparse.ArgumentParser):
     super().__init__(allow_abbrev=allow_abbrev, **kwargs)
 
   @classmethod
-  def validate_add_argument(cls, container: Any, args: Sequence[Any],
-                            kwargs: dict[str, Any]) -> None:
+  def validate_add_argument(cls, container: object, args: Sequence[object],
+                            kwargs: Mapping[str, object]) -> None:
     arg_name: str = (f"'{'/'.join(str(a) for a in args)}'"
                      if args else "argument")
     container_name: str = type(container).__name__
@@ -93,7 +93,7 @@ class CBArgumentParser(argparse.ArgumentParser):
 
   @classmethod
   def _validate_add_argument_type(cls, container_name: str, arg_name: str,
-                                  kwargs: dict[str, Any]) -> None:
+                                  kwargs: Mapping[str, object]) -> None:
     arg_type = kwargs.get("type")
     if arg_type is None:
       return
@@ -105,6 +105,7 @@ class CBArgumentParser(argparse.ArgumentParser):
           "or use a ConfigObject.")
     if arg_type not in (bool, str, int, float, list, dict, set, tuple):
       return
+    assert isinstance(arg_type, type)
     prefix = (f"Direct use of type={arg_type.__name__} is forbidden for "
               f"{arg_name} in {container_name}:")
     if arg_type is bool:
@@ -132,7 +133,7 @@ class CBArgumentParser(argparse.ArgumentParser):
 
   @classmethod
   def _validate_add_argument_action(cls, container_name: str, arg_name: str,
-                                    kwargs: dict[str, Any]) -> None:
+                                    kwargs: Mapping[str, object]) -> None:
     action = kwargs.get("action")
     default = kwargs.get("default")
     arg_type = kwargs.get("type")

@@ -8,7 +8,7 @@ import argparse
 import dataclasses
 import logging
 import re
-from typing import Any, Self
+from typing import TYPE_CHECKING, Self
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -22,6 +22,9 @@ from crossbench.plt.android_adb import Adb, AndroidAdbPlatform, adb_devices
 from crossbench.plt.chromeos_ssh import ChromeOsSshPlatform
 from crossbench.plt.ios import IOSPlatform, ios_devices
 from crossbench.plt.pyodide_adb import PyodideAndroidAdbPlatform
+
+if TYPE_CHECKING:
+  from crossbench.plt.ios import IOSDeviceInfo
 
 
 class AmbiguousDriverIdentifier(argparse.ArgumentTypeError):
@@ -274,7 +277,7 @@ class DriverConfig(ConfigObject):
                        "go/arc-setup-dev-mode-dut#usb-cros-test-image")
 
   def validate_ios(self) -> None:
-    devices: dict[str, Any] = ios_devices(plt.PLATFORM)
+    devices: dict[str, IOSDeviceInfo] = ios_devices(plt.PLATFORM)
     if not devices:
       raise argparse.ArgumentTypeError("No iOS devices attached.")
     names = list(map(str, devices))

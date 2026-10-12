@@ -21,7 +21,7 @@ from __future__ import annotations
 import io
 import logging
 import traceback
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Callable
 
 from pygments import highlight
 from pygments.formatters import get_formatter_by_name
@@ -32,6 +32,8 @@ from crossbench.cli.ui import ui
 
 if TYPE_CHECKING:
   from types import TracebackType
+
+  from pygments.formatter import Formatter
 
 
 def _get_term_color_support() -> int:
@@ -45,7 +47,7 @@ def _get_term_color_support() -> int:
 
 
 def _determine_formatter(style: str = "default",
-                         colors: int | None = None) -> Any:
+                         colors: int | None = None) -> Formatter:
   colors = colors or _get_term_color_support()
   logging.debug("Detected support for %s colors", colors)
   if colors == 256:

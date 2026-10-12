@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import dataclasses
 import secrets
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Self, TypeVar
 
 from typing_extensions import override
 
@@ -15,6 +15,8 @@ from crossbench.parse import NumberParser, ObjectParser
 
 if TYPE_CHECKING:
   from crossbench.types import JsonDict
+
+  SecretT = TypeVar("SecretT", bound="Secret")
 
 
 class SecretsMergeError(ValueError):
@@ -56,8 +58,8 @@ class Secrets(ConfigObject):
                            fallback.google_workspace, strict),
     )
 
-  def _merge_secret(self, name: str, primary: Secret | None,
-                    fallback: Secret | None, strict: bool) -> Any:
+  def _merge_secret(self, name: str, primary: SecretT | None,
+                    fallback: SecretT | None, strict: bool) -> SecretT | None:
     if strict and primary and fallback and primary != fallback:
       raise SecretsMergeError(name, primary, fallback)
     return primary or fallback
