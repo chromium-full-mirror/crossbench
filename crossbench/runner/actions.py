@@ -148,8 +148,8 @@ class Actions(TimeScope):
     wait_range: WaitRange = self._run.wait_range(min_interval, timeout, delay)
     assert "return" in js_code, (
         f"Missing return statement in js-wait code: {js_code}")
-    for _, _, time_left in wait_range.wait_with_backoff():
-      time_units = self.timing.units(time_left, absolute_time)
+    for step in wait_range.wait_with_backoff():
+      time_units = self.timing.units(step.time_left, absolute_time)
       result = self.js(
           js_code,
           timeout=time_units,

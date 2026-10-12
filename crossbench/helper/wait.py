@@ -8,10 +8,21 @@ import datetime as dt
 import logging
 import math
 import time
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING, Iterator, NamedTuple
 
 if TYPE_CHECKING:
   from crossbench.runner.timing import AnyTime, AnyTimeUnit
+
+
+class WaitStep(NamedTuple):
+  iteration: int
+  sleep_for: dt.timedelta
+
+
+class WaitBackoffStep(NamedTuple):
+  iteration: int
+  duration: dt.timedelta
+  time_left: dt.timedelta
 
 
 def as_timedelta(value: float | dt.timedelta) -> dt.timedelta:
@@ -63,22 +74,21 @@ class WaitRange:
   def timeout(self) -> dt.timedelta:
     return self._timeout
 
-  def __iter__(self) -> Iterator[tuple[int, dt.timedelta]]:
+  def __iter__(self) -> Iterator[WaitStep]:
     i = 0
     if self._delay:
-      yield i, self._delay
+      yield WaitStep(i, self._delay)
       i += 1
 
     current_sleep = self._min
     while True:
       if self._max_iterations <= i:
         break
-      yield i, current_sleep
+      yield WaitStep(i, current_sleep)
       current_sleep = min(current_sleep * self._factor, self._max)
       i += 1
 
-  def wait_with_backoff(
-      self) -> Iterator[tuple[int, dt.timedelta, dt.timedelta]]:
+  def wait_with_backoff(self) -> Iterator[WaitBackoffStep]:
     start = dt.datetime.now()
     timeout = self._timeout
     for i, sleep_for in self:
@@ -86,7 +96,7 @@ class WaitRange:
       if duration > self._timeout:
         raise TimeoutError(f"Waited for {duration}")
       time_left = timeout - duration
-      yield i, duration, time_left
+      yield WaitBackoffStep(i, duration, time_left)
       sleep_f(sleep_for.total_seconds())
 
 
@@ -104,8 +114,7 @@ def sleep_f(seconds: float) -> None:
 
 
 def wait_with_backoff(
-    wait_range: AnyTime | WaitRange,
-) -> Iterator[tuple[int, dt.timedelta, dt.timedelta]]:
+    wait_range: AnyTime | WaitRange) -> Iterator[WaitBackoffStep]:
   if not isinstance(wait_range, WaitRange):
     wait_range = WaitRange(timeout=wait_range)
   return wait_range.wait_with_backoff()

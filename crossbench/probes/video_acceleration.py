@@ -73,9 +73,12 @@ class VideoAccelerationProbeContext(
     })
     if not success:
       raise RuntimeError("Failed to query target")
-    if not targets or "targetInfos" not in targets.get("result", {}):
+    if not targets:
       return None
-    for target in targets["result"]["targetInfos"]:
+    result = targets.get("result")
+    if not isinstance(result, dict) or "targetInfos" not in result:
+      return None
+    for target in result["targetInfos"]:
       if target["type"] == "page":
         return target["targetId"]
     return None
@@ -100,16 +103,18 @@ class VideoAccelerationProbeContext(
         raise RuntimeError("Could not find page target")
 
       # Attach to the page target
-      _, response = client.send_command({
+      response = client.send_command({
           "id": 1,
           "method": "Target.attachToTarget",
           "params": {
               "targetId": target_id,
               "flatten": True,
           },
-      })
-      session_id = response.get("result", {}).get("sessionId")
-      if not session_id:
+      }).response
+      result = response.get("result")
+      if not isinstance(result, dict):
+        raise ValueError(f"Could not find 'sessionId' in response: {response}")
+      if not (session_id := result.get("sessionId")):
         raise ValueError(f"Could not find 'sessionId' in response: {response}")
 
       client.dispatch_command({

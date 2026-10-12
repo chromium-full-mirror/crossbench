@@ -14,7 +14,8 @@ import websocket
 from crossbench.action_runner.action.enums import WindowTarget
 from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.browsers.cdp_android import CdpAndroidBrowser
-from crossbench.browsers.chromium.devtools import DevToolsRemoteClient
+from crossbench.browsers.chromium.devtools import DevToolsCommandResult, \
+    DevToolsRemoteClient
 from crossbench.browsers.chromium.version import ChromiumVersion
 from crossbench.browsers.settings import Settings
 from crossbench.flags.base import Flags
@@ -48,13 +49,13 @@ class MockDevToolsRemoteClient:
   def disconnect(self) -> None:
     self.connected = False
 
-  def send_command(
-      self, command_payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
+  def send_command(self,
+                   command_payload: dict[str, object]) -> DevToolsCommandResult:
     self.commands.append(command_payload)
     if self.next_response is not None:
-      return self.next_response
+      return DevToolsCommandResult(*self.next_response)
     cmd_id = command_payload.get("id", 1)
-    return True, {"id": cmd_id, "result": {}}
+    return DevToolsCommandResult(True, {"id": cmd_id, "result": {}})
 
   def switch_to_new_tab(self, url: str = "about:blank") -> str:
     self.commands.append({

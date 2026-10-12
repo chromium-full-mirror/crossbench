@@ -9,7 +9,8 @@ import datetime as dt
 import json
 import logging
 from contextlib import closing
-from typing import TYPE_CHECKING, Any, Callable, Final, Iterator, Self
+from typing import TYPE_CHECKING, Any, Callable, Final, Iterator, NamedTuple, \
+    Self
 
 import websocket
 from websocket import create_connection
@@ -19,6 +20,14 @@ from crossbench.helper import wait
 if TYPE_CHECKING:
   from crossbench.browsers.browser import Browser
   from crossbench.plt.base import Platform
+
+
+class DevToolsCommandResult(NamedTuple):
+  # True if the command succeeded, False if DevTools replied with a
+  # protocol error.
+  success: bool
+  # The full response message returned by the websocket.
+  response: dict[str, object]
 
 
 class DevToolsInBrowserClient:
@@ -145,7 +154,7 @@ class DevToolsRemoteClient:
     logging.debug("DevTools disconnected")
 
   def _send_raw_command(
-      self, command_payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
+      self, command_payload: dict[str, object]) -> DevToolsCommandResult:
     if not self._ws or not self._ws.connected:
       raise RuntimeError("DevTools is not connected. Cannot send command.")
 
@@ -158,7 +167,7 @@ class DevToolsRemoteClient:
       data = self._ws.recv()
       response = json.loads(data)
       if response.get("id") == expected_id:
-        return True, response
+        return DevToolsCommandResult(True, response)
 
   def _get_page_session_id(self) -> str:
     if self._session_id:
@@ -167,9 +176,9 @@ class DevToolsRemoteClient:
         "id": self._get_next_id(),
         "method": "Target.getTargets",
     })
-    if "result" not in response:
+    if not isinstance(result := response.get("result"), dict):
       raise RuntimeError(f"Target.getTargets failed: {response}")
-    target_infos = response["result"].get("targetInfos", [])
+    target_infos = result.get("targetInfos", [])
     page_target_id = None
     for info in target_infos:
       if info.get("type") == "page":
@@ -183,9 +192,9 @@ class DevToolsRemoteClient:
               "url": "about:blank",
           },
       })
-      if "result" not in response:
+      if not isinstance(result := response.get("result"), dict):
         raise RuntimeError(f"Target.createTarget failed: {response}")
-      page_target_id = response["result"].get("targetId")
+      page_target_id = result.get("targetId")
     if not page_target_id:
       raise RuntimeError("Failed to obtain a page targetId")
     _, response = self._send_raw_command({
@@ -196,9 +205,10 @@ class DevToolsRemoteClient:
             "flatten": True,
         },
     })
-    if "result" not in response or "sessionId" not in response["result"]:
+    result = response.get("result")
+    if not isinstance(result, dict) or "sessionId" not in result:
       raise RuntimeError(f"Target.attachToTarget failed: {response}")
-    self._session_id = response["result"]["sessionId"]
+    self._session_id = result["sessionId"]
     return self._session_id
 
   def switch_to_new_tab(self, url: str = "about:blank") -> str:
@@ -210,9 +220,9 @@ class DevToolsRemoteClient:
             "url": url,
         },
     })
-    if "result" not in response:
+    if not isinstance(result := response.get("result"), dict):
       raise RuntimeError(f"Could not create new tab: {response}")
-    page_target_id = response["result"].get("targetId")
+    page_target_id = result.get("targetId")
     if not page_target_id:
       raise RuntimeError(f"Could not get targetId for new tab: {response}")
     _, response = self._send_raw_command({
@@ -223,14 +233,15 @@ class DevToolsRemoteClient:
             "flatten": True,
         },
     })
-    if "result" not in response or "sessionId" not in response["result"]:
+    result = response.get("result")
+    if not isinstance(result, dict) or "sessionId" not in result:
       raise RuntimeError(
           f"Could not attach to new tab {page_target_id}: {response}")
-    self._session_id = response["result"]["sessionId"]
+    self._session_id = result["sessionId"]
     return self._session_id
 
-  def send_command(
-      self, command_payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
+  def send_command(self,
+                   command_payload: dict[str, object]) -> DevToolsCommandResult:
     """Sends a command to DevTools and waits for the matching response.
 
     Commands are routed to a page session by default. Commands for
@@ -246,10 +257,7 @@ class DevToolsRemoteClient:
       command_payload: The command payload to send.
 
     Returns:
-      Tuple of [bool, dict]
-      bool: True if the command succeeded, False if DevTools replied with a
-            protocol error.
-      dict: the full response message returned by the websocket.
+      DevToolsCommandResult with (success, response).
     """
     command_payload = dict(command_payload)
     command_payload.setdefault("id", self._get_next_id())
@@ -261,7 +269,7 @@ class DevToolsRemoteClient:
       if session_id := self._get_page_session_id():
         command_payload["sessionId"] = session_id
     success, response = self._send_raw_command(command_payload)
-    return success and "error" not in response, response
+    return DevToolsCommandResult(success and "error" not in response, response)
 
   def dispatch_command(self, command_payload: dict[str, Any]) -> bool:
     """Dispatches a command to DevTools. Does not wait for any response.

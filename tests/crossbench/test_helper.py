@@ -102,16 +102,18 @@ class WaitTestCase(unittest.TestCase):
 
   def test_wait_with_backoff_max_iterations(self):
     i = 0
-    for expected_i, (i, _, _) in enumerate(
+    for expected_i, step in enumerate(
         WaitRange(min=0.01, max=0.05, max_iterations=11).wait_with_backoff()):
+      i = step.iteration
       self.assertEqual(expected_i, i)
     self.assertEqual(i, 10)
 
   def test_wait_with_backoff_max_iterations_delay(self):
     i = 0
-    for expected_i, (i, _, _) in enumerate(
+    for expected_i, step in enumerate(
         WaitRange(min=0.01, max=0.05, delay=0.1,
                   max_iterations=11).wait_with_backoff()):
+      i = step.iteration
       self.assertEqual(expected_i, i)
     self.assertEqual(i, 10)
 

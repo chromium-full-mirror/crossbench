@@ -10,7 +10,7 @@ import enum
 import logging
 import os
 import re
-from typing import Final, Self
+from typing import Final, NamedTuple, Self
 
 from typing_extensions import override
 
@@ -66,6 +66,13 @@ SHORT_FORM_RE: re.Pattern[str] = re.compile(
 ANDROID_PACKAGE_RE: re.Pattern[str] = re.compile(r"[a-z]+(\.[a-z]+){2,}")
 VERSION_FOR_RANGE_RE: re.Pattern[str] = re.compile(
     r"(?P<prefix>[^\d]*)(?P<milestone>\d+)")
+
+
+class InlineShortFormConfig(NamedTuple):
+  driver: DriverConfig
+  path: pth.AnyPathLike
+  network: NetworkConfig | None
+  env: EnvConfig | None
 
 
 @enum.unique
@@ -398,8 +405,7 @@ class BrowserConfig(ConfigObject):
   def _parse_inline_short_form(
       cls,
       value: str,
-  ) -> tuple[DriverConfig, pth.AnyPathLike, NetworkConfig | None, EnvConfig
-             | None]:
+  ) -> InlineShortFormConfig:
     assert ":" in value, f"Invalid short config {value!r} for {cls}"
     match = SHORT_FORM_RE.fullmatch(value)
     if not match:
@@ -422,7 +428,7 @@ class BrowserConfig(ConfigObject):
     env = None
     if env_identifier := match.group("env"):
       env = EnvConfig.parse_str(env_identifier)
-    return (driver, path, network, env)
+    return InlineShortFormConfig(driver, path, network, env)
 
   @classmethod
   @override

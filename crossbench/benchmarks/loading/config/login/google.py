@@ -136,7 +136,7 @@ class GoogleLogin(PresetLoginBlock):
       action.wait_for_ready_state(ReadyState.COMPLETE, self.timeout(secret))
 
       wait_range = run.wait_range(0.2, self.timeout(secret))
-      for _, _, time_left in wait_range.wait_with_backoff():
+      for step in wait_range.wait_with_backoff():
         current_url = action.current_url()
 
         if current_url.startswith(SUCCESSFUL_LOGIN_REDIRECT):
@@ -145,17 +145,17 @@ class GoogleLogin(PresetLoginBlock):
         if current_url.startswith(ADD_PASSKEY_REDIRECT):
           logging.info("Dismissing passkey enrollment page.")
           self._dismiss_login_page(action, runner, SKIP_PASSKEY_ACTION,
-                                   ADD_PASSKEY_REDIRECT, time_left)
+                                   ADD_PASSKEY_REDIRECT, step.time_left)
 
         if current_url.startswith(ADD_RECOVERY_PHONE_REDIRECT):
           logging.info("Dismissing account recovery page.")
           self._dismiss_login_page(action, runner, SKIP_RECOVERY_PHONE,
-                                   ADD_RECOVERY_PHONE_REDIRECT, time_left)
+                                   ADD_RECOVERY_PHONE_REDIRECT, step.time_left)
 
         if current_url.startswith(ADD_HOME_ADDRESS_REDIRECT):
           logging.info("Dismissing add home address page.")
           self._dismiss_login_page(action, runner, SKIP_HOME_ADDRESS,
-                                   ADD_HOME_ADDRESS_REDIRECT, time_left)
+                                   ADD_HOME_ADDRESS_REDIRECT, step.time_left)
 
       self._clear_suspicious_activity(action, runner)
 
