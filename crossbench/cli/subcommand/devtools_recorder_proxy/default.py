@@ -13,7 +13,7 @@ import secrets
 import shlex
 import sys
 import tempfile
-from typing import TYPE_CHECKING, Any, Coroutine, Final
+from typing import TYPE_CHECKING, Final
 
 import websockets
 import websockets.asyncio.server as ws_server
@@ -25,10 +25,11 @@ from crossbench.helper.state import BaseState, StateMachine
 if TYPE_CHECKING:
   import argparse
   from asyncio.subprocess import Process
+  from collections.abc import Awaitable
 
   from crossbench.cli.types import Subparsers
   from crossbench.plt.types import ListCmdArgs
-  from crossbench.types import JsonDict
+  from crossbench.types import Json, JsonDict
 
 CROSSBENCH_ROOT: pth.LocalPath = pth.LocalPath(__file__).parents[4]
 
@@ -119,11 +120,10 @@ class CrossbenchDevToolsRecorderProxy:
       await self._send_message(self._handle_message(message))
 
   async def _send_message(
-      self, coroutine: Coroutine[Any, Any,
-                                 tuple[Response, Any] | None]) -> None:
+      self, coroutine: Awaitable[tuple[Response, Json] | None]) -> None:
     response: JsonDict = {"success": False, "payload": None, "error": None}
     try:
-      result: tuple[Response, Any] | None = await coroutine
+      result: tuple[Response, Json] | None = await coroutine
       response["success"] = True
       if result:
         response_type, payload = result
@@ -144,10 +144,10 @@ class CrossbenchDevToolsRecorderProxy:
     await self._websocket.send(response_json)
 
   async def _handle_message(
-      self, message: bytearray | bytes | str) -> tuple[Response, Any] | None:
+      self, message: bytearray | bytes | str) -> tuple[Response, str] | None:
     logging.debug("RECEIVE Message: %s", message)
     try:
-      payload: dict[str, Any] = json.loads(message)
+      payload: JsonDict = json.loads(message)
     except json.JSONDecodeError as e:
       logging.error("Could not parse JSON response: %s", e)
       raise e

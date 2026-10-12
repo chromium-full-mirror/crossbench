@@ -7,7 +7,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Sequence, TypeAlias
+from typing import TYPE_CHECKING, Sequence, TypedDict
 
 import tabulate as tbl
 from typing_extensions import override
@@ -29,9 +29,14 @@ if TYPE_CHECKING:
   from crossbench.cli.parser import CBArgumentParser
   from crossbench.cli.types import Subparsers
   from crossbench.config import ConfigParser
-  from crossbench.types import TableData
+  from crossbench.types import JsonDict, TableData
 
-  HelpData: TypeAlias = dict[str, dict[str, Any]]
+  class HelpData(TypedDict):
+    benchmarks: dict[str, JsonDict]
+    probes: dict[str, dict[str, str]]
+    networks: dict[str, str]
+    config_objects: dict[str, dict[str, str]]
+    envs: dict[str, dict[str, str]]
 
 
 def get_all_config_classes() -> list[type[ConfigObject]]:
@@ -208,29 +213,25 @@ class DescribeSubcommand(CrossbenchSubcommand):
 
   def print_json(self, category: str, search_str: str | None,
                  data: HelpData) -> None:
+    output_data: Mapping[str, object] = data
     if category in self.PROBE_ALIAS:
-      data = data["probes"]
-      if not data:
+      if not (output_data := data["probes"]):
         self.choice_error("No matching probe found:", search_str,
                           self.probe_names())
     elif category in self.BENCHMARK_ALIAS:
-      data = data["benchmarks"]
-      if not data:
+      if not (output_data := data["benchmarks"]):
         self.choice_error("No matching benchmark found:", search_str,
                           self.benchmark_names())
     elif category in self.NETWORK_ALIAS:
-      data = data["networks"]
-      if not data:
+      if not (output_data := data["networks"]):
         self.choice_error("No matching network found:", search_str,
                           self.network_names())
     elif category in self.CONFIG_OBJECT_ALIAS:
-      data = data["config_objects"]
-      if not data:
+      if not (output_data := data["config_objects"]):
         self.choice_error("No matching config object found:", search_str,
                           self.config_object_names())
     elif category in self.ENV_ALIAS:
-      data = data["envs"]
-      if not data:
+      if not (output_data := data["envs"]):
         self.choice_error("No matching env found:", search_str,
                           self.env_names())
     else:
@@ -238,7 +239,7 @@ class DescribeSubcommand(CrossbenchSubcommand):
       if not data["benchmarks"] and not data["probes"] and not data[
           "networks"] and not data["config_objects"] and not data["envs"]:
         self.no_match_error(search_str)
-    print(json.dumps(data, indent=2))
+    print(json.dumps(output_data, indent=2))
 
   def no_match_error(self, search_str: str | None) -> None:
     base_message = ("No matching benchmarks, probes, networks, envs "
@@ -291,7 +292,7 @@ class DescribeSubcommand(CrossbenchSubcommand):
     return self.print_property_table("Env", category, search_str, table,
                                      self.env_names())
 
-  def format_property_table(self, data: dict[str, Any],
+  def format_property_table(self, data: Mapping[str, Mapping[str, object]],
                             table: TableData) -> None:
     for section_name, values in data.items():
       table.append([section_name])
@@ -299,13 +300,13 @@ class DescribeSubcommand(CrossbenchSubcommand):
         formatted_value = self._format_property_value(value)
         table.append(["", property_name, formatted_value])
 
-  def _format_property_value(self, value: Any, max_width: int = 50) -> str:
+  def _format_property_value(self, value: object, max_width: int = 50) -> str:
     if value is None:
       return ""
     if isinstance(value, str):
       return "\n".join(txt_helper.wrap_lines(value, width=max_width))
     if isinstance(value, (tuple, list)):
-      return "\n".join(value)
+      return "\n".join(str(item) for item in value)
     if isinstance(value, dict):
       if not value:
         return "[]"
@@ -326,8 +327,8 @@ class DescribeSubcommand(CrossbenchSubcommand):
   def _benchmark_help_data(
       self,
       search_str: str | None = None,
-  ) -> dict[str, Any]:
-    benchmarks_data: dict[str, dict[str, Any]] = {}
+  ) -> dict[str, JsonDict]:
+    benchmarks_data: dict[str, JsonDict] = {}
     for benchmark_cls in self.cli.BENCHMARKS:
       aliases: tuple[str, ...] = benchmark_cls.aliases()
       if search_str:
@@ -338,7 +339,8 @@ class DescribeSubcommand(CrossbenchSubcommand):
       benchmarks_data[benchmark_cls.NAME] = benchmark_info
     return benchmarks_data
 
-  def _probe_help_data(self, search_str: str | None) -> dict[str, Any]:
+  def _probe_help_data(self,
+                       search_str: str | None) -> dict[str, dict[str, str]]:
     config_parsers: list[ConfigParser] = [
         probe_cls.config_parser()
         for probe_cls in GENERAL_PURPOSE_PROBES
@@ -346,8 +348,8 @@ class DescribeSubcommand(CrossbenchSubcommand):
     ]
     return self._config_parser_help_data(config_parsers)
 
-  def _network_help_data(self, search_str: str | None) -> dict[str, Any]:
-    network_data: dict[str, Any] = {
+  def _network_help_data(self, search_str: str | None) -> dict[str, str]:
+    network_data: dict[str, str] = {
         network_type.name: network_type.help
         for network_type in NetworkType
         if not search_str or network_type.name.lower() == search_str
@@ -358,12 +360,12 @@ class DescribeSubcommand(CrossbenchSubcommand):
       network_data["speed"] = NetworkSpeedConfig.help()
     return network_data
 
-  def _env_help_data(self, search_str: str | None) -> dict[str, Any]:
-    env_data: dict[str, Any] = {}
+  def _env_help_data(self, search_str: str | None) -> dict[str, dict[str, str]]:
+    env_data: dict[str, dict[str, str]] = {}
     for env_name, env_config in ENV_CONFIG_PRESETS.items():
       if search_str and env_name.lower() != search_str:
         continue
-      env_dict = {}
+      env_dict: dict[str, str] = {}
       for field in dataclasses.fields(env_config):
         value = getattr(env_config, field.name)
         if value is not EnvConfig.IGNORE:
@@ -372,7 +374,7 @@ class DescribeSubcommand(CrossbenchSubcommand):
     return env_data
 
   def _config_object_help_data(
-      self, search_str: str | None) -> dict[str, dict[str, Any]]:
+      self, search_str: str | None) -> dict[str, dict[str, str]]:
     usage_lookup: dict[str, list[str]] = defaultdict(list)
     config_parsers: list[ConfigParser] = []
     for config_object_cls in self.config_classes():
@@ -391,8 +393,8 @@ class DescribeSubcommand(CrossbenchSubcommand):
       self,
       config_parsers: list[ConfigParser],
       usage_lookup: Mapping[str, list[str]] | None = None,
-  ) -> dict[str, dict[str, Any]]:
-    config_data: dict[str, dict[str, Any]] = {}
+  ) -> dict[str, dict[str, str]]:
+    config_data: dict[str, dict[str, str]] = {}
     for config_parser in config_parsers:
       help_data: dict[str, str] = dict(config_parser.help_text_items)
       if usage_lookup:

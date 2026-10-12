@@ -9,7 +9,7 @@ import datetime as dt
 import itertools
 import logging
 import sys
-from typing import TYPE_CHECKING, Any, Iterable, Sequence
+from typing import TYPE_CHECKING, Iterable, Sequence
 
 from typing_extensions import override
 
@@ -77,7 +77,7 @@ class AppendDebuggerProbeAction(argparse.Action):
   def __call__(self,
                parser: argparse.ArgumentParser,
                namespace: argparse.Namespace,
-               values: str | Sequence[Any] | None,
+               values: str | Sequence[object] | None,
                option_string: str | None = None) -> None:
     del parser, values
     probes: list[ProbeConfig] = getattr(namespace, self.dest, [])
@@ -116,7 +116,7 @@ class BenchmarkSubcommand(CrossbenchSubcommand):
     has_fast = any(arg == "--fast" or arg.startswith("--fast=") for arg in argv)
     if not has_fast:
       return
-    overrides: dict[str, Any] = {
+    overrides: dict[str, object] = {
         "cool_down_time": dt.timedelta(),
         "splash_screen": SplashScreen.NONE,
     }

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import pandas as pd
 from tabulate import tabulate
@@ -111,7 +111,7 @@ class ReprocessSubcommand(CrossbenchSubcommand):
   def _get_base_df(self, result_dir: pth.LocalPath) -> pd.DataFrame:
     # Reconstruct the base_df by scanning the result-dir for browser and story
     # combinations.
-    combinations: list[dict[str, Any]] = []
+    combinations: list[dict[str, str]] = []
     # Glob exactly 5 levels deep to reach leaf run directories.
     for run_dir in result_dir.glob("*/stories/*/*/*/"):
       try:
