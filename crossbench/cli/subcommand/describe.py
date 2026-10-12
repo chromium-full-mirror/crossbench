@@ -7,7 +7,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from collections import defaultdict
-from typing import TYPE_CHECKING, Sequence, TypedDict
+from typing import TYPE_CHECKING, Mapping, NamedTuple, Sequence, TypedDict
 
 import tabulate as tbl
 from typing_extensions import override
@@ -24,19 +24,25 @@ from crossbench.probes.all import GENERAL_PURPOSE_PROBES
 
 if TYPE_CHECKING:
   import argparse
-  from collections.abc import Mapping
 
+  from crossbench.benchmarks.base import BenchmarkDescription
   from crossbench.cli.parser import CBArgumentParser
   from crossbench.cli.types import Subparsers
   from crossbench.config import ConfigParser
-  from crossbench.types import JsonDict, TableData
+  from crossbench.types import TableData
 
-  class HelpData(TypedDict):
-    benchmarks: dict[str, JsonDict]
-    probes: dict[str, dict[str, str]]
-    networks: dict[str, str]
-    config_objects: dict[str, dict[str, str]]
-    envs: dict[str, dict[str, str]]
+
+class DescribeTarget(NamedTuple):
+  category: str
+  search_str: str | None
+
+
+class HelpData(TypedDict):
+  benchmarks: dict[str, BenchmarkDescription]
+  probes: dict[str, dict[str, str]]
+  networks: dict[str, str]
+  config_objects: dict[str, dict[str, str]]
+  envs: dict[str, dict[str, str]]
 
 
 def get_all_config_classes() -> list[type[ConfigObject]]:
@@ -186,7 +192,7 @@ class DescribeSubcommand(CrossbenchSubcommand):
     return data
 
   def _process_search_str(self, category: str,
-                          search_str: str | None) -> tuple[str, str | None]:
+                          search_str: str | None) -> DescribeTarget:
     if category not in self.CATEGORIES:
       message, alternative = close_matches_message(category, self.CATEGORIES,
                                                    "help category")
@@ -195,7 +201,7 @@ class DescribeSubcommand(CrossbenchSubcommand):
       else:
         category = alternative
     if not search_str:
-      return category, search_str
+      return DescribeTarget(category, search_str)
     search_str = search_str.lower()
     if search_str in self.PROBE_ALIAS:
       category = "probe"
@@ -209,7 +215,7 @@ class DescribeSubcommand(CrossbenchSubcommand):
     elif search_str in self.ENV_ALIAS:
       category = "env"
       search_str = None
-    return category, search_str
+    return DescribeTarget(category, search_str)
 
   def print_json(self, category: str, search_str: str | None,
                  data: HelpData) -> None:
@@ -327,8 +333,8 @@ class DescribeSubcommand(CrossbenchSubcommand):
   def _benchmark_help_data(
       self,
       search_str: str | None = None,
-  ) -> dict[str, JsonDict]:
-    benchmarks_data: dict[str, JsonDict] = {}
+  ) -> dict[str, BenchmarkDescription]:
+    benchmarks_data: dict[str, BenchmarkDescription] = {}
     for benchmark_cls in self.cli.BENCHMARKS:
       aliases: tuple[str, ...] = benchmark_cls.aliases()
       if search_str:

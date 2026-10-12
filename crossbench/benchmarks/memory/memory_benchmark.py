@@ -7,7 +7,8 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, Sequence, \
+    TypedDict
 
 import selenium.common.exceptions
 import urllib3.exceptions
@@ -45,6 +46,17 @@ if TYPE_CHECKING:
   from crossbench.runner.run import Run
   from crossbench.stories.story import Story
   from crossbench.types import JsonDict
+
+
+class PlaybackMetrics(TypedDict):
+  final_surviving_tabs_count: int
+  alive_tabs_by_tab_index: dict[str, int]
+  page_load_duration_ms_by_tab_index: dict[str, float]
+  allocation_duration_ms_by_tab_index: dict[str, float]
+  tab_index_at_first_kill: int | None
+  average_page_load_duration_ms: NotRequired[float]
+  average_allocation_duration_ms: NotRequired[float]
+  average_alive_tabs_after_first_kill: NotRequired[float]
 
 
 class MemoryProbe(BenchmarkProbeMixin, JsonResultProbe):
@@ -119,7 +131,7 @@ class MemoryProbeContext(ActionRunnerListener,
       raise TypeError("The probe only works for MemoryBenchmark")
     run.action_runner.set_listener(self)
     # Records the navigation_start_time time for each window handle.
-    self._playbacks_metrics: list[dict[str, Any]] = []
+    self._playbacks_metrics: list[PlaybackMetrics] = []
     self._navigation_time_ms: dict[str, float] = {}
     self._tab_count: int = 1
     self._alive_tabs_by_tab_index: dict[str, int] = {}
@@ -143,7 +155,7 @@ class MemoryProbeContext(ActionRunnerListener,
     if not self._alive_tabs_by_tab_index:
       return
 
-    playback_metrics: dict[str, Any] = {
+    playback_metrics: PlaybackMetrics = {
         "final_surviving_tabs_count":
             len(self._navigation_time_ms),
         "alive_tabs_by_tab_index":

@@ -8,7 +8,7 @@ import argparse
 import json
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, TypedDict, cast
 
 from typing_extensions import Self, override
 
@@ -26,6 +26,13 @@ if TYPE_CHECKING:
   from crossbench.env.runner_env import RunnerEnv
   from crossbench.probes.results import ProbeResult
   from crossbench.runner.run import Run
+
+
+class CategoryDescriptionDict(TypedDict):
+  data_source: str
+  name: str
+  description: str
+  tags: list[str]
 
 
 @dataclass(frozen=True)
@@ -53,7 +60,7 @@ class CategoryDescription(ConfigObject):
     raise argparse.ArgumentTypeError(
         f"Cannot parse CategoryDescription from string: '{value}'")
 
-  def as_dict(self) -> dict[str, Any]:
+  def as_dict(self) -> CategoryDescriptionDict:
     return {
         "data_source": self.data_source,
         "name": self.name,

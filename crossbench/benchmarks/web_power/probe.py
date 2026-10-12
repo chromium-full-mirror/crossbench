@@ -7,7 +7,7 @@ from __future__ import annotations
 import csv
 import functools
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Iterable, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Iterable, NamedTuple, cast
 
 import pandas as pd
 from perfetto.batch_trace_processor.api import BatchTraceProcessor
@@ -36,6 +36,12 @@ if TYPE_CHECKING:
   from crossbench.probes.results import ProbeResult
   from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.runner.runner import Runner
+
+
+class TraceMetadata(NamedTuple):
+  cb_browser: str
+  cb_story: str
+  cb_run: int
 
 
 def _mean_without_outliers(group: pd.Series) -> float:
@@ -324,7 +330,7 @@ class WebPowerProbe(BenchmarkProbeMixin, Probe):
     browser_to_model = base_df.set_index("cb_browser")["device_model"].to_dict()
 
     sql_to_traces: dict[str, list[str]] = {}
-    trace_to_meta: dict[str, tuple[str, str, int]] = {}
+    trace_to_meta: dict[str, TraceMetadata] = {}
 
     for trace in traces:
       cb_browser, _, cb_story, cb_run, *_ = trace.parent.relative_to(
@@ -339,7 +345,8 @@ class WebPowerProbe(BenchmarkProbeMixin, Probe):
 
       str_trace = str(trace)
       sql_to_traces.setdefault(resolved.sql, []).append(str_trace)
-      trace_to_meta[str_trace] = (cb_browser, cb_story, int(cb_run))
+      trace_to_meta[str_trace] = TraceMetadata(cb_browser, cb_story,
+                                               int(cb_run))
 
     meta_df = pd.DataFrame.from_dict(
         trace_to_meta,

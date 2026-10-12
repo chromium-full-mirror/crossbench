@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from typing_extensions import override
 
@@ -155,4 +155,6 @@ class ResultsSummaryProbeContext(InternalJsonResultProbeContext):
 
   @override
   def to_json(self, actions: Actions) -> Json:
-    return self.run.details_json()
+    # TODO: remove once mypy is replaced by pyrefly
+    # https://peps.python.org/pep-0728
+    return cast("Json", self.run.details_json())

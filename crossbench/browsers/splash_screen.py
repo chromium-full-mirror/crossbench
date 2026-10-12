@@ -8,7 +8,7 @@ import abc
 import dataclasses
 import html
 from argparse import ArgumentTypeError
-from typing import TYPE_CHECKING, Any, ClassVar, Final
+from typing import TYPE_CHECKING, ClassVar, Final, Mapping
 
 from typing_extensions import override
 
@@ -18,13 +18,15 @@ from crossbench.helper import url_helper
 if TYPE_CHECKING:
   from crossbench.browsers.browser import Browser
   from crossbench.runner.actions import Actions
+  from crossbench.runner.run import RunDetailsJson
+  from crossbench.types import JsonDict
 
 
 @dataclasses.dataclass(frozen=True)
 class SplashScreenData:
   is_warmup: bool
   browser: Browser
-  run_details: dict
+  run_details: RunDetailsJson
 
 
 class SplashScreen:
@@ -110,7 +112,10 @@ class DetailedSplashScreen(BaseURLSplashScreen):
     data_url = f"data:text/html;charset=utf-8,{url_helper.quote(page)}"
     return data_url
 
-  def _render_properties(self, title: str, properties: dict[str, Any]) -> str:
+  # TODO: use JsonMapping once mypy is replaced by pyrefly
+  # https://peps.python.org/pep-0728
+  def _render_properties(self, title: str, properties: Mapping[str,
+                                                               object]) -> str:
     section = f"<h2>{html.escape(title)}</h2><dl>"
     for property_name, value in properties.items():
       section += f"<dt>{html.escape(property_name)}</dt>"
@@ -131,7 +136,7 @@ class MinimalSplashScreen(DetailedSplashScreen):
 
   @override
   def _render_browser_details(self, info: SplashScreenData) -> str:
-    properties = {"User Agent": info.browser.user_agent()}
+    properties: JsonDict = {"User Agent": info.browser.user_agent()}
     return self._render_properties("Browser Details", properties)
 
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime as dt
 import enum
 import logging
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Iterable, TypedDict
 
 from typing_extensions import override
 
@@ -47,6 +47,41 @@ if TYPE_CHECKING:
   from crossbench.runner.timing import AnyTimeUnit, Timing
   from crossbench.stories.story import Story
   from crossbench.types import JsonDict
+
+
+class RunMetaDetailsJson(TypedDict):
+  name: str | None
+  index: int
+  repetition: int
+  temperature: str
+  isWarmup: bool
+
+
+class RunSessionDetailsJson(TypedDict):
+  index: int
+  cwd: str
+
+
+class RunTimingDetailsJson(TypedDict):
+  startDateTime: str
+  duration: float
+  durations: dict[str, float]
+  timeout: float
+  overall: dict[str, float]
+
+
+class RunDetailsJson(TypedDict):
+  cwd: str
+  name: str | None
+  story: JsonDict
+  browser: JsonDict
+  run: RunMetaDetailsJson
+  session: RunSessionDetailsJson
+  probes: JsonDict
+  timing: RunTimingDetailsJson
+  success: bool
+  annotations: list[JsonDict]
+  errors: list[str]
 
 
 @enum.unique
@@ -139,7 +174,7 @@ class Run(ResultOrigin):
         f"repetition={self.repetition_name}",
     )
 
-  def details_json(self) -> JsonDict:
+  def details_json(self) -> RunDetailsJson:
     return {
         "cwd": str(self.out_dir),
         "name": self.name,
@@ -162,7 +197,7 @@ class Run(ResultOrigin):
             "duration": self.story.duration.total_seconds(),
             "durations": self.durations.to_json(),
             "timeout": self.timeout.total_seconds(),
-            "global": self.timing.to_json(),
+            "overall": self.timing.to_json(),
         },
         "success": self.is_success,
         "annotations": [

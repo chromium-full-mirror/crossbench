@@ -10,7 +10,7 @@ import datetime as dt
 import logging
 import re
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Generic, Iterable, \
-    Mapping, Sequence, TypeAlias, TypeVar, cast
+    Mapping, NotRequired, Sequence, TypeAlias, TypedDict, TypeVar, cast
 
 from ordered_set import OrderedSet
 from typing_extensions import override
@@ -38,6 +38,20 @@ if TYPE_CHECKING:
   from crossbench.types import StoryTagLookupT
 
 VersionParts: TypeAlias = tuple[str] | tuple[int, ...]
+
+
+class BenchmarkDescription(TypedDict):
+  name: str
+  aliases: tuple[str, ...] | str
+  description: str
+  stories: list[str] | Mapping[str, str]
+  probes_default: dict[str, str]
+  tags: NotRequired[tuple[str, ...]]
+  url: NotRequired[str]
+  url_official: NotRequired[str]
+  url_local: NotRequired[str]
+  version: NotRequired[str]
+  help: NotRequired[str]
 
 
 class Benchmark(abc.ABC):
@@ -109,7 +123,7 @@ class Benchmark(abc.ABC):
     return parser
 
   @classmethod
-  def describe(cls) -> dict[str, Any]:
+  def describe(cls) -> BenchmarkDescription:
     return {
         "name":
             cls.NAME,
@@ -118,7 +132,7 @@ class Benchmark(abc.ABC):
         "description":
             "\n".join(txt_helper.wrap_lines(cls.cli_description(), 70)),
         "stories": [],
-        "probes-default": {
+        "probes_default": {
             probe_cls.NAME:
                 "\n".join(
                     list(
@@ -427,7 +441,7 @@ class SubStoryBenchmark(Benchmark, metaclass=abc.ABCMeta):
 
   @classmethod
   @override
-  def describe(cls) -> dict[str, Any]:
+  def describe(cls) -> BenchmarkDescription:
     data = super().describe()
     data["stories"] = cls.describe_stories()
     data["tags"] = cls.DEFAULT_STORY_CLS.all_tags()
@@ -842,12 +856,12 @@ class PressBenchmark(SubStoryBenchmark):
 
   @classmethod
   @override
-  def describe(cls) -> dict[str, Any]:
+  def describe(cls) -> BenchmarkDescription:
     data = super().describe()
     assert issubclass(cls.DEFAULT_STORY_CLS, PressBenchmarkStory)
     data["url"] = cls.DEFAULT_STORY_CLS.URL
-    data["url-official"] = cls.DEFAULT_STORY_CLS.URL_OFFICIAL
-    data["url-local"] = cls.DEFAULT_STORY_CLS.URL_LOCAL
+    data["url_official"] = cls.DEFAULT_STORY_CLS.URL_OFFICIAL
+    data["url_local"] = cls.DEFAULT_STORY_CLS.URL_LOCAL
     data["version"] = ".".join(map(str, cls.version()))
     return data
 

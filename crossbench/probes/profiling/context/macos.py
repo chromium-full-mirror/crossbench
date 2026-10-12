@@ -67,8 +67,7 @@ class MacOSProfilingContext(PosixProfilingContext):
     if self.target == TargetMode.SYSTEM_WIDE:
       self._start_xctrace()
     elif self.target == TargetMode.RENDERER_PROCESS_ONLY:
-      renderer_pid, _ = self.cached_renderer_pid_tid
-      self._start_xctrace(renderer_pid)
+      self._start_xctrace(self.cached_renderer_pid_tid.pid)
     else:
       raise ValueError(f"Invalid target: {self.target}")
 

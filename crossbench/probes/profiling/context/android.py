@@ -84,7 +84,7 @@ class AndroidProfilingContext(PosixProfilingContext):
     return f"{mask:x}"
 
   def _pin_renderer_main_core(self, cpu: int) -> None:
-    _, renderer_main_tid = self.cached_renderer_pid_tid
+    renderer_main_tid = self.cached_renderer_pid_tid.tid
     self.browser_platform.sh("taskset", "-p", self._cpu_mask([cpu]),
                              str(renderer_main_tid))
 

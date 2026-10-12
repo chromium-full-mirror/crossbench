@@ -485,7 +485,7 @@ class McpSubcommand(CrossbenchSubcommand):
     describe_cmd = DescribeSubcommandNoParser(self.cli)
     data = describe_cmd.help_data("benchmarks", benchmark_name or None)
     if benchmark_name:
-      return data["benchmarks"].get(benchmark_name, {})
+      return dict(data["benchmarks"].get(benchmark_name, {}))
     return data["benchmarks"]
 
   def describe_probes(self, name: str = "") -> dict:

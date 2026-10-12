@@ -7,7 +7,7 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import json
-from typing import TYPE_CHECKING, Any, ClassVar, Self
+from typing import TYPE_CHECKING, ClassVar, NotRequired, Self, TypedDict
 
 from typing_extensions import override
 
@@ -19,6 +19,13 @@ if TYPE_CHECKING:
   from crossbench.plt.process_meminfo import ProcessMeminfo
   from crossbench.probes.results import ProbeResult
   from crossbench.runner.run import Run
+
+
+class MeminfoJson(TypedDict):
+  info_stack: list[str]
+  processes: list[dict[str, object]]
+  title: NotRequired[str]
+  system: NotRequired[dict[str, float]]
 
 
 class MeminfoProbe(Probe):
@@ -98,7 +105,7 @@ class MeminfoProbeContext(ProbeContext[MeminfoProbe]):
       process_meminfos += self.browser.meminfo(
           self._timeout_from_deadline(deadline))
 
-    meminfo_json: dict[str, Any] = {
+    meminfo_json: MeminfoJson = {
         "info_stack": list(info_stack),
         "processes": [],
     }

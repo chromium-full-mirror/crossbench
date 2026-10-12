@@ -7,7 +7,7 @@ from __future__ import annotations
 import abc
 import logging
 from functools import cached_property
-from typing import TYPE_CHECKING, Final, Sequence, cast
+from typing import TYPE_CHECKING, Final, NamedTuple, Sequence, cast
 
 from typing_extensions import override
 
@@ -28,6 +28,11 @@ if TYPE_CHECKING:
   from crossbench.plt.base import Platform
   from crossbench.probes.profiling.system_profiling import ProfilingProbe
   from crossbench.runner.run import Run
+
+
+class RendererPidTid(NamedTuple):
+  pid: int
+  tid: int
 
 
 class ProfilingContext(ProbeContext, metaclass=abc.ABCMeta):
@@ -66,8 +71,8 @@ class ProfilingContext(ProbeContext, metaclass=abc.ABCMeta):
       self._verify_current_renderer_pid()
 
   def _verify_current_renderer_pid(self) -> None:
-    original_render_pid, _ = self.cached_renderer_pid_tid
-    current_renderer_pid, _ = self._get_renderer_pid_tid()
+    original_render_pid = self.cached_renderer_pid_tid.pid
+    current_renderer_pid = self._get_renderer_pid_tid().pid
     if current_renderer_pid != original_render_pid:
       logging.error(
           "Renderer PID changed from %d to %d during the run. "
@@ -75,11 +80,11 @@ class ProfilingContext(ProbeContext, metaclass=abc.ABCMeta):
           original_render_pid, current_renderer_pid)
 
   @cached_property
-  def cached_renderer_pid_tid(self) -> tuple[int, int]:
+  def cached_renderer_pid_tid(self) -> RendererPidTid:
     """Cached renderer PID / TID"""
     return self._get_renderer_pid_tid()
 
-  def _get_renderer_pid_tid(self) -> tuple[int, int]:
+  def _get_renderer_pid_tid(self) -> RendererPidTid:
     assert self._story_ready, (
         "Fetching renderer PID/TID before the story is loaded could lead to "
         "the wrong PID/TID being used. This should never happen TM!")
@@ -94,7 +99,7 @@ class ProfilingContext(ProbeContext, metaclass=abc.ABCMeta):
           "is required.")
       logging.error(error_message)
       raise ValueError(error_message)
-    return renderer_pid, renderer_main_tid
+    return RendererPidTid(renderer_pid, renderer_main_tid)
 
 
 class PosixProfilingContext(ProfilingContext):
