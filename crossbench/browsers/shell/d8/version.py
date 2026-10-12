@@ -22,6 +22,11 @@ class D8Version(BrowserVersion):
 
   @classmethod
   @override
+  def default_channel(cls) -> BrowserVersionChannel:
+    return BrowserVersionChannel.ALPHA
+
+  @classmethod
+  @override
   def _parse(cls, full_version: str) -> VersionParseResult:
     matches = cls._VERSION_RE.fullmatch(full_version.strip())
     if not matches:

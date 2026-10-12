@@ -9,11 +9,12 @@ import dataclasses
 import enum
 import functools
 import re
-from typing import Final, Iterable, NamedTuple, Self
+from typing import Final, NamedTuple, Self
 
 from typing_extensions import override
 
-from crossbench.helper.version import Version, VersionParseError
+from crossbench.helper.version import Version, VersionParseError, \
+    VersionPartsData
 
 
 @dataclasses.dataclass
@@ -73,6 +74,10 @@ _VERSION_DIGITS_ONLY_RE: re.Pattern[str] = re.compile(r"\d+(\.\d+)*")
 class BrowserVersion(Version, metaclass=abc.ABCMeta):
 
   @classmethod
+  def default_channel(cls) -> BrowserVersionChannel:
+    return BrowserVersionChannel.STABLE
+
+  @classmethod
   def parse_unique(cls, value: str) -> Self:
     """Parse a unique version identifier for a browser.
     Unlike the parse() method, this should only parse input values that can
@@ -104,35 +109,36 @@ class BrowserVersion(Version, metaclass=abc.ABCMeta):
     pass
 
   @classmethod
-  def any(cls, parts: Iterable[int], version_str: str = "") -> Self:
+  def any(cls, parts: VersionPartsData, version_str: str = "") -> Self:
     return cls(parts, BrowserVersionChannel.ANY, version_str)
 
   @classmethod
-  def lts(cls, parts: Iterable[int], version_str: str = "") -> Self:
+  def lts(cls, parts: VersionPartsData, version_str: str = "") -> Self:
     return cls(parts, BrowserVersionChannel.LTS, version_str)
 
   @classmethod
-  def stable(cls, parts: Iterable[int], version_str: str = "") -> Self:
+  def stable(cls, parts: VersionPartsData, version_str: str = "") -> Self:
     return cls(parts, BrowserVersionChannel.STABLE, version_str)
 
   @classmethod
-  def beta(cls, parts: Iterable[int], version_str: str = "") -> Self:
+  def beta(cls, parts: VersionPartsData, version_str: str = "") -> Self:
     return cls(parts, BrowserVersionChannel.BETA, version_str)
 
   @classmethod
-  def alpha(cls, parts: Iterable[int], version_str: str = "") -> Self:
+  def alpha(cls, parts: VersionPartsData, version_str: str = "") -> Self:
     return cls(parts, BrowserVersionChannel.ALPHA, version_str)
 
   @classmethod
-  def pre_alpha(cls, parts: Iterable[int], version_str: str = "") -> Self:
+  def pre_alpha(cls, parts: VersionPartsData, version_str: str = "") -> Self:
     return cls(parts, BrowserVersionChannel.PRE_ALPHA, version_str)
 
   def __init__(self,
-               parts: Iterable[int],
-               channel: BrowserVersionChannel = BrowserVersionChannel.STABLE,
+               parts: VersionPartsData,
+               channel: BrowserVersionChannel | None = None,
                version_str: str = "") -> None:
     super().__init__(parts, version_str)
-    self._channel: Final[BrowserVersionChannel] = channel
+    self._channel: Final[BrowserVersionChannel] = (
+        channel or self.default_channel())
 
   @property
   @override
@@ -268,7 +274,7 @@ class UnknownBrowserVersion(BrowserVersion):
   knowing which exact browser/version is used."""
 
   def __init__(self,
-               parts: tuple[int, ...] = (),
+               parts: VersionPartsData = (),
                channel: BrowserVersionChannel = BrowserVersionChannel.ANY,
                version_str: str = "unknown") -> None:
     del channel

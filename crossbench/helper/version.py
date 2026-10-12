@@ -5,7 +5,9 @@
 from __future__ import annotations
 
 import functools
-from typing import Final, Iterable
+from typing import Final, Iterable, TypeAlias
+
+VersionPartsData: TypeAlias = Iterable[int] | int
 
 
 class VersionParseError(ValueError):
@@ -27,15 +29,18 @@ class Version:
   def parse_error(cls, msg: str, version: str) -> VersionParseError:
     return VersionParseError(cls.__name__, msg, version)
 
-  def __init__(self, parts: Iterable[int], version_str: str = "") -> None:
+  def __init__(self, parts: VersionPartsData, version_str: str = "") -> None:
     self._parts: Final[tuple[int, ...]] = self._validate_parts(
         parts, version_str or repr(parts))
     self._version_str: Final[str] = version_str
 
   @classmethod
-  def _validate_parts(cls, parts: Iterable[int], value: str) -> tuple[int, ...]:
+  def _validate_parts(cls, parts: VersionPartsData,
+                      value: str) -> tuple[int, ...]:
     if parts is None:
       raise cls.parse_error("Invalid version format", value)
+    if isinstance(parts, int):
+      parts = (parts,)
     parts_tuple = tuple(parts)
     for part in parts_tuple:
       if part < 0:

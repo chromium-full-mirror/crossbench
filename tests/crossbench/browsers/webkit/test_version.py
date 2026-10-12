@@ -3,13 +3,13 @@
 # found in the LICENSE file.
 from __future__ import annotations
 
-import unittest
-
 from crossbench.browsers.webkit.version import WebKitVersion
 from tests import test_helper
+from tests.crossbench.helper.test_version import VersionTestCase
 
 
-class WebKitVersionTestCase(unittest.TestCase):
+class WebKitVersionTestCase(VersionTestCase):
+  VERSION_CLS = WebKitVersion
 
   def test_parse_webkit_nightly(self):
     version = WebKitVersion.parse("webkit-nightly-299105@main")

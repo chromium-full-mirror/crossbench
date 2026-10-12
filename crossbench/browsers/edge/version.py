@@ -5,11 +5,14 @@
 from __future__ import annotations
 
 import re
-from typing import Final, Iterable, Self
+from typing import TYPE_CHECKING, Final, Self
 
 from typing_extensions import override
 
 from crossbench.browsers.chromium.version import ChromiumVersion
+
+if TYPE_CHECKING:
+  from crossbench.helper.version import VersionPartsData
 
 
 class EdgeVersion(ChromiumVersion):
@@ -36,9 +39,9 @@ class EdgeVersion(ChromiumVersion):
     return super()._validate_suffix(suffix)
 
   @classmethod
-  def dev(cls, parts: Iterable[int], version_str: str = "") -> Self:
+  def dev(cls, parts: VersionPartsData, version_str: str = "") -> Self:
     return cls.alpha(parts, version_str)
 
   @classmethod
-  def canary(cls, parts: Iterable[int], version_str: str = "") -> Self:
+  def canary(cls, parts: VersionPartsData, version_str: str = "") -> Self:
     return cls.pre_alpha(parts, version_str)

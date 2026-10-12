@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import abc
 import re
-from typing import Iterable, Self
+from typing import Self
 
 from typing_extensions import override
 
-from crossbench.helper.version import Version
+from crossbench.helper.version import Version, VersionPartsData
 
 VERSION_PART_RE = re.compile(r"[^0-9]*(?P<parts>[\d+.]+)")
 
@@ -27,11 +27,12 @@ class PlatformVersion(Version, metaclass=abc.ABCMeta):
 
   @classmethod
   @override
-  def _validate_parts(cls, parts: Iterable[int], value: str) -> tuple[int, ...]:
-    parts = super()._validate_parts(parts, value)
-    if not parts:
+  def _validate_parts(cls, parts: VersionPartsData,
+                      value: str) -> tuple[int, ...]:
+    parts_tuple = super()._validate_parts(parts, value)
+    if not parts_tuple:
       raise cls.parse_error("missing parts", value)
-    return parts
+    return parts_tuple
 
   @property
   def major(self) -> int:

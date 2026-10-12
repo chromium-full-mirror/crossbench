@@ -13,10 +13,12 @@ from crossbench.plt.bin import Binaries
 from crossbench.probes.cb_perfetto import traceconv
 from tests import test_helper
 from tests.crossbench.base import CrossbenchFakeFsTestCase
+from tests.crossbench.helper.test_version import VersionTestCase
 from tests.crossbench.mock_helper import LinuxMockPlatform
 
 
-class PerfettoVersionTestCase(CrossbenchFakeFsTestCase):
+class PerfettoVersionTestCase(VersionTestCase):
+  VERSION_CLS = traceconv.PerfettoVersion
 
   def test_parse(self) -> None:
     self.assertSequenceEqual(

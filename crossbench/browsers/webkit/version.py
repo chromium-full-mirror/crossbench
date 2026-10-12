@@ -20,6 +20,11 @@ class WebKitVersion(BrowserVersion):
 
   @classmethod
   @override
+  def default_channel(cls) -> BrowserVersionChannel:
+    return BrowserVersionChannel.PRE_ALPHA
+
+  @classmethod
+  @override
   def _parse(cls, full_version: str) -> VersionParseResult:
     if "webkit" not in full_version.lower():
       raise cls.parse_error("Could not extract version number", full_version)
