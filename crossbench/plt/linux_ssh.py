@@ -17,6 +17,7 @@ if TYPE_CHECKING:
   from crossbench import path as pth
   from crossbench.plt.arch import MachineArch
   from crossbench.plt.base import Platform
+  from crossbench.plt.details import CpuDetails
   from crossbench.plt.port_manager import PortManager
   from crossbench.plt.types import CmdArg, CmdArgs, ListCmdArgs
 
@@ -28,7 +29,7 @@ class LinuxSshPlatform(SshPlatformMixin, RemoteLinuxPlatform):
     super().__init__(host_platform, host, port, ssh_port, ssh_user)
     self._machine: MachineArch | None = None
     self._system_details: dict[str, Any] | None = None
-    self._cpu_details: dict[str, Any] | None = None
+    self._cpu_details: CpuDetails | None = None
 
   def _create_port_manager(self) -> PortManager:
     return SshPortManager(self)

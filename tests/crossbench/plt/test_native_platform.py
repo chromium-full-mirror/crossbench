@@ -54,7 +54,7 @@ class BaseNativePlatformTestCase(unittest.TestCase):
 
   def test_cpu_details(self):
     details = self.platform.cpu_details()
-    self.assertLess(0, details["physical cores"])
+    self.assertLess(0, details["physical_cores"])
 
   def test_get_relative_cpu_speed(self):
     self.assertGreater(self.platform.get_relative_cpu_speed(), 0)
@@ -870,10 +870,10 @@ class PosixNativePlatformTestCase(BaseNativePlatformTestCase):
     self.assertTrue(details)
     self.assertTrue(json.dumps(details))
     self.assertIn("info", details)
-    self.assertIn("physical cores", details)
-    self.assertIn("logical cores", details)
-    self.assertIn("min frequency", details)
-    self.assertIn("max frequency", details)
+    self.assertIn("physical_cores", details)
+    self.assertIn("logical_cores", details)
+    self.assertIn("min_frequency", details)
+    self.assertIn("max_frequency", details)
 
   def test_python_details(self):
     details = self.platform.python_details()
@@ -1174,8 +1174,8 @@ class MacOSNativePlatformTestCase(PosixNativePlatformTestCase):
       self.skipTest("Refresh rate not supported")
 
     with mock.patch.object(self.platform, "sleep") as mock_sleep:
-      success, _ = self.platform.set_display_refresh_rate(rate)
-      self.assertTrue(success)
+      result = self.platform.set_display_refresh_rate(rate)
+      self.assertTrue(result.success)
       mock_sleep.assert_not_called()
 
   def test_search_app_binary_not_found(self):

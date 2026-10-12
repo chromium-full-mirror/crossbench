@@ -27,9 +27,9 @@ from crossbench.plt.version import PlatformVersion
 if TYPE_CHECKING:
   import subprocess
 
+  from crossbench.plt.details import CpuDetails, OsDetails, PythonDetails
   from crossbench.plt.signals import AnyPosixSignals, Signals
   from crossbench.plt.types import CmdArg, ListCmdArgs, ProcessIo, ProcessLike
-  from crossbench.types import JsonDict
 
 
 class PosixVersion(PlatformVersion):
@@ -138,21 +138,21 @@ class PosixPlatform(Platform, metaclass=abc.ABCMeta):
 
   @functools.lru_cache(maxsize=1)
   @override
-  def cpu_details(self) -> dict[str, Any]:
+  def cpu_details(self) -> CpuDetails:
     if self.is_local:
       return super().cpu_details()
     return {
         "info": self.cpu,
-        "physical cores": self.cpu_cores(logical=False),
-        "logical cores": self.cpu_cores(logical=True),
-        "min frequency": "n/a",
-        "max frequency": "n/a",
-        "current frequency": "n/a",
+        "physical_cores": self.cpu_cores(logical=False),
+        "logical_cores": self.cpu_cores(logical=True),
+        "min_frequency": "n/a",
+        "max_frequency": "n/a",
+        "current_frequency": "n/a",
     }
 
   @functools.lru_cache(maxsize=1)
   @override
-  def os_details(self) -> JsonDict:
+  def os_details(self) -> OsDetails:
     if self.is_local:
       return super().os_details()
     return {
@@ -166,7 +166,7 @@ class PosixPlatform(Platform, metaclass=abc.ABCMeta):
 
   @functools.lru_cache(maxsize=1)
   @override
-  def python_details(self) -> JsonDict:
+  def python_details(self) -> PythonDetails:
     if self.is_local:
       return super().python_details()
     if python3 := self.which("python3"):

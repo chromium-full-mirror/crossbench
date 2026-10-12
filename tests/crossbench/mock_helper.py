@@ -47,6 +47,7 @@ if TYPE_CHECKING:
   from crossbench.action_runner.virtual_device.pointing import \
       PointingVirtualDeviceConfig
   from crossbench.device_config import DeviceConfigKeyPath
+  from crossbench.plt.details import CpuDetails, OsDetails
   from crossbench.plt.signals import Signals
   from crossbench.plt.types import CmdArg, ListCmdArgs, ProcessIo, \
       ProcessLike, TupleCmdArgs
@@ -228,7 +229,7 @@ class MockPlatformMixin:
   def port_manager(self) -> PortManager:
     return self._default_port_manager
 
-  def os_details(self):
+  def os_details(self) -> OsDetails:
     return {
         "system": "mock os system",
         "release": "mock os release",
@@ -352,8 +353,8 @@ class MockPlatformMixin:
     return 0.1
 
   @functools.lru_cache(maxsize=1)
-  def cpu_details(self) -> dict[str, Any]:
-    return {"physical cores": 2, "logical cores": 4, "info": self.cpu}
+  def cpu_details(self) -> CpuDetails:
+    return {"physical_cores": 2, "logical_cores": 4, "info": self.cpu}
 
   def write_text(self,
                  file: pth.AnyPathLike,

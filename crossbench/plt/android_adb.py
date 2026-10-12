@@ -45,7 +45,8 @@ from crossbench.plt.arch import MachineArch
 from crossbench.plt.base import SubprocessError
 from crossbench.plt.bin import Binaries
 from crossbench.plt.device_info import DeviceInfo
-from crossbench.plt.display_info import DisplayResolution
+from crossbench.plt.display_info import DisplayRefreshRateResult, \
+    DisplayResolution
 from crossbench.plt.evemu_platform_mixin import EvemuPlatformMixin
 from crossbench.plt.port_manager import PortManager
 from crossbench.plt.posix import PosixVersion, RemotePosixPlatform
@@ -61,10 +62,10 @@ if TYPE_CHECKING:
       VirtualDeviceType
   from crossbench.device_config import DeviceConfigKeyPath
   from crossbench.plt.base import Platform
+  from crossbench.plt.details import CpuDetails, PythonDetails
   from crossbench.plt.display_info import DisplayInfo
   from crossbench.plt.types import CmdArg, ListCmdArgs, PlatformKey, \
       ProcessIo, TupleCmdArgs
-  from crossbench.types import JsonDict
 
 
 class _MoblyDebugFilter(logging.Filter):
@@ -1397,18 +1398,18 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
 
   @functools.lru_cache(maxsize=1)
   @override
-  def cpu_details(self) -> dict[str, Any]:
+  def cpu_details(self) -> CpuDetails:
     # TODO: Implement properly (i.e. remove all n/a values)
     return {
         "info": self.cpu,
-        "physical cores": self.cpu_cores(logical=False),
-        "logical cores": self.cpu_cores(logical=True),
+        "physical_cores": self.cpu_cores(logical=False),
+        "logical_cores": self.cpu_cores(logical=True),
         "usage": "n/a",
-        "total usage": "n/a",
-        "system load": "n/a",
-        "min frequency": "n/a",
-        "max frequency": "n/a",
-        "current frequency": "n/a",
+        "total_usage": "n/a",
+        "system_load": "n/a",
+        "min_frequency": "n/a",
+        "max_frequency": "n/a",
+        "current_frequency": "n/a",
     }
 
   @functools.lru_cache(maxsize=1)
@@ -1451,7 +1452,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
 
   @functools.lru_cache(maxsize=1)
   @override
-  def python_details(self) -> JsonDict:
+  def python_details(self) -> PythonDetails:
     # TODO: Implement properly (i.e. remove all n/a values)
     return {
         "version": "n/a",
@@ -1513,7 +1514,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
   @override
   def set_display_refresh_rate(self,
                                refresh_rate: int,
-                               retry: int = 3) -> tuple[bool, str]:
+                               retry: int = 3) -> DisplayRefreshRateResult:
     rate_str = str(float(refresh_rate))
     for _ in range(retry):
       self.sh("settings", "put", "system", "min_refresh_rate", rate_str)
@@ -1525,10 +1526,12 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
           val_str = line.split("=", maxsplit=1)[1].strip()
           try:
             if round(float(val_str)) == refresh_rate:
-              return True, f"Refresh rate successfully set to {refresh_rate}Hz"
+              return DisplayRefreshRateResult(
+                  True, f"Refresh rate successfully set to {refresh_rate}Hz")
           except ValueError:
             pass
-    return False, f"Failed to set display refresh rate to {refresh_rate}Hz"
+    return DisplayRefreshRateResult(
+        False, f"Failed to set display refresh rate to {refresh_rate}Hz")
 
   @override
   def reset_display_refresh_rate(self) -> None:

@@ -339,11 +339,11 @@ class RunnerEnv(BaseEnv):
     refresh_rate = self._config.screen_refresh_rate
     if not self._platform.is_macos or refresh_rate is EnvConfig.IGNORE:
       return
-    success, log_msg = self._platform.set_display_refresh_rate(refresh_rate)
-    if success:
-      logging.debug(log_msg)
+    result = self._platform.set_display_refresh_rate(refresh_rate)
+    if result.success:
+      logging.debug(result.message)
     else:
-      self.handle_validation_warning(log_msg)
+      self.handle_validation_warning(result.message)
 
   def _check_headless(self) -> None:
     self._check_config_headless()

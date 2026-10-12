@@ -54,14 +54,15 @@ if TYPE_CHECKING:
   from crossbench.action_runner.virtual_device.virtual_device_config import \
       VirtualDeviceConfig
   from crossbench.device_config import DeviceConfigKeyPath
-  from crossbench.plt.display_info import DisplayInfo, DisplayResolution
+  from crossbench.plt.details import CpuDetails, OsDetails, PythonDetails
+  from crossbench.plt.display_info import DisplayInfo, \
+      DisplayRefreshRateResult, DisplayResolution
   from crossbench.plt.process_meminfo import ProcessMeminfo
   from crossbench.plt.signals import AnySignals, Signals
   from crossbench.plt.types import CmdArg, PlatformKey, ProcessIo, \
       ProcessLike, TupleCmdArgs
   from crossbench.plt.version import PlatformVersion
   from crossbench.plt.version_details import VersionDetails
-  from crossbench.types import JsonDict
 
 
 class Environ(collections.abc.MutableMapping, metaclass=abc.ABCMeta):
@@ -353,24 +354,24 @@ class Platform(abc.ABC):
     return not status.power_plugged
 
   @functools.lru_cache(maxsize=1)
-  def cpu_details(self) -> dict[str, Any]:
+  def cpu_details(self) -> CpuDetails:
     self.assert_is_local()
-    details = {
-        "physical cores": self.cpu_cores(logical=False),
-        "logical cores": self.cpu_cores(logical=True),
+    details: CpuDetails = {
+        "physical_cores": self.cpu_cores(logical=False),
+        "logical_cores": self.cpu_cores(logical=True),
         "usage": psutil.cpu_percent(percpu=True, interval=0.1),
-        "total usage": psutil.cpu_percent(),
-        "system load": psutil.getloadavg(),
+        "total_usage": psutil.cpu_percent(),
+        "system_load": psutil.getloadavg(),
         "info": self.cpu,
-        "min frequency": "N/A",
-        "max frequency": "N/A",
-        "current frequency": "N/A",
+        "min_frequency": "N/A",
+        "max_frequency": "N/A",
+        "current_frequency": "N/A",
     }
     if cpu_freq := self._cpu_freq():
       details.update({
-          "min frequency": f"{cpu_freq.min:.2f}Mhz",
-          "max frequency": f"{cpu_freq.max:.2f}Mhz",
-          "current frequency": f"{cpu_freq.current:.2f}Mhz",
+          "min_frequency": f"{cpu_freq.min:.2f}MHz",
+          "max_frequency": f"{cpu_freq.max:.2f}MHz",
+          "current_frequency": f"{cpu_freq.current:.2f}MHz",
       })
     return details
 
@@ -431,7 +432,7 @@ class Platform(abc.ABC):
     return details
 
   @functools.lru_cache(maxsize=1)
-  def os_details(self) -> JsonDict:
+  def os_details(self) -> OsDetails:
     self.assert_is_local()
     return {
         "system": py_platform.system(),
@@ -441,7 +442,7 @@ class Platform(abc.ABC):
     }
 
   @functools.lru_cache(maxsize=1)
-  def python_details(self) -> JsonDict:
+  def python_details(self) -> PythonDetails:
     self.assert_is_local()
     return {
         "version": py_platform.python_version(),
@@ -1359,7 +1360,7 @@ class Platform(abc.ABC):
 
   def set_display_refresh_rate(self,
                                refresh_rate: int,
-                               retry: int = 3) -> tuple[bool, str]:
+                               retry: int = 3) -> DisplayRefreshRateResult:
     raise NotImplementedError(
         "'set_display_refresh_rate' is only available on MacOS and "
         "Android for now")

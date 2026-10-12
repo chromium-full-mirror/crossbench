@@ -13,6 +13,7 @@ from unittest import mock
 from typing_extensions import override
 
 from crossbench.env.runner_env import EnvConfig, RunnerEnv, ValidationMode
+from crossbench.plt.display_info import DisplayRefreshRateResult
 from crossbench.runner.runner import Runner
 from tests.crossbench.benchmarks import helper
 
@@ -91,7 +92,7 @@ class MotionMark1BaseTestCase(
     self.set_display_refresh_rate_patcher = mock.patch.object(
         self.platform,
         "set_display_refresh_rate",
-        return_value=(True, "mocked"))
+        return_value=DisplayRefreshRateResult(True, "mocked"))
     self.addCleanup(self.set_display_refresh_rate_patcher.stop)
     self.set_display_refresh_rate_patcher.start()
 

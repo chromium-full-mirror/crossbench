@@ -22,9 +22,9 @@ from crossbench.plt.version import PlatformVersion
 
 if TYPE_CHECKING:
   from crossbench.plt.base import CPUFreqInfo
+  from crossbench.plt.details import CpuDetails, OsDetails, PythonDetails
   from crossbench.plt.display_info import DisplayInfo
   from crossbench.plt.signals import AnySignals
-  from crossbench.types import JsonDict
 
 pattern: re.Pattern[str] = re.compile(
     r"(?P<name>[^\(\)]+) \((?P<version>[0-9\.]+)\) (- Connecting )?"
@@ -216,23 +216,23 @@ class IOSPlatform(RemotePlatformMixin, Platform):
 
   @functools.lru_cache(maxsize=1)
   @override
-  def cpu_details(self) -> dict[str, Any]:
+  def cpu_details(self) -> CpuDetails:
     # TODO: Implement properly (i.e. remove all n/a values)
     return {
         "info": self.cpu,
-        "physical cores": self.cpu_cores(logical=False),
-        "logical cores": self.cpu_cores(logical=True),
+        "physical_cores": self.cpu_cores(logical=False),
+        "logical_cores": self.cpu_cores(logical=True),
         "usage": "n/a",
-        "total usage": "n/a",
-        "system load": "n/a",
-        "min frequency": "n/a",
-        "max frequency": "n/a",
-        "current frequency": "n/a",
+        "total_usage": "n/a",
+        "system_load": "n/a",
+        "min_frequency": "n/a",
+        "max_frequency": "n/a",
+        "current_frequency": "n/a",
     }
 
   @functools.lru_cache(maxsize=1)
   @override
-  def os_details(self) -> JsonDict:
+  def os_details(self) -> OsDetails:
     return {
         "system": "ios",
         "platform": f"ios {self.version_str}",
@@ -242,7 +242,7 @@ class IOSPlatform(RemotePlatformMixin, Platform):
 
   @functools.lru_cache(maxsize=1)
   @override
-  def python_details(self) -> JsonDict:
+  def python_details(self) -> PythonDetails:
     return {
         "version": "n/a",
         "bits": "n/a",

@@ -33,10 +33,10 @@ class PlatformRecord(BaseRecord):
         os_version=os_details["release"],
         os_version_name=os_details["version"],
         cpu_architecture=str(platform.machine),
-        cpu_physical_cores=cpu_details["physical cores"],
-        cpu_logical_cores=cpu_details["logical cores"],
-        cpu_max_frequency=cpu_details.get("max frequency", "N/A"),
-        cpu_min_frequency=cpu_details.get("min frequency", "N/A"),
+        cpu_physical_cores=cpu_details["physical_cores"],
+        cpu_logical_cores=cpu_details["logical_cores"],
+        cpu_max_frequency=cpu_details.get("max_frequency", "N/A"),
+        cpu_min_frequency=cpu_details.get("min_frequency", "N/A"),
         hw_model=platform.model,
         python_version=python_details["version"])
 

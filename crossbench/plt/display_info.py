@@ -12,6 +12,11 @@ class DisplayResolution(NamedTuple):
   height: int
 
 
+class DisplayRefreshRateResult(NamedTuple):
+  success: bool
+  message: str
+
+
 class DisplayInfo(TypedDict):
   resolution: DisplayResolution
   refresh_rate: float

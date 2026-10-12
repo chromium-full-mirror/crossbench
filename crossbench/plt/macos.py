@@ -25,12 +25,14 @@ from typing_extensions import override
 from crossbench import path as pth
 from crossbench.helper.size import Size
 from crossbench.parse import NumberParser
-from crossbench.plt.display_info import DisplayResolution
+from crossbench.plt.display_info import DisplayRefreshRateResult, \
+    DisplayResolution
 from crossbench.plt.posix import PosixPlatform, PosixVersion
 from crossbench.plt.signals import MacOSSignals
 
 if TYPE_CHECKING:
   from crossbench.plt.base import CPUFreqInfo
+  from crossbench.plt.details import MacOsSystemDetails
   from crossbench.plt.display_info import DisplayInfo
   from crossbench.plt.types import TupleCmdArgs
   from crossbench.plt.version import PlatformVersion
@@ -205,7 +207,7 @@ class MacOSPlatform(PosixPlatform):
       return super().system_memory_bytes
     return int(self.sh_stdout("sysctl", "-n", "hw.memsize").strip())
 
-  def _macos_system_details(self) -> dict[str, Any]:
+  def _macos_system_details(self) -> MacOsSystemDetails:
     return {
         "system_profiler":
             self.sh_stdout("system_profiler", "SPHardwareDataType"),
@@ -582,7 +584,7 @@ class MacOSPlatform(PosixPlatform):
 
   def set_display_refresh_rate(self,
                                refresh_rate: int,
-                               retry: int = 3) -> tuple[bool, str]:
+                               retry: int = 3) -> DisplayRefreshRateResult:
     """Sets the refresh rate if the main display supports it.
 
     This function uses CoreGraphics and CoreFoundtation libraries:
@@ -609,7 +611,8 @@ class MacOSPlatform(PosixPlatform):
       self._default_display_mode = display_mode
     main_refresh_rate = core_graphics.CGDisplayModeGetRefreshRate(display_mode)
     if main_refresh_rate == refresh_rate:
-      return True, f"The display refresh rate is already {refresh_rate}Hz"
+      return DisplayRefreshRateResult(
+          True, f"The display refresh rate is already {refresh_rate}Hz")
     main_width = round(core_graphics.CGDisplayModeGetWidth(display_mode))
     main_height = round(core_graphics.CGDisplayModeGetHeight(display_mode))
     log_msg = (f"\nMain display: ID={main_display}, "
@@ -624,16 +627,17 @@ class MacOSPlatform(PosixPlatform):
     log_msg += find_log
 
     if set_mode is not None:
-      success, set_log = self._apply_display_mode(core_graphics, main_display,
-                                                  set_mode, refresh_rate, retry)
-      if success:
-        return True, (f"The refresh rate was successfully set!\n"
-                      f"{log_msg}{set_log}")
-      log_msg += set_log
+      result = self._apply_display_mode(core_graphics, main_display, set_mode,
+                                        refresh_rate, retry)
+      if result.success:
+        return DisplayRefreshRateResult(
+            True, ("The refresh rate was successfully set!\n"
+                   f"{log_msg}{result.message}"))
+      log_msg += result.message
     else:
       log_msg += "\nFailed to find a match for display size and refresh rate!"
 
-    return False, log_msg
+    return DisplayRefreshRateResult(False, log_msg)
 
   def _get_core_foundation(self) -> ctypes.CDLL:
     core_foundation = ctypes.CDLL(ctypes.util.find_library("CoreFoundation"))
@@ -684,17 +688,17 @@ class MacOSPlatform(PosixPlatform):
       set_mode: ctypes.c_void_p,
       refresh_rate: int,
       retry: int,
-  ) -> tuple[bool, str]:
+  ) -> DisplayRefreshRateResult:
     log_msg = ""
     for _ in range(retry):
       core_graphics.CGDisplaySetDisplayMode(main_display, set_mode, None)
       current_mode = core_graphics.CGDisplayCopyDisplayMode(main_display)
       rate = int(core_graphics.CGDisplayModeGetRefreshRate(current_mode))
       if refresh_rate == rate:
-        return True, log_msg
+        return DisplayRefreshRateResult(True, log_msg)
       log_msg += "\nFailed to set the refresh rate!"
       self.sleep(2)
-    return False, log_msg
+    return DisplayRefreshRateResult(False, log_msg)
 
   @override
   def reset_display_refresh_rate(self) -> None:
