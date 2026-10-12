@@ -308,7 +308,6 @@ class BitsProbeContext(ProbeContext[BitsProbe]):
 
   def __init__(self, probe: BitsProbe, run: Run) -> None:
     super().__init__(probe, run)
-    self._process: subprocess.Popen | None = None
     self._bits_out_id = self.probe.bits_out or dt.datetime.now().strftime(
         "%Y%m%d_%H%M%S")
     self._clock_sync: _ClockSync | None = None
@@ -338,21 +337,18 @@ class BitsProbeContext(ProbeContext[BitsProbe]):
     self.host_platform.mkdir(self.local_result_path)
     self._write_bits_json()
 
-    device_args: tuple[str, ...] = ("--service_port", str(self.probe.port))
+    device_args: tuple[str, ...] = ()
     if self.probe.bits_device:
-      device_args += ("--device", self.probe.bits_device)
-
-    with self._log_files("w") as (stdout, stderr):
-      self._process = self.host_platform.popen(
-          self.probe.bits_path,
-          "--create",
-          self.bits_out_id,
-          "--duration",
-          f"{self.probe.duration.total_seconds():.0f}s",
-          *device_args,
-          stdout=stdout,
-          stderr=stderr,
-      )
+      device_args = ("--device", self.probe.bits_device)
+    # `--create` returns once the collectors are online and sampling, which
+    # takes about a second; data must be flowing before the story starts.
+    self._run_service_cmd(
+        "--create",
+        self.bits_out_id,
+        "--duration",
+        f"{self.probe.duration.total_seconds():.0f}s",
+        *device_args,
+    )
 
   def _stop_collection(self) -> None:
     logging.info("Stopping BITS collection (ID: %s)", self.bits_out_id)

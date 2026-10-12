@@ -201,7 +201,6 @@ class BitsProbeTestCase(BaseProbeTestCase):
     run.browser_session.browser.platform.clock_boottime_ns.return_value = 1
 
     host_platform = run.browser_session.browser.host_platform
-    host_platform.popen = mock.MagicMock()
     host_platform.sh = mock.MagicMock()
 
     context = probe.create_context(run)
@@ -209,20 +208,20 @@ class BitsProbeTestCase(BaseProbeTestCase):
     # 1. start() and start_story_setup() should not touch BITS
     context.start()
     context.start_story_setup()
-    host_platform.popen.assert_not_called()
+    host_platform.sh.assert_not_called()
 
-    # 2. start_story_run() should spawn BITS
+    # 2. start_story_run() should start a BITS collection and wait for it.
     context.start_story_run()
-    host_platform.popen.assert_called_once()
-    call_args = host_platform.popen.call_args.args
+    host_platform.sh.assert_called_once()
+    create_call = host_platform.sh.call_args
 
     expected_port = port if port is not None else BitsProbe.DEFAULT_PORT
-    expected_device_args: list[str] = ["--service_port", str(expected_port)]
+    expected_device_args: list[str] = []
     if bits_device:
-      expected_device_args += ["--device", bits_device]
+      expected_device_args = ["--device", bits_device]
 
     self.assertSequenceEqual(
-        call_args,
+        create_call.args,
         (
             self.bits_path,
             "--create",
@@ -230,17 +229,19 @@ class BitsProbeTestCase(BaseProbeTestCase):
             "--duration",
             "120s",
             *expected_device_args,
+            "--service_port",
+            str(expected_port),
         ),
     )
-    self.assertIn("stdout", host_platform.popen.call_args.kwargs)
-    self.assertIn("stderr", host_platform.popen.call_args.kwargs)
+    self.assertIn("stdout", create_call.kwargs)
+    self.assertIn("stderr", create_call.kwargs)
 
     # 3. stop_story_run() should stop BITS
     context.stop_story_run()
     expected_stop_args = ["--service_port", str(expected_port)]
 
-    self.assertEqual(len(host_platform.sh.call_args_list), 3)
-    stop_call, _, export_call = host_platform.sh.call_args_list
+    self.assertEqual(len(host_platform.sh.call_args_list), 4)
+    _, stop_call, _, export_call = host_platform.sh.call_args_list
     self.assertSequenceEqual(
         stop_call.args,
         (
@@ -271,12 +272,10 @@ class BitsProbeTestCase(BaseProbeTestCase):
     self.assertIn("stderr", export_call.kwargs)
 
     # Reset mocks to verify that the final stop phase is a clean no-op
-    host_platform.popen.reset_mock()
     host_platform.sh.reset_mock()
 
     # 4. stop() should be a no-op
     context.stop()
-    host_platform.popen.assert_not_called()
     host_platform.sh.assert_not_called()
 
     self.assertIsInstance(context.teardown(), LocalProbeResult)
@@ -293,6 +292,19 @@ class BitsProbeTestCase(BaseProbeTestCase):
   def test_probe_lifecycle_with_device_and_port(self) -> None:
     self._check_probe_lifecycle(bits_device="device_id_123", port=1234)
 
+  def test_start_story_run_fails_if_create_fails(self) -> None:
+    probe = BitsProbe(self.bits_path, "test_run_id", port=1234)
+    run = self.mock_run()
+    host_platform = run.browser_session.browser.host_platform
+    host_platform.sh = mock.MagicMock(
+        side_effect=subprocess.CalledProcessError(1, "bits"))
+
+    context = probe.create_context(run)
+    with self.assertRaises(subprocess.CalledProcessError):
+      context.start_story_run()
+    host_platform.sh.assert_called_once()
+    self.assertEqual(host_platform.sh.call_args.args[1], "--create")
+
   def test_collect_channel_averages(self) -> None:
     probe = BitsProbe(
         self.bits_path,
@@ -301,15 +313,15 @@ class BitsProbeTestCase(BaseProbeTestCase):
     )
     run = self.mock_run()
     host_platform = run.browser_session.browser.host_platform
-    host_platform.popen = mock.MagicMock()
     host_platform.sh = mock.MagicMock()
 
     context = probe.create_context(run)
     context.start_story_run()
     context.stop_story_run()
 
-    self.assertEqual(len(host_platform.sh.call_args_list), 3)
-    _stop_call, avg_call, _export_call = host_platform.sh.call_args_list
+    self.assertEqual(len(host_platform.sh.call_args_list), 4)
+    _create_call, _stop_call, avg_call, _export_call = (
+        host_platform.sh.call_args_list)
     self.assertEqual(
         avg_call.args,
         (
@@ -379,7 +391,6 @@ class BitsProbePerfettoTestCase(BaseProbeTestCase):
     self.device = self.run.browser_session.browser.platform
     self.device.clock_boottime_ns.return_value = self.DEVICE_BOOTTIME_NS
     self.host_platform = self.run.browser_session.browser.host_platform
-    self.host_platform.popen = mock.MagicMock()
     self.host_platform.sh = mock.MagicMock()
     time_patcher = mock.patch("crossbench.probes.bits.time")
     self.addCleanup(time_patcher.stop)
@@ -726,7 +737,6 @@ class BitsProbeResultsFileTestCase(BaseProbeTestCase):
     device = self.run.browser_session.browser.platform
     device.clock_boottime_ns.return_value = self.DEVICE_BOOTTIME_NS
     self.host_platform = self.run.browser_session.browser.host_platform
-    self.host_platform.popen = mock.MagicMock()
     self.host_platform.sh = mock.MagicMock()
     time_patcher = mock.patch("crossbench.probes.bits.time")
     self.addCleanup(time_patcher.stop)
