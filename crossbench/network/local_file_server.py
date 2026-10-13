@@ -11,7 +11,7 @@ import json
 import logging
 import os
 import threading
-from typing import TYPE_CHECKING, Final, Iterator, Mapping, Self, TypeVar
+from typing import TYPE_CHECKING, Final, Iterator, Mapping, NamedTuple, Self
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -25,10 +25,15 @@ if TYPE_CHECKING:
   from crossbench import plt
   from crossbench.network.traffic_shaping.base import TrafficShaper
   from crossbench.runner.groups.session import BrowserSessionRunGroup
-  LocalFileNetworkT = TypeVar("LocalFileNetworkT", bound="LocalFileNetwork")
 
 _DEFAULT_HOST: Final[str] = "localhost"
 _DEFAULT_PORT: Final[int] = 8000
+
+
+class HostPort(NamedTuple):
+  host: str = _DEFAULT_HOST
+  port: int = _DEFAULT_PORT
+
 
 # List of known headers that are served by the default HTTPServer and might
 # be accidentally overridden by provided extra headers.
@@ -47,13 +52,15 @@ _DEFAULT_HEADERS: Final[immutabledict[str, str]] = immutabledict({
 
 
 class CustomHeadersRequestHandler(http.server.SimpleHTTPRequestHandler):
+  # Enable HTTP keep-alive so browsers reuse sockets across requests.
+  protocol_version = "HTTP/1.1"
 
   @classmethod
   def bind(
       cls,
       server_dir: pth.LocalPath,
       extra_headers: Mapping[str, str],
-  ) -> type[http.server.SimpleHTTPRequestHandler]:
+  ) -> type[CustomHeadersRequestHandler]:
     # Use a temporary class to bind arguments.
     class BoundDirectoryRequestHandler(cls):  # type: ignore
 
@@ -71,10 +78,15 @@ class CustomHeadersRequestHandler(http.server.SimpleHTTPRequestHandler):
                directory: str | None = None,
                extra_headers: Mapping[str, str] | None = None,
                **kwargs) -> None:
-    self._extra_headers: Final[immutabledict[str, str]] = (
-        immutabledict(extra_headers) if extra_headers else immutabledict())
+    self._extra_headers: Final[immutabledict[str, str]] = immutabledict(
+        extra_headers or {})
     super().__init__(*args, directory=directory, **kwargs)
 
+  @property
+  def extra_headers(self) -> immutabledict[str, str]:
+    return self._extra_headers
+
+  @override
   def end_headers(self) -> None:
     if self._extra_headers:
       self._send_custom_headers()
@@ -85,18 +97,28 @@ class CustomHeadersRequestHandler(http.server.SimpleHTTPRequestHandler):
       self.send_header(key, value)
 
 
+class LocalThreadingHTTPServer(http.server.ThreadingHTTPServer):
+  """Threaded HTTP server with a larger listen backlog so bursts of concurrent
+  browser connections (e.g. Chrome's 6 sockets per origin) do not overflow the
+  default listen(5) accept queue and trigger TCP RSTs on macOS."""
+  # Match Python's socket.listen() default and macOS SOMAXCONN (128).
+  request_queue_size = 128
+  daemon_threads = True
+  block_on_close = False
+
+
 class LocalFileNetwork(Network):
 
   def __init__(self,
                path: pth.LocalPath,
-               url: str | None,
+               url: str | None = None,
                traffic_shaper: TrafficShaper | None = None,
                browser_platform: plt.Platform | None = None) -> None:
     super().__init__(traffic_shaper, browser_platform)
     self._path: Final[pth.LocalPath] = path
-    (host, port) = self._parse_url(url)
-    self._host: Final[str] = host
-    self._port: int = port
+    host_port = self._parse_url(url)
+    self._host: Final[str] = host_port.host
+    self._port: int = host_port.port
     # TODO: support custom headers via command line
     self._extra_headers: Final[immutabledict[str,
                                              str]] = self._try_parse_headers()
@@ -112,17 +134,19 @@ class LocalFileNetwork(Network):
   def path(self) -> pth.LocalPath:
     return self._path
 
-  def _parse_url(self, url: str | None) -> tuple[str, int]:
-    host: str = _DEFAULT_HOST
-    port: int = _DEFAULT_PORT
+  @property
+  def extra_headers(self) -> immutabledict[str, str]:
+    return self._extra_headers
+
+  def _parse_url(self, url: str | None) -> HostPort:
     if not url:
-      return host, port
+      return HostPort()
     parsed_url = ObjectParser.url(url)
-    if parsed_url.hostname:
-      host = parsed_url.hostname
+    host: str = parsed_url.hostname or _DEFAULT_HOST
+    port: int = _DEFAULT_PORT
     if parsed_url.port is not None:
       port = parsed_url.port
-    return host, port
+    return HostPort(host, port)
 
   def _try_parse_headers(self) -> immutabledict[str, str]:
     for name in ("HEADERS", "HEADERS.txt"):
@@ -162,8 +186,8 @@ class LocalFileNetwork(Network):
         self._path, self._extra_headers)
     with exception.annotate(
         f"Starting fileserver on {self.host}:{self.http_port}"):
-      server = http.server.ThreadingHTTPServer((self._host, self._port),
-                                               request_handler_cls)
+      server = LocalThreadingHTTPServer((self._host, self._port),
+                                        request_handler_cls)
     with self._server_thread(server):
       logging.info("%s custom host=%s, port=%s",
                    type(self).__name__, self.host, self.http_port)
@@ -185,17 +209,18 @@ class LocalFileNetwork(Network):
   @contextlib.contextmanager
   def _forward_ports(self, session: BrowserSessionRunGroup) -> Iterator[None]:
     browser_platform = session.browser_platform
+    if not browser_platform.is_remote:
+      yield
+      return
     ports = browser_platform.ports
-    if browser_platform.is_remote:
-      logging.info("REMOTE PORT FORWARDING: %s <= %s", self.host_platform,
-                   browser_platform)
-      # TODO: make ports configurable
-      ports.reverse_forward(self._port, self._port)
+    logging.info("REMOTE PORT FORWARDING: %s <= %s", self.host_platform,
+                 browser_platform)
+    # TODO: make ports configurable
+    ports.reverse_forward(self._port, self._port)
     try:
       yield
     finally:
-      if browser_platform.is_remote:
-        ports.stop_reverse_forward(self._port)
+      ports.stop_reverse_forward(self._port)
 
   @property
   @override
