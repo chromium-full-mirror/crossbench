@@ -35,7 +35,7 @@ if TYPE_CHECKING:
   from crossbench.runner.groups.session import BrowserSessionRunGroup
   from crossbench.runner.run import Run
   from crossbench.runner.runner import Runner
-  from crossbench.types import StoryTagLookupT
+  from crossbench.types import JsonDict, StoryTagLookupT
 
 VersionParts: TypeAlias = tuple[str] | tuple[int, ...]
 
@@ -52,6 +52,7 @@ class BenchmarkDescription(TypedDict):
   url_local: NotRequired[str]
   version: NotRequired[str]
   help: NotRequired[str]
+  flags: NotRequired[list[JsonDict]]
 
 
 class Benchmark(abc.ABC):

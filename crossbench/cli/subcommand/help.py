@@ -5,12 +5,11 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from typing_extensions import override
 
 from crossbench.cli.subcommand.base import CrossbenchSubcommand
-from crossbench.cli.subcommand.describe import DescribeSubcommand
 
 if TYPE_CHECKING:
   import argparse
@@ -20,13 +19,14 @@ if TYPE_CHECKING:
 
 
 class HelpSubcommand(CrossbenchSubcommand):
+  NAME: ClassVar[str] = "help"
 
   @override
   def register_subcommand(self,
                           subparsers: Subparsers) -> argparse.ArgumentParser:
     # Just for completeness we want to support "--help" and "help"
     self._parser = subparsers.add_parser(
-        "help",
+        self.NAME,
         help=("Print the top-level by default, same as --help. "
               "Use `help $PROBE`, or `help $BENCHMARK` to print more details."))
     self._parser.set_defaults(crossbench_subcommand=self)
@@ -44,9 +44,7 @@ class HelpSubcommand(CrossbenchSubcommand):
   @override
   def run(self, args: argparse.Namespace) -> None:
     if args.search_terms:
-      subcommand = self.cli.subcommands["describe"]
-      assert isinstance(subcommand, DescribeSubcommand)
-      subcommand.run_from_help(args)
+      self.cli.describe_subcommand.run_from_help(args)
     else:
       self.cli.parser.print_help()
     sys.exit(0)

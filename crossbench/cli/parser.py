@@ -5,16 +5,20 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import logging
 import sys
 import types
-from typing import Any, Mapping, Never, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Never, Sequence
 
 import colorama
 from typing_extensions import Self, override
 
 from crossbench.cli.ui import ui
 from crossbench.parse import ObjectParser
+
+if TYPE_CHECKING:
+  from crossbench.types import JsonDict
 
 
 class CBArgumentGroup(argparse._ArgumentGroup):  # noqa: SLF001
@@ -40,6 +44,116 @@ class CBMutuallyExclusiveGroup(
   def add_argument(self, *args: Any, **kwargs: Any) -> argparse.Action:
     CBArgumentParser.validate_add_argument(self, args, kwargs)
     return super().add_argument(*args, **kwargs)
+
+
+@dataclasses.dataclass(frozen=True)
+class ArgumentHelp:
+  name: str
+  aliases: tuple[str, ...]
+  help: str
+  required: bool = False
+  default: object | None = None
+  choices: tuple[object, ...] | None = None
+
+  @classmethod
+  def from_action(cls, action: argparse.Action) -> ArgumentHelp:
+    if action.option_strings:
+      name = action.option_strings[0]
+      aliases = tuple(action.option_strings[1:])
+    else:
+      name = action.dest
+      aliases = ()
+    choices = tuple(action.choices) if action.choices else None
+    default = None
+    if action.default not in (None, argparse.SUPPRESS):
+      default = action.default
+    return cls(
+        name=name,
+        aliases=aliases,
+        help=(action.help or "").strip(),
+        required=action.required,
+        default=default,
+        choices=choices,
+    )
+
+  def to_json(self) -> JsonDict:
+    choices = [str(c) for c in self.choices] if self.choices else None
+    default = str(self.default) if self.default is not None else None
+    return {
+        "name": self.name,
+        "aliases": list(self.aliases),
+        "help": self.help,
+        "required": self.required,
+        "default": default,
+        "choices": choices,
+    }
+
+
+@dataclasses.dataclass(frozen=True)
+class ArgumentGroupHelp:
+  """Helper to extract and format argparse argument groups and arguments.
+
+  We use this helper to wrap around private members of argparse, as argparse
+  does not expose public APIs for group introspection:
+  - `argparse.ArgumentParser._action_groups`: action groups on the parser.
+  - `argparse._ArgumentGroup._group_actions`: actions belonging to a group.
+  - `argparse._HelpAction`: default help action class.
+  """
+  name: str
+  description: str
+  arguments: tuple[ArgumentHelp, ...]
+
+  @classmethod
+  def from_action_group(
+      cls,
+      group: argparse._ArgumentGroup,  # noqa: SLF001
+      default_title: str | None = None) -> ArgumentGroupHelp:
+    actions = [
+        action for action in group._group_actions  # noqa: SLF001
+        if not cls.is_help_action(action)
+    ]
+    arguments = tuple(ArgumentHelp.from_action(action) for action in actions)
+    title = cls._extract_group_title(group, default_title)
+    return cls(
+        name=title,
+        description=(group.description or "").strip(),
+        arguments=arguments,
+    )
+
+  @classmethod
+  def _extract_group_title(
+      cls,
+      group: argparse._ArgumentGroup,  # noqa: SLF001
+      default_title: str | None = None) -> str:
+    if default_title:
+      if not group.title:
+        return default_title
+      if group.title == "options":
+        return default_title
+    return group.title or "Options"
+
+  @classmethod
+  def from_parser(cls,
+                  parser: argparse.ArgumentParser,
+                  default_title: str | None = None) -> list[ArgumentGroupHelp]:
+    groups: list[ArgumentGroupHelp] = []
+    for group in parser._action_groups:  # noqa: SLF001
+      group_help = cls.from_action_group(group, default_title=default_title)
+      if group_help.arguments:
+        groups.append(group_help)
+    return groups
+
+  @classmethod
+  def is_help_action(cls, action: argparse.Action) -> bool:
+    return isinstance(
+        action, argparse._HelpAction) or action.dest == "help"  # noqa: SLF001
+
+  def to_json(self) -> JsonDict:
+    return {
+        "name": self.name,
+        "description": self.description,
+        "arguments": [arg.to_json() for arg in self.arguments],
+    }
 
 
 class CBNamespace(argparse.Namespace):

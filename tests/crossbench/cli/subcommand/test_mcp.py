@@ -4,11 +4,14 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import tempfile
 import unittest
 from unittest import mock
+
+from immutabledict import immutabledict
 
 from crossbench import path as pth
 from crossbench.cli.subcommand.mcp import McpSubcommand
@@ -37,20 +40,31 @@ class McpSubcommandTest(unittest.TestCase):
       NAME = "manual"
 
       @classmethod
-      def aliases(cls):
+      def aliases(cls) -> tuple[str, ...]:
         return ()
 
       @classmethod
-      def describe(cls):
+      def describe(cls) -> dict[str, str]:
         return {"doc": "Manual benchmark"}
+
+    class MockSubcommand:
+
+      def __init__(self) -> None:
+        self.parser = argparse.ArgumentParser()
+
+      def init_cli_parser(self) -> None:
+        pass
 
     class DummyCLI:
 
-      def __init__(self):
+      def __init__(self) -> None:
         self.BENCHMARKS = [MockBenchmarkCls]
         self.subparsers = DummySubparsers()
+        self.benchmark_subcommands = immutabledict(
+            {MockBenchmarkCls: MockSubcommand()})
 
-      def add_debugging_arguments(self, parser):
+      def add_debugging_arguments(self,
+                                  parser: argparse.ArgumentParser) -> None:
         pass
 
     self.cli = DummyCLI()

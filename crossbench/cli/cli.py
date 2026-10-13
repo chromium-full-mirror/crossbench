@@ -15,6 +15,7 @@ import traceback
 from typing import TYPE_CHECKING, Iterator, Sequence, TypeAlias, TypeVar
 
 import tabulate as tbl
+from immutabledict import immutabledict
 from typing_extensions import override
 
 import crossbench.benchmarks.all as benchmarks
@@ -53,6 +54,8 @@ if TYPE_CHECKING:
   from crossbench.types import TableData
 
   BenchmarkClass: TypeAlias = type[Benchmark]
+  BenchmarkSubcommands: TypeAlias = (
+      immutabledict[BenchmarkClass, BenchmarkSubcommand])
   BrowserLookupTable: TypeAlias = dict[str, tuple[type[Browser], pth.LocalPath]]
   SubcommandT = TypeVar("SubcommandT", bound=CrossbenchSubcommand)
 
@@ -210,7 +213,6 @@ class CrossBenchCLI:
   def __init__(self, enable_logging: bool = True) -> None:
     self._enable_logging: bool = enable_logging
     self._console_handler: logging.StreamHandler | None = None
-    self._benchmark_subcommands: dict[BenchmarkClass, BenchmarkSubcommand] = {}
     self.parser = MainCrossBenchArgumentParser(
         description=("A cross browser and cross benchmark runner "
                      "with configurable measurement probes.\n"))
@@ -218,12 +220,15 @@ class CrossBenchCLI:
     self._setup_parser()
     self._last_subcommand: CrossbenchSubcommand | None = None
     self.args: CBNamespace = CBNamespace()
-    self._setup_subcommands()
+    self._benchmark_subcommands: BenchmarkSubcommands = (
+        self._setup_subcommands())
 
-  def _setup_subcommands(self) -> None:
+  def _setup_subcommands(self) -> BenchmarkSubcommands:
     self._setup_core_subcommands()
     self._setup_tools_subcommands()
-    self._setup_benchmark_subcommands()
+    benchmark_subcommands: dict[BenchmarkClass, BenchmarkSubcommand] = {}
+    self._setup_benchmark_subcommands(benchmark_subcommands)
+    return immutabledict(benchmark_subcommands)
 
   def _setup_core_subcommands(self) -> None:
     self._add_subcommand(HelpSubcommand)
@@ -240,15 +245,22 @@ class CrossBenchCLI:
     self._add_subcommand(SetupCrossPlatformModeSubcommand)
     self._add_subcommand(UploadResultsSubcommand)
 
-  def _setup_benchmark_subcommands(self) -> None:
+  def _setup_benchmark_subcommands(
+      self,
+      subcommands: dict[BenchmarkClass, BenchmarkSubcommand],
+  ) -> None:
     for benchmark_cls in self.BENCHMARKS:
       subcommand = BenchmarkSubcommand(self, benchmark_cls)
       subcommand.register_subcommand(self.subparsers)
-      self._benchmark_subcommands[benchmark_cls] = subcommand
+      subcommands[benchmark_cls] = subcommand
 
   @property
   def subparsers(self) -> Subparsers:
     return self._subparsers
+
+  @property
+  def benchmark_subcommands(self) -> BenchmarkSubcommands:
+    return self._benchmark_subcommands
 
   @property
   def subcommands(self) -> dict[str, CrossbenchSubcommand]:
@@ -257,6 +269,18 @@ class CrossBenchCLI:
       if subcommand := parser.get_default("crossbench_subcommand"):
         subcommands[key] = subcommand
     return subcommands
+
+  @property
+  def describe_subcommand(self) -> DescribeSubcommand:
+    subcommand = self.subcommands[DescribeSubcommand.NAME]
+    assert isinstance(subcommand, DescribeSubcommand)
+    return subcommand
+
+  @property
+  def help_subcommand(self) -> HelpSubcommand:
+    subcommand = self.subcommands[HelpSubcommand.NAME]
+    assert isinstance(subcommand, HelpSubcommand)
+    return subcommand
 
   @property
   def last_subcommand(self) -> CrossbenchSubcommand | None:

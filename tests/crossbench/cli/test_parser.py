@@ -4,10 +4,12 @@
 
 from __future__ import annotations
 
+import argparse
 import unittest
 
 from crossbench import path as pth
-from crossbench.cli.parser import CBArgumentParser, CBNamespace
+from crossbench.cli.parser import ArgumentGroupHelp, ArgumentHelp, \
+    CBArgumentParser, CBNamespace
 from crossbench.parse import NumberParser, ObjectParser
 from tests import test_helper
 
@@ -231,6 +233,120 @@ class CBArgumentParserTestCase(unittest.TestCase):
     self.assertEqual(args.app1, ["val1"])
     self.assertEqual(args.app2, ["val2"])
     self.assertEqual(args.ext1, ["val3"])
+
+
+class ArgumentHelpTest(unittest.TestCase):
+
+  def test_from_action_options(self) -> None:
+    parser = argparse.ArgumentParser()
+    action = parser.add_argument(
+        "--test-flag",
+        "-t",
+        default="default_val",
+        choices=["a", "b"],
+        help="Help text")
+    arg_help = ArgumentHelp.from_action(action)
+    self.assertEqual(arg_help.name, "--test-flag")
+    self.assertEqual(arg_help.aliases, ("-t",))
+    self.assertFalse(arg_help.required)
+    self.assertEqual(arg_help.default, "default_val")
+    self.assertEqual(arg_help.choices, ("a", "b"))
+    self.assertEqual(arg_help.help, "Help text")
+
+    json_data = arg_help.to_json()
+    self.assertEqual(json_data["name"], "--test-flag")
+    self.assertEqual(json_data["aliases"], ["-t"])
+    self.assertFalse(json_data["required"])
+    self.assertEqual(json_data["choices"], ["a", "b"])
+
+  def test_from_action_positional(self) -> None:
+    parser = argparse.ArgumentParser()
+    action = parser.add_argument("pos_arg", help="Positional help")
+    arg_help = ArgumentHelp.from_action(action)
+    self.assertEqual(arg_help.name, "pos_arg")
+    self.assertEqual(arg_help.aliases, ())
+    self.assertTrue(arg_help.required)
+    self.assertIsNone(arg_help.default)
+    self.assertIsNone(arg_help.choices)
+    self.assertEqual(arg_help.help, "Positional help")
+
+  def test_from_action_required_and_default_path(self) -> None:
+    parser = argparse.ArgumentParser()
+    path_val = pth.LocalPath("/tmp/foo")
+    action = parser.add_argument(
+        "--path", required=True, default=path_val, help="Path")
+    arg_help = ArgumentHelp.from_action(action)
+    self.assertTrue(arg_help.required)
+    self.assertEqual(arg_help.default, path_val)
+    self.assertIsInstance(arg_help.default, pth.LocalPath)
+    json_data = arg_help.to_json()
+    self.assertTrue(json_data["required"])
+    self.assertEqual(json_data["default"], "/tmp/foo")
+
+
+class ArgumentGroupHelpTest(unittest.TestCase):
+
+  def test_from_parser(self) -> None:
+    parser = argparse.ArgumentParser()
+    group = parser.add_argument_group("Test Group", "Group description")
+    group.add_argument("--foo", help="Foo help")
+    group.add_argument("--bar", help="Bar help")
+
+    groups = ArgumentGroupHelp.from_parser(parser)
+    self.assertEqual(len(groups), 1)
+    group_help = groups[0]
+    self.assertEqual(group_help.name, "Test Group")
+    self.assertEqual(group_help.description, "Group description")
+    self.assertEqual(len(group_help.arguments), 2)
+    self.assertEqual(group_help.arguments[0].name, "--foo")
+    self.assertEqual(group_help.arguments[1].name, "--bar")
+
+  def test_from_parser_default_title(self) -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--custom-opt", help="Custom option")
+
+    groups = ArgumentGroupHelp.from_parser(
+        parser, default_title="Custom Options")
+    self.assertEqual(len(groups), 1)
+    self.assertEqual(groups[0].name, "Custom Options")
+
+  def test_extract_group_title(self) -> None:
+    parser = argparse.ArgumentParser()
+    group = parser.add_argument_group("custom")
+    self.assertEqual(ArgumentGroupHelp._extract_group_title(group),
+                     "custom")  # noqa: SLF001
+    self.assertEqual(
+        ArgumentGroupHelp._extract_group_title(  # noqa: SLF001
+            group, "Default"),
+        "custom")
+
+    empty_group = parser.add_argument_group("")
+    self.assertEqual(
+        ArgumentGroupHelp._extract_group_title(empty_group),  # noqa: SLF001
+        "Options")
+    self.assertEqual(
+        ArgumentGroupHelp._extract_group_title(  # noqa: SLF001
+            empty_group, "Default"),
+        "Default")
+
+    default_options_group = parser._action_groups[1]  # noqa: SLF001
+    self.assertEqual(
+        ArgumentGroupHelp._extract_group_title(  # noqa: SLF001
+            default_options_group),
+        "options")
+    self.assertEqual(
+        ArgumentGroupHelp._extract_group_title(  # noqa: SLF001
+            default_options_group, "Default"),
+        "Default")
+
+  def test_crossbench_argument_parser_extract_argument_groups(self) -> None:
+    parser = CBArgumentParser()
+    group = parser.add_argument_group("Group A")
+    group.add_argument("--flag-a", help="Flag A")
+    groups = ArgumentGroupHelp.from_parser(parser)
+    self.assertEqual(len(groups), 1)
+    self.assertEqual(groups[0].name, "Group A")
+    self.assertEqual(groups[0].arguments[0].name, "--flag-a")
 
 
 if __name__ == "__main__":

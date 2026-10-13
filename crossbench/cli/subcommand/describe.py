@@ -7,7 +7,8 @@ from __future__ import annotations
 import dataclasses
 import json
 from collections import defaultdict
-from typing import TYPE_CHECKING, Mapping, NamedTuple, Sequence, TypedDict
+from typing import TYPE_CHECKING, ClassVar, Mapping, NamedTuple, Sequence, \
+    TypedDict
 
 import tabulate as tbl
 from typing_extensions import override
@@ -15,6 +16,7 @@ from typing_extensions import override
 from crossbench.cli.config.env import ENV_CONFIG_PRESETS, EnvConfig
 from crossbench.cli.config.network import NetworkConfig, NetworkType
 from crossbench.cli.config.network_speed import NetworkSpeedConfig
+from crossbench.cli.parser import ArgumentGroupHelp
 from crossbench.cli.subcommand.base import CrossbenchSubcommand
 from crossbench.config import ConfigObject
 from crossbench.helper import txt_helper
@@ -55,6 +57,7 @@ def get_all_config_classes() -> list[type[ConfigObject]]:
 
 
 class DescribeSubcommand(CrossbenchSubcommand):
+  NAME: ClassVar[str] = "describe"
 
   PROBE_ALIAS = ("probe", "probes")
   BENCHMARK_ALIAS = ("benchmark", "benchmarks")
@@ -69,7 +72,7 @@ class DescribeSubcommand(CrossbenchSubcommand):
   def register_subcommand(self,
                           subparsers: Subparsers) -> argparse.ArgumentParser:
     self._parser = subparsers.add_parser(
-        "describe", aliases=["desc"], help="Print all benchmarks and stories")
+        self.NAME, aliases=["desc"], help="Print all benchmarks and stories")
     self._parser.set_defaults(crossbench_subcommand=self)
     return self.parser
 
@@ -298,12 +301,19 @@ class DescribeSubcommand(CrossbenchSubcommand):
     return self.print_property_table("Env", category, search_str, table,
                                      self.env_names())
 
-  def format_property_table(self, data: Mapping[str, Mapping[str, object]],
-                            table: TableData) -> None:
+  def format_property_table(
+      self,
+      data: Mapping[str, Mapping[str, object]],
+      table: TableData,
+      exclude_keys: tuple[str, ...] = ("flags",),
+  ) -> None:
+    max_width: int = 50
     for section_name, values in data.items():
       table.append([section_name])
       for property_name, value in values.items():
-        formatted_value = self._format_property_value(value)
+        if property_name in exclude_keys:
+          continue
+        formatted_value = self._format_property_value(value, max_width)
         table.append(["", property_name, formatted_value])
 
   def _format_property_value(self, value: object, max_width: int = 50) -> str:
@@ -312,13 +322,16 @@ class DescribeSubcommand(CrossbenchSubcommand):
     if isinstance(value, str):
       return "\n".join(txt_helper.wrap_lines(value, width=max_width))
     if isinstance(value, (tuple, list)):
-      return "\n".join(str(item) for item in value)
+      return self._format_sequence_property(value)
     if isinstance(value, dict):
       if not value:
         return "[]"
       return tbl.tabulate(
           value.items(), tablefmt="plain", maxcolwidths=max_width)
     return str(value)
+
+  def _format_sequence_property(self, items: Sequence[object]) -> str:
+    return "\n".join(map(str, items))
 
   def print_property_table(self, name: str, category: str,
                            search_str: str | None, table: TableData,
@@ -342,6 +355,11 @@ class DescribeSubcommand(CrossbenchSubcommand):
           continue
       benchmark_info = benchmark_cls.describe()
       benchmark_info["help"] = f"See `{benchmark_cls.NAME} --help`"
+      subcommand = self.cli.benchmark_subcommands[benchmark_cls]
+      subcommand.init_cli_parser()
+      groups = ArgumentGroupHelp.from_parser(
+          subcommand.parser, default_title="Benchmark Options")
+      benchmark_info["flags"] = [g.to_json() for g in groups]
       benchmarks_data[benchmark_cls.NAME] = benchmark_info
     return benchmarks_data
 

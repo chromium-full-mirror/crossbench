@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, Sequence, cast
+from typing import TYPE_CHECKING, ClassVar, Sequence, cast
 
 from crossbench.cli.parser import CBArgumentParser, CBNamespace
 
@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 
 
 class CrossbenchSubcommand(abc.ABC):
+
+  NAME: ClassVar[str] = ""
 
   def __init__(self, cli: CrossBenchCLI) -> None:
     self._cli = cli
