@@ -265,8 +265,8 @@ class BrowserProbeResult(ProbeResult):
         local_kwargs[suffix_name] = self._copy_files(result_origin, files)
     else:
       # Keep local files as is.
-      local_file = cast(Iterable[pth.LocalPath], file)
-      local_perfetto = cast(Iterable[pth.LocalPath], perfetto)
+      local_file = cast(Iterable[pth.LocalPath] | None, file)
+      local_perfetto = cast(Iterable[pth.LocalPath] | None, perfetto)
       local_kwargs = cast(dict[str, Iterable[pth.LocalPath]], kwargs)
 
     super().__init__(

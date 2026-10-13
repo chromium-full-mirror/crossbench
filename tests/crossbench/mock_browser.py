@@ -19,6 +19,7 @@ from crossbench.action_runner.action.enums import ReadyState, WindowTarget
 from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.browsers.browser import Browser
 from crossbench.browsers.chromium.version import ChromiumVersion
+from crossbench.browsers.chromium_based.chromium_based import ChromiumBased
 from crossbench.browsers.settings import Settings
 from crossbench.flags.chrome import ChromeFeatures, ChromeFlags
 from crossbench.network.base import Network
@@ -292,7 +293,13 @@ def app_root(platform: plt.Platform) -> pth.AnyPath:
   return platform.path("/usr/bin")
 
 
-class MockChromiumBasedBrowser(MockBrowser, metaclass=abc.ABCMeta):
+class MockChromiumBasedBrowser(
+    MockBrowser, ChromiumBased, metaclass=abc.ABCMeta):
+
+  @classmethod
+  @override
+  def version_cls(cls) -> type[ChromiumVersion]:
+    return ChromiumVersion
 
   @override
   def _init_flags(self, settings: Settings) -> ChromeFlags:
