@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-from typing import Any, Self
+from typing import Mapping, Self
 
 from typing_extensions import override
 
@@ -42,7 +42,7 @@ class CUJsConfig(ConfigObject):
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict, **kwargs) -> Self:
+  def parse_dict(cls, config: dict[str, object], **kwargs) -> Self:
     """
     Variant a):
       { "cujs": { "LABEL": CUJ_ACTION_CONFIG } }
@@ -58,7 +58,7 @@ class CUJsConfig(ConfigObject):
     raise exception.UnreachableError
 
   @classmethod
-  def _parse_cujs(cls, data: dict[str, Any]) -> tuple[CUJConfig, ...]:
+  def _parse_cujs(cls, data: Mapping[str, object]) -> tuple[CUJConfig, ...]:
     cujs = []
     for name, cuj_config in data.items():
       with exception.annotate_argparsing(f"Parsing story ...['{name}']"):

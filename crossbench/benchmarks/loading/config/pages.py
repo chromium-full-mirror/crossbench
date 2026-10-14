@@ -8,7 +8,8 @@ import argparse
 import dataclasses
 import datetime as dt
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Self, Sequence
+from typing import TYPE_CHECKING, ClassVar, Mapping, Required, Self, \
+    Sequence, TypedDict, cast
 
 from typing_extensions import override
 
@@ -30,6 +31,12 @@ if TYPE_CHECKING:
   import urllib.parse as urlparse
 
   from crossbench.action_runner.action.action import Action
+
+
+class DevToolsRecorderStep(TypedDict, total=False):
+  type: Required[str]
+  url: Required[str]
+  selectors: Required[list[list[str]]]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -83,7 +90,7 @@ class PagesConfig(ConfigObject):
     return cls.parse_config_path(path, **kwargs)
 
   @classmethod
-  def parse_other(cls, value: Any, **kwargs) -> Self:
+  def parse_other(cls, value: object, **kwargs) -> Self:
     if isinstance(value, (list, tuple)):
       return cls.parse_sequence(value, **kwargs)
     return super().parse_other(value, **kwargs)
@@ -107,7 +114,7 @@ class PagesConfig(ConfigObject):
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict, **kwargs) -> Self:
+  def parse_dict(cls, config: dict[str, object], **kwargs) -> Self:
     """
     Variant a):
       { "pages": { "LABEL": PAGE_CONFIG }, "secrets": { ... } }
@@ -127,7 +134,7 @@ class PagesConfig(ConfigObject):
 
   @classmethod
   def _parse_pages(cls,
-                   data: dict[str, Any],
+                   data: Mapping[str, object],
                    secrets: Secrets | None = None) -> tuple[PageConfig, ...]:
     pages = []
     for name, page_config in data.items():
@@ -155,11 +162,12 @@ class DevToolsRecorderPagesConfig(PagesConfig):
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict[str, Any], **kwargs) -> Self:
+  def parse_dict(cls, config: dict[str, object], **kwargs) -> Self:
     config = ObjectParser.non_empty_dict(config)
     with exception.annotate_argparsing("Loading DevTools recording file"):
       title = ObjectParser.non_empty_str(config["title"], "title")
-      actions = cls._parse_steps(config["steps"])
+      steps = cast("list[DevToolsRecorderStep]", config["steps"])
+      actions = cls._parse_steps(steps)
       # Use default block
       blocks = (ActionBlock(actions=actions),)
       pages = (PageConfig(label=title, blocks=blocks),)
@@ -167,7 +175,8 @@ class DevToolsRecorderPagesConfig(PagesConfig):
     raise exception.UnreachableError
 
   @classmethod
-  def _parse_steps(cls, steps: list[dict[str, Any]]) -> tuple[Action, ...]:
+  def _parse_steps(cls,
+                   steps: Sequence[DevToolsRecorderStep]) -> tuple[Action, ...]:
     actions: list[Action] = []
     for step in steps:
       if maybe_actions := cls.parse_step(step):
@@ -177,7 +186,7 @@ class DevToolsRecorderPagesConfig(PagesConfig):
     return tuple(actions)
 
   @classmethod
-  def parse_step(cls, step: dict[str, Any]) -> list[Action]:
+  def parse_step(cls, step: DevToolsRecorderStep) -> list[Action]:
     step_type: str = step["type"]
     default_timeout = dt.timedelta(seconds=10)
     if step_type == "navigate":
@@ -190,13 +199,13 @@ class DevToolsRecorderPagesConfig(PagesConfig):
     raise ValueError(f"Unsupported step: {step_type}")
 
   @classmethod
-  def _parse_navigate_step(cls, step: dict[str, Any],
+  def _parse_navigate_step(cls, step: DevToolsRecorderStep,
                            default_timeout: dt.timedelta) -> Action:
     del default_timeout
     return GetAction.create(step["url"], ready_state=ReadyState.COMPLETE)
 
   @classmethod
-  def _parse_click_step(cls, step: dict[str, Any],
+  def _parse_click_step(cls, step: DevToolsRecorderStep,
                         default_timeout: dt.timedelta) -> Action:
     selector = cls._parse_selectors(step["selectors"])
     return ClickAction.create(

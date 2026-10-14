@@ -7,8 +7,8 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, Sequence, \
-    TypedDict
+from typing import TYPE_CHECKING, ClassVar, NotRequired, Sequence, TypedDict, \
+    cast
 
 import selenium.common.exceptions
 import urllib3.exceptions
@@ -205,10 +205,12 @@ class MemoryProbeContext(ActionRunnerListener,
       self._save_current_playback_metrics()
       self._alive_tabs_by_tab_index.clear()  # Prevent double saving
 
-    metrics: dict[str, Any] = {}
+    metrics: dict[str, PlaybackMetrics] = {}
     for i, playback_metrics in enumerate(self._playbacks_metrics):
       metrics[f"playback_{i}"] = playback_metrics
-    return metrics
+    # TODO: remove once mypy is replaced by pyrefly
+    # https://peps.python.org/pep-0728
+    return cast("JsonDict", metrics)
 
   def _increment_tab_count(self) -> None:
     self._tab_count += 1

@@ -7,7 +7,8 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import functools
-from typing import TYPE_CHECKING, Any, Final, Iterator, Self, Sequence, cast
+from typing import TYPE_CHECKING, Final, Iterator, Mapping, Self, Sequence, \
+    cast
 
 from typing_extensions import override
 
@@ -25,6 +26,7 @@ if TYPE_CHECKING:
   from crossbench.action_runner.base import ActionRunner
   from crossbench.benchmarks.loading.page.interactive import InteractivePage
   from crossbench.runner.run import Run
+  from crossbench.types import JsonDict
 
 assert ACTIONS_TUPLE, "import failed"
 
@@ -43,7 +45,7 @@ class ActionBlock(ConfigObject):
     raise NotImplementedError("Cannot create action blocks from strings")
 
   @classmethod
-  def parse_other(cls, value: Any, **kwargs) -> Self:
+  def parse_other(cls, value: object, **kwargs) -> Self:
     if isinstance(value, (tuple, list)):
       return cls.parse_sequence(value, **kwargs)
     return super().parse_other(value, **kwargs)
@@ -51,7 +53,7 @@ class ActionBlock(ConfigObject):
   @classmethod
   @override
   def parse_dict(cls,
-                 config: dict[str, Any],
+                 config: dict[str, object],
                  label: str | None = None,
                  index: int | None = None,
                  **kwargs) -> Self:
@@ -71,7 +73,7 @@ class ActionBlock(ConfigObject):
 
   @classmethod
   def parse_sequence(cls,
-                     config: Sequence[dict[str, Any]],
+                     config: Sequence[object],
                      label: str | None = None,
                      index: int | None = None) -> Self:
     with exception.annotate_argparsing(
@@ -80,13 +82,13 @@ class ActionBlock(ConfigObject):
     raise exception.UnreachableError
 
   @classmethod
-  def _parse_block_label(cls, value: Any) -> str | None:
+  def _parse_block_label(cls, value: object) -> str | None:
     if not value:
       return None
     label = ObjectParser.non_empty_str(value)
     if label == LOGIN_LABEL:
       raise ConfigError(f"Block label {label!r} is reserved for login blocks")
-    return value
+    return label
 
   @classmethod
   def from_url(cls, url: str, duration: dt.timedelta) -> Self:
@@ -114,7 +116,7 @@ class ActionBlock(ConfigObject):
     del page
     runner.run_block(run, self)
 
-  def to_json(self) -> dict[str, Any]:
+  def to_json(self) -> JsonDict:
     return {
         "label": self.label,
         "actions": [action.to_json() for action in self.actions],
@@ -154,13 +156,13 @@ class ActionBlockListConfig(ConfigObject):
     return self.blocks
 
   @classmethod
-  def parse_other(cls, value: Any) -> Self:
+  def parse_other(cls, value: object) -> Self:
     if isinstance(value, (tuple, list)):
       return cls.parse_sequence(value)
     return super().parse_other(value)
 
   @classmethod
-  def parse_sequence(cls, config: Sequence[dict[str, Any]]) -> Self:
+  def parse_sequence(cls, config: Sequence[object]) -> Self:
     """Parse either a sequence of blocks or a sequence of actions for an
     implicit default block.
 
@@ -190,20 +192,23 @@ class ActionBlockListConfig(ConfigObject):
     return cls._parse_blocks(block_config_data_gen())
 
   @classmethod
-  def _is_block_sequence_config(cls, config: Sequence[dict[str, Any]]) -> bool:
-    return "label" in config[0] or "actions" in config[0]
+  def _is_block_sequence_config(cls, config: Sequence[object]) -> bool:
+    sample = config[0]
+    return isinstance(sample, Mapping) and ("label" in sample or
+                                            "actions" in sample)
 
   @classmethod
-  def _is_default_block_actions(cls, config: Sequence[dict[str, Any]]) -> bool:
+  def _is_default_block_actions(cls, config: Sequence[object]) -> bool:
     sample = config[0]
-    return isinstance(sample, str) or "action" in sample
+    return isinstance(sample, str) or (isinstance(sample, Mapping) and
+                                       "action" in sample)
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict[str, Any], **kwargs) -> Self:
+  def parse_dict(cls, config: dict[str, object], **kwargs) -> Self:
     config = ObjectParser.non_empty_dict(config, "blocks")
 
-    def block_config_data_gen() -> Iterator[tuple[int, str | None, dict]]:
+    def block_config_data_gen() -> Iterator[tuple[int, str | None, object]]:
       for index, (label, block_data) in enumerate(config.items()):
         with exception.annotate_argparsing(
             f"Parsing action block  ...[{label}]"):
@@ -214,7 +219,7 @@ class ActionBlockListConfig(ConfigObject):
   @classmethod
   def _parse_blocks(
       cls, block_config_data_gen: Iterator[tuple[int, str | None,
-                                                 dict]]) -> Self:
+                                                 object]]) -> Self:
     blocks: list[ActionBlock] = []
     for index, label, block_data in block_config_data_gen:
       block = cls._parse_block(index, label, block_data)
@@ -223,7 +228,7 @@ class ActionBlockListConfig(ConfigObject):
 
   @classmethod
   def _parse_block(cls, index: int, label: str | None,
-                   block_data: Any) -> ActionBlock:
+                   block_data: object) -> ActionBlock:
     if isinstance(block_data, dict):
       # Early warning for better usability.
       if inner_label := block_data.get("label"):

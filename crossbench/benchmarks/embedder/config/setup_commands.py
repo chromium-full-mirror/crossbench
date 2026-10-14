@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-from typing import Any, Self
+from typing import Mapping, Self
 
 from typing_extensions import override
 
@@ -41,7 +41,7 @@ class SetupCommandsConfig(ConfigObject):
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict, **kwargs) -> Self:
+  def parse_dict(cls, config: dict[str, object], **kwargs) -> Self:
     """
     Variant a):
       { "setup_commands": { "LABEL": ["command", "arg1", "arg2"] } }
@@ -58,8 +58,8 @@ class SetupCommandsConfig(ConfigObject):
     raise exception.UnreachableError
 
   @classmethod
-  def _parse_commands(cls, data: dict[str,
-                                      Any]) -> tuple[SetupCommandConfig, ...]:
+  def _parse_commands(
+      cls, data: Mapping[str, object]) -> tuple[SetupCommandConfig, ...]:
     commands = []
     for name, command_config in data.items():
       with exception.annotate_argparsing(f"Parsing command ...['{name}']"):

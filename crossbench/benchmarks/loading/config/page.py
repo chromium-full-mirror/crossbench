@@ -7,7 +7,7 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Iterator, Self, Sequence, cast
+from typing import TYPE_CHECKING, ClassVar, Iterator, Self, Sequence, cast
 
 from typing_extensions import override
 
@@ -42,21 +42,21 @@ class PageConfig(ConfigObject):
   teardown: ActionBlock | None = None
 
   @classmethod
-  def parse_label(cls, value: Any) -> str:
+  def parse_label(cls, value: object) -> str:
     label = ObjectParser.non_empty_str(value, "label")
     if label == "all":
       raise ValueError("PageConfig label cannot be 'all'")
     return label
 
   @classmethod
-  def parse_tags(cls, tags: Any) -> frozenset[str]:
+  def parse_tags(cls, tags: object) -> frozenset[str]:
     tags_list = ObjectParser.str_list(tags, name="tags", error_cls=ValueError)
     return frozenset(
         ObjectParser.unique_sequence(
             tags_list, name="tags", error_cls=ValueError))
 
   @classmethod
-  def parse_other(cls, value: Any, **kwargs) -> Self:
+  def parse_other(cls, value: object, **kwargs) -> Self:
     if isinstance(value, (list, tuple)):
       return cls.parse_sequence(value, **kwargs)
     return super().parse_other(value)
@@ -82,7 +82,7 @@ class PageConfig(ConfigObject):
 
   @classmethod
   def parse_sequence(cls,
-                     value: Sequence[Any],
+                     value: Sequence[object],
                      label: str | None = None,
                      secrets: Secrets | None = None) -> Self:
     value = ObjectParser.non_empty_sequence(value, "story actions or blocks")
@@ -95,7 +95,7 @@ class PageConfig(ConfigObject):
   @classmethod
   @override
   def parse_dict(cls,
-                 config: dict[str, Any],
+                 config: dict[str, object],
                  label: str | None = None,
                  secrets: Secrets | None = None,
                  **kwargs) -> Self:

@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Final
+from typing import TYPE_CHECKING, Any, ClassVar, Final, TypedDict
 
 import numpy as np
 import pandas as pd
@@ -42,8 +42,15 @@ if TYPE_CHECKING:
 VERSION_STRING: Final[str] = "2.6.0"
 
 
-def _metric_stats(df: pd.DataFrame) -> dict[str, dict[str, Any]]:
-  metric_stats = {}
+class MetricStats(TypedDict):
+  mean: float
+  delta: float
+  se: float
+  n: int
+
+
+def _metric_stats(df: pd.DataFrame) -> dict[str, MetricStats]:
+  metric_stats: dict[str, MetricStats] = {}
   for metric, metric_df in df.groupby("metric"):
     values = metric_df["value"].dropna().to_numpy()
     n = len(values)

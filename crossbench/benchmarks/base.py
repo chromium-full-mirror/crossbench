@@ -98,7 +98,7 @@ class Benchmark(abc.ABC):
     return ()
 
   @classmethod
-  def fast_mode_default_overrides(cls) -> dict[str, Any]:
+  def fast_mode_default_overrides(cls) -> dict[str, object]:
     """Return benchmark-specific default overrides for --fast mode."""
     return {}
 
