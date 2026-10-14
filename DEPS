@@ -54,7 +54,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling crossbench-internal
   # and whatever else without interference from each other.
-  'crossbench_internal_revision': '29ad9c80032b9996531246c9120191c3a708209a',
+  'crossbench_internal_revision': '5d15bd4e16dfc56c13c01ffad47f2796360c35db',
 
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling tsproxy
