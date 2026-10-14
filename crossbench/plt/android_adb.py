@@ -16,8 +16,8 @@ import re
 import shlex
 import subprocess
 import time
-from typing import TYPE_CHECKING, Any, Final, Generator, Iterable, Mapping, \
-    Sequence
+from typing import TYPE_CHECKING, Final, Iterable, Iterator, Mapping, \
+    Sequence, cast
 
 from mobly.controllers import android_device
 from snippet_uiautomator import uiautomator
@@ -61,11 +61,13 @@ if TYPE_CHECKING:
       VirtualDeviceConfig
   from crossbench.action_runner.virtual_device.virtual_device_type import \
       VirtualDeviceType
-  from crossbench.device_config import DeviceConfigKeyPath
+  from crossbench.device_config import DeviceConfigKeyPath, DeviceConfigMap
   from crossbench.plt.base import Platform
   from crossbench.plt.details import CpuDetails, PythonDetails
   from crossbench.plt.display_info import DisplayInfo
-  from crossbench.plt.types import CmdArg, ListCmdArgs, PlatformKey, ProcessIo
+  from crossbench.plt.types import CmdArg, ListCmdArgs, PlatformKey, \
+      ProcessInfo, ProcessIo
+  from crossbench.types import JsonDict
 
 
 class _MoblyDebugFilter(logging.Filter):
@@ -457,7 +459,7 @@ class Adb:
               local_protocol: str = "tcp",
               remote_protocol: str = "tcp",
               flags_data: FlagsData = None) -> int:
-    cmd_args: list[Any] = ["forward"]
+    cmd_args: ListCmdArgs = ["forward"]
     if flags_data:
       parsed_flags = Flags(flags_data)
       cmd_args.extend(list(parsed_flags))
@@ -805,7 +807,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
 
   def send_cdp_command(self,
                        method: str,
-                       params: dict[str, Any] | None = None) -> dict[str, Any]:
+                       params: JsonDict | None = None) -> JsonDict:
     if not self._devtools_client:
       self.start_devtools()
     assert self._devtools_client is not None, "DevTools client not initialized"
@@ -816,7 +818,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
     })
     if not success:
       raise RuntimeError(f"CDP command '{method}' failed: {res}")
-    return res
+    return cast("JsonDict", res)
 
   def switch_to_new_tab(self, url: str = "about:blank") -> None:
     if not self._devtools_client:
@@ -1049,7 +1051,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
   def uiautomator_device(
       self,
       root_device: bool = True,
-  ) -> Generator[android_device.AndroidDevice, Any, None]:
+  ) -> Iterator[android_device.AndroidDevice]:
     # uiautomator requires adb in PATH
     adb_dir = os.path.dirname(self.adb.adb_bin)  # noqa: PTH120
     environ = self.host_platform.environ
@@ -1188,12 +1190,12 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
   def process_children(self,
                        parent_pid: int,
                        recursive: bool = False,
-                       attrs: list[str] | None = None) -> list[dict[str, Any]]:
+                       attrs: list[str] | None = None) -> list[ProcessInfo]:
     # TODO: implement
     return []
 
   @override
-  def foreground_process(self) -> dict[str, Any] | None:
+  def foreground_process(self) -> ProcessInfo | None:
     # adb shell dumpsys activity activities
     # TODO: implement
     return None
@@ -1306,12 +1308,12 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
     self.sh("pkill", process_name, check=False)
 
   @override
-  def processes(self, attrs: list[str] | None = None) -> list[dict[str, Any]]:
+  def processes(self, attrs: list[str] | None = None) -> list[ProcessInfo]:
     lines = self.sh_stdout("ps", "-A", "-o", "PID,NAME").splitlines()
     if len(lines) == 1:
       return []
 
-    res: list[dict[str, Any]] = []
+    res: list[ProcessInfo] = []
     for line in lines[1:]:
       tokens = line.strip().split(maxsplit=1)
       assert len(tokens) == 2, f"Got invalid process tokens: {tokens}"
@@ -1441,7 +1443,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
 
   @functools.lru_cache(maxsize=1)
   @override
-  def system_details(self) -> dict[str, Any]:
+  def system_details(self) -> JsonDict:
     system_details = super().system_details()
     system_details.update({
         "Android": _AndroidDeviceConfigReader(self.adb).getprop(),
@@ -1449,7 +1451,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
     return system_details
 
   @override
-  def device_config(self) -> dict[str, Any]:
+  def device_config(self) -> dict[str, DeviceConfigMap]:
     reader = _AndroidDeviceConfigReader(self.adb)
     return {
         "android": {
@@ -1570,7 +1572,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
 
   @override
   @contextlib.contextmanager
-  def low_power_mode(self) -> Generator[None, Any, None]:
+  def low_power_mode(self) -> Iterator[None]:
     try:
       self.lock_screen()
       self.doze()

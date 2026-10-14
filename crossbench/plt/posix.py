@@ -12,7 +12,7 @@ import logging
 import pathlib
 import re
 import shlex
-from typing import TYPE_CHECKING, Any, Final, Generator, Iterator, Mapping
+from typing import TYPE_CHECKING, Final, Generator, Iterator, Mapping
 
 from typing_extensions import override
 
@@ -29,7 +29,8 @@ if TYPE_CHECKING:
 
   from crossbench.plt.details import CpuDetails, OsDetails, PythonDetails
   from crossbench.plt.signals import AnyPosixSignals, Signals
-  from crossbench.plt.types import CmdArg, ListCmdArgs, ProcessIo, ProcessLike
+  from crossbench.plt.types import CmdArg, ListCmdArgs, ProcessInfo, \
+      ProcessIo, ProcessLike
 
 
 class PosixVersion(PlatformVersion):
@@ -493,7 +494,7 @@ class PosixPlatform(Platform, metaclass=abc.ABCMeta):
   @override
   def process_info(self,
                    process: ProcessLike,
-                   attrs: list[str] | None = None) -> dict[str, Any] | None:
+                   attrs: list[str] | None = None) -> ProcessInfo | None:
     if self.is_local:
       return super().process_info(process, attrs)
     try:
@@ -505,7 +506,7 @@ class PosixPlatform(Platform, metaclass=abc.ABCMeta):
       assert len(lines) == 2, lines
       tokens = lines[1].split()
       assert len(tokens) == 1
-      return {"comm": tokens[0]}
+      return {"pid": pid, "comm": tokens[0]}
     except SubprocessError:
       return None
 

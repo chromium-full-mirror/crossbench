@@ -17,9 +17,8 @@ import subprocess
 import time
 import traceback as tb
 from subprocess import SubprocessError
-from typing import TYPE_CHECKING, Any, Final, Iterator
+from typing import TYPE_CHECKING, Final, Iterator, cast
 
-import psutil
 from typing_extensions import override
 
 from crossbench import path as pth
@@ -34,8 +33,9 @@ if TYPE_CHECKING:
   from crossbench.plt.base import CPUFreqInfo
   from crossbench.plt.details import MacOsSystemDetails
   from crossbench.plt.display_info import DisplayInfo
-  from crossbench.plt.types import TupleCmdArgs
+  from crossbench.plt.types import ProcessInfo, TupleCmdArgs
   from crossbench.plt.version import PlatformVersion
+  from crossbench.types import JsonDict
 
 DISPLAY_NDRV_RE: Final[re.Pattern] = re.compile(
     "(?P<resX>[0-9]+) x (?P<resY>[0-9]+) @ (?P<freq>[0-9.]+)Hz")
@@ -195,9 +195,11 @@ class MacOSPlatform(PosixPlatform):
 
   @functools.lru_cache(maxsize=1)
   @override
-  def system_details(self) -> dict[str, Any]:
+  def system_details(self) -> JsonDict:
     details = super().system_details()
-    details.update(self._macos_system_details())
+    # TODO: remove once mypy is replaced by pyrefly
+    # https://peps.python.org/pep-0728
+    details.update(cast("JsonDict", self._macos_system_details()))
     return details
 
   @property
@@ -384,7 +386,7 @@ class MacOSPlatform(PosixPlatform):
       end run"""
     return self.sh_stdout("/usr/bin/osascript", "-e", script, *args)
 
-  def foreground_process(self) -> dict[str, Any] | None:
+  def foreground_process(self) -> ProcessInfo | None:
     foreground_process_info = self.sh_stdout("lsappinfo", "front").strip()
     if not foreground_process_info:
       return None
@@ -412,7 +414,7 @@ class MacOSPlatform(PosixPlatform):
             break
 
     if pid and pid.isdigit():
-      return psutil.Process(int(pid)).as_dict()
+      return self.process_info(int(pid))
 
     return None
 
@@ -470,14 +472,14 @@ class MacOSPlatform(PosixPlatform):
     self.sh("sudo", falconctl, "unload")
     return True
 
-  def _get_main_display(self) -> tuple[ctypes.CDLL, Any]:
+  def _get_main_display(self) -> tuple[int, ctypes.CDLL]:
     assert self.is_local, "Operation not supported on remote platforms"
     core_graphics = ctypes.CDLL(
         "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
-    main_display = core_graphics.CGMainDisplayID()
+    main_display = int(core_graphics.CGMainDisplayID())
     return main_display, core_graphics
 
-  def _get_display_service(self) -> tuple[ctypes.CDLL, Any]:
+  def _get_display_service(self) -> tuple[ctypes.CDLL, int]:
     main_display, _ = self._get_main_display()
     display_services = ctypes.CDLL(
         "/System/Library/PrivateFrameworks/DisplayServices.framework"
@@ -648,7 +650,7 @@ class MacOSPlatform(PosixPlatform):
       self,
       core_graphics: ctypes.CDLL,
       core_foundation: ctypes.CDLL,
-      main_display: Any,
+      main_display: int,
       main_width: int,
       main_height: int,
       refresh_rate: int,
@@ -684,7 +686,7 @@ class MacOSPlatform(PosixPlatform):
   def _apply_display_mode(
       self,
       core_graphics: ctypes.CDLL,
-      main_display: Any,
+      main_display: int,
       set_mode: ctypes.c_void_p,
       refresh_rate: int,
       retry: int,

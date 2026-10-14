@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import shlex
-from typing import TYPE_CHECKING, Any, Final, Mapping
+from typing import TYPE_CHECKING, Final, Mapping
 
 from typing_extensions import override
 
@@ -19,7 +19,9 @@ if TYPE_CHECKING:
   from crossbench.plt.base import Platform
   from crossbench.plt.details import CpuDetails
   from crossbench.plt.port_manager import PortManager
-  from crossbench.plt.types import CmdArg, CmdArgs, ListCmdArgs, TupleCmdArgs
+  from crossbench.plt.types import CmdArg, CmdArgs, ListCmdArgs, \
+      ProcessInfo, TupleCmdArgs
+  from crossbench.types import JsonDict
 
 
 class LinuxSshPlatform(SshPlatformMixin, RemoteLinuxPlatform):
@@ -38,7 +40,7 @@ class LinuxSshPlatform(SshPlatformMixin, RemoteLinuxPlatform):
                ssh_port: int, ssh_user: str) -> None:
     super().__init__(host_platform, host, port, ssh_port, ssh_user)
     self._machine: MachineArch | None = None
-    self._system_details: dict[str, Any] | None = None
+    self._system_details: JsonDict | None = None
     self._cpu_details: CpuDetails | None = None
 
   def _create_port_manager(self) -> PortManager:
@@ -86,7 +88,7 @@ class LinuxSshPlatform(SshPlatformMixin, RemoteLinuxPlatform):
         remote_cmd,
     ]
 
-  def processes(self, attrs: list[str] | None = None) -> list[dict[str, Any]]:
+  def processes(self, attrs: list[str] | None = None) -> list[ProcessInfo]:
     del attrs
     # TODO: Define a more generic method in PosixPlatform, possibly with
     # an overridable function to generate ps command line.
@@ -94,7 +96,7 @@ class LinuxSshPlatform(SshPlatformMixin, RemoteLinuxPlatform):
     if len(lines) == 1:
       return []
 
-    res: list[dict[str, Any]] = []
+    res: list[ProcessInfo] = []
     for line in lines[1:]:
       pid, name = line.split(maxsplit=1)
       res.append({"pid": int(pid), "name": name})

@@ -13,7 +13,7 @@ import os
 import re
 import subprocess
 import textwrap
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Iterator
+from typing import TYPE_CHECKING, ClassVar, Final, Iterator
 
 from typing_extensions import override
 
@@ -33,6 +33,7 @@ if TYPE_CHECKING:
       VirtualDeviceType
   from crossbench.plt.display_info import DisplayInfo
   from crossbench.plt.types import TupleCmdArgs
+  from crossbench.types import JsonDict
 
 SCRIPTS_DIR: Final = pth.LocalPath(__file__).parent / "remote_scripts"
 PERF_EVENT_PARANOID_PATH: Final = pth.AnyPosixPath(
@@ -164,7 +165,7 @@ class LinuxPlatform(EvemuPlatformMixin, PosixPlatform):
 
   @functools.lru_cache(maxsize=1)
   @override
-  def system_details(self) -> dict[str, Any]:
+  def system_details(self) -> JsonDict:
     details = super().system_details()
     for info_bin in ("lscpu", "inxi"):
       if info_bin_path := self.which(info_bin):

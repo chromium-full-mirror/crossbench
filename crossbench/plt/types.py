@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from asyncio.subprocess import Process
 from subprocess import Popen
-from typing import IO, Any, Sequence, TypeAlias
+from typing import IO, Any, NotRequired, Sequence, TypeAlias, TypedDict
 
 from crossbench import path as pth
 
@@ -21,3 +21,12 @@ ProcessLike: TypeAlias = Popen | Process | int
 ProcessIo: TypeAlias = int | IO[Any] | None
 
 PlatformKey: TypeAlias = tuple[str, ...]
+
+
+class ProcessInfo(TypedDict):
+  pid: int
+  name: NotRequired[str]
+  exe: NotRequired[str | None]
+  cmdline: NotRequired[list[str] | None]
+  status: NotRequired[str]
+  comm: NotRequired[str]

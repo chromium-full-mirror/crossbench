@@ -9,7 +9,7 @@ import datetime as dt
 import functools
 import json
 import re
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Final
 
 from typing_extensions import override
 
@@ -25,6 +25,7 @@ if TYPE_CHECKING:
   from crossbench.plt.details import CpuDetails, OsDetails, PythonDetails
   from crossbench.plt.display_info import DisplayInfo
   from crossbench.plt.signals import AnySignals
+  from crossbench.plt.types import ProcessInfo
 
 pattern: re.Pattern[str] = re.compile(
     r"(?P<name>[^\(\)]+) \((?P<version>[0-9\.]+)\) (- Connecting )?"
@@ -300,5 +301,5 @@ class IOSPlatform(RemotePlatformMixin, Platform):
   def process_children(self,
                        parent_pid: int,
                        recursive: bool = False,
-                       attrs: list[str] | None = None) -> list[dict[str, Any]]:
+                       attrs: list[str] | None = None) -> list[ProcessInfo]:
     return []

@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import abc
 import functools
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Self, TypeAlias, cast
+from typing import TYPE_CHECKING, Callable, ClassVar, Final, Self, TypeAlias, \
+    cast
 
 from typing_extensions import override
 
@@ -47,8 +48,8 @@ class BinaryPath(abc.ABC):
       return self
     if path.suffix.lower() in (".exe", ".bat"):
       return self
-    cls: Any = type(self)
-    return cast(Self, cls(f"{path}.exe"))
+    cls = cast(Callable[[str], Self], type(self))
+    return cls(f"{path}.exe")
 
 
 class SystemPath(BinaryPath):

@@ -26,8 +26,8 @@ import tempfile
 import urllib.error
 import urllib.request
 import weakref
-from typing import TYPE_CHECKING, Any, Callable, Final, Generator, Iterable, \
-    Iterator, Mapping, Sequence
+from typing import TYPE_CHECKING, Callable, Final, Generator, Iterable, \
+    Iterator, Mapping, Sequence, cast
 
 import google.api_core.exceptions as gcloud_exceptions
 import google.cloud.storage as gcloud_storage
@@ -53,16 +53,17 @@ if TYPE_CHECKING:
   from crossbench.action_runner.input_events import InputEvent
   from crossbench.action_runner.virtual_device.virtual_device_config import \
       VirtualDeviceConfig
-  from crossbench.device_config import DeviceConfigKeyPath
+  from crossbench.device_config import DeviceConfigKeyPath, DeviceConfigMap
   from crossbench.plt.details import CpuDetails, OsDetails, PythonDetails
   from crossbench.plt.display_info import DisplayInfo, \
       DisplayRefreshRateResult, DisplayResolution
   from crossbench.plt.process_meminfo import ProcessMeminfo
   from crossbench.plt.signals import AnySignals, Signals
-  from crossbench.plt.types import CmdArg, PlatformKey, ProcessIo, \
-      ProcessLike, TupleCmdArgs
+  from crossbench.plt.types import CmdArg, PlatformKey, ProcessInfo, \
+      ProcessIo, ProcessLike, TupleCmdArgs
   from crossbench.plt.version import PlatformVersion
   from crossbench.plt.version_details import VersionDetails
+  from crossbench.types import Json, JsonDict
 
 
 class Environ(collections.abc.MutableMapping, metaclass=abc.ABCMeta):
@@ -388,7 +389,7 @@ class Platform(abc.ABC):
   def total_memory_mb(self) -> int:
     return self.system_memory_bytes // Size.MiB
 
-  def device_config(self) -> dict[str, Any]:
+  def device_config(self) -> dict[str, DeviceConfigMap]:
     """Returns a hierarchical dictionary of device/host configuration.
 
     Subclasses override this method to provide platform-specific configuration
@@ -419,16 +420,20 @@ class Platform(abc.ABC):
     raise ValueError(f"Cannot set device config {'.'.join(key_path)!r}.")
 
   @functools.lru_cache(maxsize=1)
-  def system_details(self) -> dict[str, Any]:
-    details = {
+  def system_details(self) -> JsonDict:
+    # TODO: remove once mypy is replaced by pyrefly
+    # https://peps.python.org/pep-0728
+    details: JsonDict = {
         "machine": str(self.machine),
-        "os": self.os_details(),
-        "python": self.python_details(),
-        "CPU": self.cpu_details(),
-        "display": self.display_details(),
+        "os": cast("Json", self.os_details()),
+        "python": cast("Json", self.python_details()),
+        "CPU": cast("Json", self.cpu_details()),
+        "display": cast("Json", self.display_details()),
     }
     if self.is_local:
-      details["crossbench"] = self.crossbench_details()
+      # TODO: remove once mypy is replaced by pyrefly
+      # https://peps.python.org/pep-0728
+      details["crossbench"] = cast("Json", self.crossbench_details())
     return details
 
   @functools.lru_cache(maxsize=1)
@@ -701,7 +706,7 @@ class Platform(abc.ABC):
     except proc_helper.PROCESS_NOT_FOUND_EXCEPTIONS:
       pass
 
-  def processes(self, attrs: list[str] | None = None) -> list[dict[str, Any]]:
+  def processes(self, attrs: list[str] | None = None) -> list[ProcessInfo]:
     # TODO(cbruni): support remote platforms
     assert self.is_local, "Only local platform supported"
     return self._collect_process_dict(psutil.process_iter(attrs=attrs), attrs)
@@ -720,7 +725,7 @@ class Platform(abc.ABC):
   def process_children(self,
                        parent_pid: int,
                        recursive: bool = False,
-                       attrs: list[str] | None = None) -> list[dict[str, Any]]:
+                       attrs: list[str] | None = None) -> list[ProcessInfo]:
     self.assert_is_local()
     # TODO(cbruni): support remote platforms
     try:
@@ -733,8 +738,8 @@ class Platform(abc.ABC):
   def _collect_process_dict(
       self,
       process_iterator: Iterable[psutil.Process],
-      attrs: list[str] | None = None) -> list[dict[str, Any]]:
-    process_info_list: list[dict[str, Any]] = []
+      attrs: list[str] | None = None) -> list[ProcessInfo]:
+    process_info_list: list[ProcessInfo] = []
     for process in process_iterator:
       with contextlib.suppress(*proc_helper.PROCESS_NOT_FOUND_EXCEPTIONS):
         # psutil.Process does not always have an "info" property.
@@ -744,17 +749,18 @@ class Platform(abc.ABC):
         if info := getattr(process, "info", None):
           process_info_list.append(info.copy())
         else:
-          process_info_list.append(process.as_dict(attrs=attrs))
+          process_info_list.append(
+              cast("ProcessInfo", process.as_dict(attrs=attrs)))
     return process_info_list
 
   def process_info(self,
                    process: ProcessLike,
-                   attrs: list[str] | None = None) -> dict[str, Any] | None:
+                   attrs: list[str] | None = None) -> ProcessInfo | None:
     self.assert_is_local()
     # TODO(cbruni): support remote platforms
     try:
       pid = self.process_pid(process)
-      return psutil.Process(pid).as_dict(attrs=attrs)
+      return cast("ProcessInfo", psutil.Process(pid).as_dict(attrs=attrs))
     except proc_helper.PROCESS_NOT_FOUND_EXCEPTIONS:
       return None
 
@@ -776,7 +782,7 @@ class Platform(abc.ABC):
     used in MB."""
     return {}
 
-  def foreground_process(self) -> dict[str, Any] | None:
+  def foreground_process(self) -> ProcessInfo | None:
     return None
 
   def dump_java_heap(self, identifier: str, label: str,
@@ -1239,7 +1245,7 @@ class Platform(abc.ABC):
     del script, args
     raise NotImplementedError("AppleScript is only available on MacOS")
 
-  def log(self, *messages: Any, level: int = 2) -> None:
+  def log(self, *messages: object, level: int = 2) -> None:
     message_str = " ".join(map(str, messages))
     if level == 3:
       level = logging.DEBUG
@@ -1390,7 +1396,7 @@ class Platform(abc.ABC):
         f"'get_ui_element_rect' is not supported on {self.name}")
 
   @contextlib.contextmanager
-  def low_power_mode(self) -> Generator[None, Any, None]:
+  def low_power_mode(self) -> Iterator[None]:
     raise NotImplementedError("'low_power_mode' is only supported on Android")
 
   @property

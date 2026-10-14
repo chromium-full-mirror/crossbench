@@ -11,7 +11,7 @@ import logging
 import shlex
 import subprocess
 import time
-from typing import TYPE_CHECKING, Any, Mapping, cast
+from typing import IO, TYPE_CHECKING, Any, Mapping, cast
 
 from typing_extensions import override
 
@@ -25,6 +25,7 @@ if TYPE_CHECKING:
   from crossbench.plt.base import Platform
   from crossbench.plt.signals import Signals
   from crossbench.plt.types import CmdArg, ProcessIo
+  from crossbench.types import JsonDict
 
 try:
   import js
@@ -225,12 +226,14 @@ class PyodideAdb(android_adb.Adb):
       return str(args[0])
     raise ValueError(f"Expected single sh arg with shell=True, but got: {args}")
 
-  def _to_bytes(self, raw: Any) -> bytes:
+  def _to_bytes(self, raw: object) -> bytes:
     if isinstance(raw, bytes):
       return raw
     if isinstance(raw, str):
       return raw.encode("utf-8")
-    return bytes(raw)
+    if isinstance(raw, (bytearray, memoryview)):
+      return bytes(raw)
+    raise TypeError(f"Unsupported type: {type(raw)}")
 
   @override
   def shell(
@@ -345,7 +348,7 @@ class PyodideAndroidAdbPlatform(android_adb.AndroidAdbPlatform):
   @override
   def send_cdp_command(self,
                        method: str,
-                       params: dict[str, Any] | None = None) -> dict[str, Any]:
+                       params: JsonDict | None = None) -> JsonDict:
     self._check_interrupted()
     try:
       res_str = self.webadb.sendCdpCommand(method, json.dumps(params or {}))
@@ -421,13 +424,16 @@ class PyodideAndroidAdbPlatform(android_adb.AndroidAdbPlatform):
 
     logging.info("Starting background process via WebADB spawn: %s", cmd_str)
     proc_id = int(self.webadb.spawnProcess(cmd_str))
+    local_file: IO[str] | None = None
+    if isinstance(stdout, io.IOBase):
+      local_file = cast(IO[str], stdout)
     popen_obj = PyodideStreamingPopen(
         self,
         proc_id=proc_id,
         cmd=cmd_str,
         stdout=stdout,
         stderr=stderr,
-        local_log_file=stdout if isinstance(stdout, io.IOBase) else None,
+        local_log_file=local_file,
     )
     popen_obj.poll()
     return popen_obj
@@ -447,12 +453,12 @@ class PyodideStreamingPopen(subprocess.Popen):
       cmd: str,
       stdout: ProcessIo = None,
       stderr: ProcessIo = None,
-      local_log_file: Any | None = None,
+      local_log_file: IO[str] | None = None,
   ) -> None:
     self._platform: PyodideAndroidAdbPlatform = platform
     self._proc_id: int = proc_id
     self._cmd: str = cmd
-    self._local_log_file: Any | None = local_log_file
+    self._local_log_file: IO[str] | None = local_log_file
     self._last_log_offset: int = 0
     self.returncode: int | None = None
     self.args = cmd

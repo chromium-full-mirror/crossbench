@@ -9,7 +9,7 @@ import functools
 import json
 import logging
 import subprocess
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Iterator
+from typing import TYPE_CHECKING, ClassVar, Final, Iterator
 
 from typing_extensions import override
 
@@ -22,6 +22,7 @@ from crossbench.plt.linux_ssh import LinuxSshPlatform
 if TYPE_CHECKING:
   from crossbench.plt.display_info import DisplayInfo
   from crossbench.plt.types import ListCmdArgs
+  from crossbench.types import JsonDict
 
 
 class ChromeOsSshPlatform(LinuxSshPlatform):
@@ -147,7 +148,7 @@ class ChromeOsSshPlatform(LinuxSshPlatform):
 
   @functools.lru_cache(maxsize=1)
   @override
-  def system_details(self) -> dict[str, Any]:
+  def system_details(self) -> JsonDict:
     details = super().system_details()
 
     details.update({
