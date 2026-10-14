@@ -8,7 +8,8 @@ import argparse
 import dataclasses
 import functools
 import logging
-from typing import TYPE_CHECKING, Final, Iterable, Self, Sequence, TypeAlias
+from typing import TYPE_CHECKING, Final, Iterable, Mapping, Self, Sequence, \
+    TypeAlias, cast
 
 from immutabledict import immutabledict
 from ordered_set import OrderedSet
@@ -57,8 +58,7 @@ class FlagsVariantConfig:
       default_factory=lambda: ChromeFlags().freeze())
 
   @classmethod
-  def parse(cls, name: str, index: int,
-            data: RawFlagsData) -> FlagsVariantConfig:
+  def parse(cls, name: str, index: int, data: RawFlagsData) -> Self:
     return cls(name, index, _parse_flags(data))
 
   def merge_copy(self,
@@ -339,6 +339,12 @@ class FlagsGroupConfig(tuple[FlagsVariantConfig, ...]):
 
 
 class FlagsConfig(ConfigObject, immutabledict[str, FlagsGroupConfig]):
+
+  # immutabledict.__new__ is annotated as returning immutabledict, not Self.
+  def __new__(cls, data: Mapping[str, FlagsGroupConfig] | None = None) -> Self:
+    if not data:
+      return cast(Self, super().__new__(cls))
+    return cast(Self, super().__new__(cls, data))
 
   @classmethod
   @override

@@ -7,7 +7,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 import logging
-from typing import TYPE_CHECKING, Final, Iterable
+from typing import TYPE_CHECKING, Final, Iterable, Self
 
 from crossbench.helper import collection_helper
 
@@ -44,19 +44,19 @@ class RunAnnotation:
   level: WarnLevel = WarnLevel.INFO
 
   @classmethod
-  def fatal(cls, message: str) -> RunAnnotation:
+  def fatal(cls, message: str) -> Self:
     return cls(message, level=WarnLevel.FATAL)
 
   @classmethod
-  def error(cls, message: str) -> RunAnnotation:
+  def error(cls, message: str) -> Self:
     return cls(message, level=WarnLevel.ERROR)
 
   @classmethod
-  def warning(cls, message: str) -> RunAnnotation:
+  def warning(cls, message: str) -> Self:
     return cls(message, level=WarnLevel.WARNING)
 
   @classmethod
-  def info(cls, message: str) -> RunAnnotation:
+  def info(cls, message: str) -> Self:
     return cls(message, level=WarnLevel.INFO)
 
   def to_json(self) -> JsonDict:

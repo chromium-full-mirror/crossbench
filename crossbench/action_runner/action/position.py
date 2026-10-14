@@ -90,19 +90,18 @@ class UiSelectorConfig(ConfigObject):
 
   @classmethod
   @override
-  def parse_str(cls, value: str) -> UiSelectorConfig:
+  def parse_str(cls, value: str) -> Self:
     del value
     raise NotImplementedError("Cannot create UiSelectorConfig from string")
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict[str, object],
-                 **kwargs: object) -> UiSelectorConfig:
+  def parse_dict(cls, config: dict[str, object], **kwargs: object) -> Self:
     return cls.config_parser().parse(config)
 
   @classmethod
   @override
-  def config_parser(cls) -> ConfigParser[UiSelectorConfig]:
+  def config_parser(cls) -> ConfigParser[Self]:
     parser = ConfigParser(
         cls, unused_properties_mode=UnusedPropertiesMode.ERROR)
     parser.add_argument(
@@ -198,7 +197,7 @@ class PositionConfig(ConfigObject):
                        res: str | None = None,
                        clazz: str | None = None,
                        text: str | None = None,
-                       required: bool = True) -> PositionConfig:
+                       required: bool = True) -> Self:
     return cls(
         ui_selector=UiSelectorConfig(
             pkg=pkg, res=res, clazz=clazz, text=text, required=required))

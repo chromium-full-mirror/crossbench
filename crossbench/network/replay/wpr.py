@@ -170,8 +170,7 @@ class LocalWprReplayNetwork(WprReplayNetwork):
 
   @contextlib.contextmanager
   @override
-  def open(self: LocalWprReplayNetwork,
-           session: BrowserSessionRunGroup) -> Iterator[LocalWprReplayNetwork]:
+  def open(self, session: BrowserSessionRunGroup) -> Iterator[Self]:
     with super().open(session):
       with self._forward_ports(session):
         yield self
@@ -263,8 +262,7 @@ class RemoteWprReplayNetwork(WprReplayNetwork):
 
   @contextlib.contextmanager
   @override
-  def open(self: RemoteWprReplayNetwork,
-           session: BrowserSessionRunGroup) -> Iterator[RemoteWprReplayNetwork]:
+  def open(self, session: BrowserSessionRunGroup) -> Iterator[Self]:
     with self._remote_temp_dir(session):
       with super().open(session):
         yield self

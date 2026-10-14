@@ -8,7 +8,7 @@ import enum
 import logging
 import re
 import sys
-from typing import TYPE_CHECKING, Final, Iterable
+from typing import TYPE_CHECKING, Final, Iterable, Self
 
 from crossbench.helper import fs_helper
 from crossbench.helper.version import Version
@@ -46,7 +46,7 @@ _VERSION_RE: Final[re.Pattern] = re.compile(r"Perfetto v(\d+)\.(\d+)")
 class PerfettoVersion(Version):
 
   @classmethod
-  def parse(cls, version_str: str) -> PerfettoVersion:
+  def parse(cls, version_str: str) -> Self:
     if match := _VERSION_RE.search(version_str):
       parts = (int(match.group(1)), int(match.group(2)))
       return cls(parts, version_str)

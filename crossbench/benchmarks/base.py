@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Final, Generic, Iterable, \
     Mapping, NotRequired, Sequence, TypeAlias, TypedDict, TypeVar, cast
 
 from ordered_set import OrderedSet
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from crossbench.action_runner.config import ActionRunnerConfig
 from crossbench.flags.base import Flags
@@ -167,7 +167,7 @@ class Benchmark(abc.ABC):
     return {"action_runner_config": args.action_runner_config}
 
   @classmethod
-  def from_cli_args(cls, args: argparse.Namespace) -> Benchmark:
+  def from_cli_args(cls, args: argparse.Namespace) -> Self:
     kwargs = cls.kwargs_from_cli(args)
     return cls(**kwargs)
 
@@ -340,7 +340,7 @@ class StoryFilter(Generic[StoryT], metaclass=abc.ABCMeta):
 
   @classmethod
   def from_cli_args(cls, story_cls: type[StoryT],
-                    args: argparse.Namespace) -> StoryFilter[StoryT]:
+                    args: argparse.Namespace) -> Self:
     kwargs = cls.kwargs_from_cli(args)
     return cls(story_cls, **kwargs)
 

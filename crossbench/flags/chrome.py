@@ -8,7 +8,7 @@ import argparse
 import logging
 from typing import Final, Iterable
 
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from crossbench import path as pth
 from crossbench.flags.base import Flags, FlagsData
@@ -57,7 +57,8 @@ class ChromeFlags(Flags):
     self._extensions: ChromeExtensions = ChromeExtensions()
     super().__init__(initial_data)
 
-  def freeze(self) -> ChromeFlags:
+  @override
+  def freeze(self) -> Self:
     super().freeze()
     self._js_flags.freeze()
     self._features.freeze()

@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Callable, Iterable, Sequence, TypeGuard
 from crossbench.probes import helper
 
 if TYPE_CHECKING:
+  from typing import Self
+
   from crossbench import path as pth
   from crossbench.types import Json, JsonDict
 
@@ -48,7 +50,7 @@ class Metric:
     return f"{value:.{value_width}f} ± {percent:.{percent_width}f}%"
 
   @classmethod
-  def from_json(cls, json_data: JsonDict) -> Metric:
+  def from_json(cls, json_data: JsonDict) -> Self:
     values = json_data["values"]
     assert isinstance(values, list)
     return cls(values)
@@ -174,7 +176,7 @@ class MetricsMerger:
   def merge_json_list(cls,
                       files: Iterable[pth.LocalPath],
                       key_fn: helper.KeyFnType | None = None,
-                      merge_duplicate_paths: bool = False) -> MetricsMerger:
+                      merge_duplicate_paths: bool = False) -> Self:
     merger = cls(key_fn=key_fn)
     for file in files:
       merger.merge_json_file(file, merge_duplicate_paths=merge_duplicate_paths)

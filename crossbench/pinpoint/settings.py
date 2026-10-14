@@ -6,9 +6,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 import platformdirs
+from typing_extensions import override
 
 from crossbench import path as pth
 from crossbench.config import ConfigObject, ConfigParser
@@ -84,7 +85,8 @@ class _SettingsConfig(ConfigObject):
   collect_metrics: bool | None = None
 
   @classmethod
-  def config_parser(cls) -> ConfigParser[_SettingsConfig]:
+  @override
+  def config_parser(cls) -> ConfigParser[Self]:
     parser = ConfigParser(cls)
     parser.add_argument(
         "user_id",
@@ -102,7 +104,8 @@ class _SettingsConfig(ConfigObject):
     return parser
 
   @classmethod
-  def parse_str(cls, value: str) -> _SettingsConfig:
+  @override
+  def parse_str(cls, value: str) -> Self:
     raise NotImplementedError
 
   def to_dict(self) -> JsonDict:

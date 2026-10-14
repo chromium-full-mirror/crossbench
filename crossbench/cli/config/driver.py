@@ -54,7 +54,7 @@ class DriverConfig(ConfigObject):
   settings: immutabledict | None = None
 
   @classmethod
-  def default(cls) -> DriverConfig:
+  def default(cls) -> Self:
     return cls(BrowserDriverType.default())
 
   @classmethod

@@ -76,7 +76,7 @@ class DeviceConfigRequirement:
 
   @classmethod
   def parse(cls, key_path: DeviceConfigKeyPath,
-            value: DeviceConfigValue) -> DeviceConfigRequirement:
+            value: DeviceConfigValue) -> Self:
     """Parses a leaf value, annotating parse errors with its key path."""
     try:
       predicate, target = _Predicate.parse(value)
@@ -458,7 +458,7 @@ class _MappingPredicate(_Predicate):
 
   @classmethod
   @abc.abstractmethod
-  def from_mapping(cls, mapping: DeviceConfigMap) -> _Predicate:
+  def from_mapping(cls, mapping: DeviceConfigMap) -> Self:
     """Parses a mapping whose keys this predicate owns."""
 
 
@@ -471,7 +471,7 @@ class _RegexPredicate(_MappingPredicate):
 
   @classmethod
   @override
-  def from_mapping(cls, mapping: DeviceConfigMap) -> _RegexPredicate:
+  def from_mapping(cls, mapping: DeviceConfigMap) -> Self:
     raw_regex = mapping.get("$regex")
     if not isinstance(raw_regex, str):
       raise ValueError(f"Invalid $regex: expected str, got {raw_regex!r}.")
@@ -505,7 +505,7 @@ class _NumericRangePredicate(_MappingPredicate):
 
   @classmethod
   @override
-  def from_mapping(cls, mapping: DeviceConfigMap) -> _NumericRangePredicate:
+  def from_mapping(cls, mapping: DeviceConfigMap) -> Self:
     min_val = mapping.get("$min")
     max_val = mapping.get("$max")
     return cls(

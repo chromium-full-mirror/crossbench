@@ -49,7 +49,8 @@ class VariantConfig(ConfigObject):
     return cls(commit=commit, patch=patch, flags=flags)
 
   @classmethod
-  def config_parser(cls) -> ConfigParser[VariantConfig]:
+  @override
+  def config_parser(cls) -> ConfigParser[Self]:
     parser = ConfigParser(cls)
     parser.add_argument(
         "commit",
@@ -88,7 +89,8 @@ class VariantConfig(ConfigObject):
     return patch_resolver.resolve_patch(value)
 
   @classmethod
-  def parse_str(cls, value: str) -> VariantConfig:
+  @override
+  def parse_str(cls, value: str) -> Self:
     raise NotImplementedError
 
   def override_commit(self, commit: str | None, bot: str) -> Self:
@@ -271,7 +273,8 @@ class PinpointTryJobConfig(PinpointJobConfigMixin, ConfigObject):
     )
 
   @classmethod
-  def config_parser(cls) -> ConfigParser[PinpointTryJobConfig]:
+  @override
+  def config_parser(cls) -> ConfigParser[Self]:
     parser = ConfigParser(cls)
     parser.add_argument(
         "benchmark",
@@ -316,7 +319,8 @@ class PinpointTryJobConfig(PinpointJobConfigMixin, ConfigObject):
     return parser
 
   @classmethod
-  def parse_str(cls, value: str) -> PinpointTryJobConfig:
+  @override
+  def parse_str(cls, value: str) -> Self:
     raise NotImplementedError
 
   @classmethod
@@ -345,13 +349,13 @@ class PinpointTryJobConfig(PinpointJobConfigMixin, ConfigObject):
       exp_enable_blink_features: str | None = None,
       base_disable_blink_features: str | None = None,
       exp_disable_blink_features: str | None = None,
-  ) -> PinpointTryJobConfig:
+  ) -> Self:
     """Create a new valid PinpointTryJobConfig instance for new jobs."""
     with annotate("Parsing job configuration"):
       if config:
         parsed = super().parse(config)
       else:
-        parsed = PinpointTryJobConfig(benchmark="", bot="")
+        parsed = cls(benchmark="", bot="")
 
       resolved_benchmark = benchmark or parsed.benchmark
       resolved_bot = bot or parsed.bot
@@ -442,7 +446,7 @@ class PinpointTryJobConfig(PinpointJobConfigMixin, ConfigObject):
     }
 
   @classmethod
-  def from_response_dict(cls, raw_dict: JsonDict) -> PinpointTryJobConfig:
+  def from_response_dict(cls, raw_dict: JsonDict) -> Self:
     """Returns a valid PinpointTryJobConfig if the server response is valid."""
     comparison_mode = raw_dict.get("comparison_mode")
     if comparison_mode != "try":
@@ -453,7 +457,7 @@ class PinpointTryJobConfig(PinpointJobConfigMixin, ConfigObject):
     # An empty field created from the Web UI is an empty string. Such empty
     # fields are replaced with None to make it possible to convert the result
     # config to JSON and back to PinpointTryJobConfig for creating new jobs.
-    return PinpointTryJobConfig(
+    return cls(
         benchmark=ObjectParser.non_empty_str(arguments["benchmark"],
                                              "benchmark"),
         bot=ObjectParser.non_empty_str(arguments["configuration"],
@@ -536,7 +540,8 @@ class PinpointBisectJobConfig(PinpointJobConfigMixin, ConfigObject):
     )
 
   @classmethod
-  def config_parser(cls) -> ConfigParser[PinpointBisectJobConfig]:
+  @override
+  def config_parser(cls) -> ConfigParser[Self]:
     parser = ConfigParser(cls)
     parser.add_argument(
         "benchmark",
@@ -583,7 +588,8 @@ class PinpointBisectJobConfig(PinpointJobConfigMixin, ConfigObject):
     return parser
 
   @classmethod
-  def parse_str(cls, value: str) -> PinpointBisectJobConfig:
+  @override
+  def parse_str(cls, value: str) -> Self:
     raise NotImplementedError
 
   @classmethod
@@ -605,13 +611,13 @@ class PinpointBisectJobConfig(PinpointJobConfigMixin, ConfigObject):
       disable_features: str | None = None,
       enable_blink_features: str | None = None,
       disable_blink_features: str | None = None,
-  ) -> PinpointBisectJobConfig:
+  ) -> Self:
     """Create a new valid PinpointBisectJobConfig instance for new jobs."""
     with annotate("Parsing job configuration"):
       if config:
         parsed = super().parse(config)
       else:
-        parsed = PinpointBisectJobConfig(benchmark="", bot="")
+        parsed = cls(benchmark="", bot="")
 
       resolved_benchmark = benchmark or parsed.benchmark
       resolved_bot = bot or parsed.bot
@@ -694,7 +700,7 @@ class PinpointBisectJobConfig(PinpointJobConfigMixin, ConfigObject):
     }
 
   @classmethod
-  def from_response_dict(cls, raw_dict: JsonDict) -> PinpointBisectJobConfig:
+  def from_response_dict(cls, raw_dict: JsonDict) -> Self:
     """Returns a valid PinpointBisectJobConfig if the server response is
     valid."""
     comparison_mode = raw_dict.get("comparison_mode")
@@ -706,7 +712,7 @@ class PinpointBisectJobConfig(PinpointJobConfigMixin, ConfigObject):
     # An empty field created from the Web UI is an empty string. Such empty
     # fields are replaced with None to make it possible to convert the result
     # config to JSON and back to PinpointBisectJobConfig for creating new jobs.
-    return PinpointBisectJobConfig(
+    return cls(
         benchmark=ObjectParser.non_empty_str(arguments["benchmark"],
                                              "benchmark"),
         bot=ObjectParser.non_empty_str(arguments["configuration"],
