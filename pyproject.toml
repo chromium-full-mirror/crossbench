@@ -106,6 +106,7 @@ extend-select = [
     "S",    # flake8-bandit security checks
     "T10",  # flake8-debugger
     "C4",   # flake8-comprehensions
+    "C901", # mccabe cyclomatic complexity
     "COM812", # flake8-commas: missing-trailing-comma
     "COM818", # flake8-commas: trailing-comma-on-bare-tuple
     "COM819", # flake8-commas: prohibited-trailing-comma
@@ -216,6 +217,9 @@ runtime-evaluated-base-classes = [
 
 [tool.ruff.lint.flake8-annotations]
 mypy-init-return = true
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
 
 [tool.ruff.lint.isort]
 required-imports = [ "from __future__ import annotations" ]

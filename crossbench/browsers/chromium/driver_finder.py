@@ -48,6 +48,19 @@ class ChromiumDashParams(TypedDict):
   dash_limit: NotRequired[int]
 
 
+# Minimal version entry returned by the Chromium Dash API.
+class ChromiumDashVersionInfo(TypedDict, total=False):
+  version: str
+  chromium_main_branch_position: int | str
+  milestone: int
+
+
+# Storage item entry returned by the Google Cloud Storage listing API.
+class CanaryStorageItem(TypedDict, total=False):
+  name: str
+  mediaLink: str
+
+
 class DriverUrlResult(NamedTuple):
   listing_url: str
   download_url: str | None
@@ -373,52 +386,7 @@ class ChromeDriverFinder:
     if not properties:
       raise DriverNotFoundError(f"Unsupported platform={self.platform}, "
                                 f"type_key={self.host_platform.type_key}")
-    dash_platform = properties["dash_platform"]
-    dash_channel = properties.get("dash_channel", "canary")
-    # Limit should be > len(canary_versions) so we also get potentially
-    # the latest dev version (only beta / stable have official driver binaries).
-    dash_limit = properties.get("dash_limit", 100)
-    url = url_helper.update_url_query(
-        self.CHROMIUM_DASH_URL, {
-            "platform": dash_platform,
-            "channel": dash_channel,
-            "milestone": str(self.browser.version.major),
-            "num": str(dash_limit),
-        })
-    chromium_base_position = 0
-    response = url_helper.get(url)
-    version_infos = list(response.json())
-    if not version_infos:
-      raise DriverNotFoundError("Could not find latest version info for "
-                                f"platform={self.host_platform}")
-    for version_info in version_infos:
-      if version_info["version"] == self.browser.version.parts_str:
-        chromium_base_position = int(
-            version_info["chromium_main_branch_position"])
-        break
-
-    if not chromium_base_position and version_infos:
-      fallback_version_info = None
-      # Try matching latest milestone
-      for version_info in version_infos:
-        if version_info["milestone"] == self.browser.version.major:
-          fallback_version_info = version_info
-          break
-
-      if not fallback_version_info:
-        # Android has a slightly different release cycle than the desktop
-        # versions. Assume that the latest canary version is good enough
-        fallback_version_info = version_infos[0]
-      chromium_base_position = int(
-          fallback_version_info["chromium_main_branch_position"])
-      logging.warning(
-          "Falling back to latest (not precisely matching) "
-          "canary chromedriver %s (expected %s)",
-          fallback_version_info["version"], self.browser.version)
-
-    if not chromium_base_position:
-      raise DriverNotFoundError("Could not find matching canary chromedriver "
-                                f"for {self.browser.version}")
+    chromium_base_position: int = self._get_canary_base_position(properties)
     # Use prefixes to limit listing results and increase chances of finding
     # a matching version
     listing_prefix = self.CHROMIUM_LISTING_PREFIX.get(
@@ -426,41 +394,96 @@ class ChromeDriverFinder:
     if not listing_prefix:
       raise NotImplementedError(
           f"Unsupported chromedriver platform {self.host_platform}")
-    base_prefix = str(chromium_base_position)[:4]
+    base_prefix: str = str(chromium_base_position)[:4]
     listing_url: str = url_helper.update_url_query(self.CHROMIUM_LISTING_URL, {
         "prefix": f"{listing_prefix}/{base_prefix}",
         "maxResults": "10000",
     })
-    listing = url_helper.get(listing_url).json()
+    candidate_url: str | None = self._find_canary_candidate_url(
+        listing_url, chromium_base_position)
+    return DriverUrlResult(listing_url, candidate_url)
 
+  def _get_canary_base_position(self, properties: ChromiumDashParams) -> int:
+    dash_platform: str = properties["dash_platform"]
+    dash_channel: str = properties.get("dash_channel", "canary")
+    # Limit should be > len(canary_versions) so we also get potentially
+    # the latest dev version (only beta / stable have official driver binaries).
+    dash_limit: int = properties.get("dash_limit", 100)
+    url: str = url_helper.update_url_query(
+        self.CHROMIUM_DASH_URL, {
+            "platform": dash_platform,
+            "channel": dash_channel,
+            "milestone": str(self.browser.version.major),
+            "num": str(dash_limit),
+        })
+    response = url_helper.get(url)
+    version_infos: list[ChromiumDashVersionInfo] = list(response.json())
+    if not version_infos:
+      raise DriverNotFoundError("Could not find latest version info for "
+                                f"platform={self.host_platform}")
+    return self._resolve_canary_base_position(version_infos)
+
+  def _resolve_canary_base_position(
+      self, version_infos: list[ChromiumDashVersionInfo]) -> int:
+    for version_info in version_infos:
+      if version_info["version"] == self.browser.version.parts_str:
+        return int(version_info["chromium_main_branch_position"])
+    fallback_version_info = None
+    # Try matching latest milestone
+    for version_info in version_infos:
+      if version_info["milestone"] == self.browser.version.major:
+        fallback_version_info = version_info
+        break
+    if not fallback_version_info:
+      # Android has a slightly different release cycle than the desktop
+      # versions. Assume that the latest canary version is good enough
+      fallback_version_info = version_infos[0]
+    base_position = int(fallback_version_info["chromium_main_branch_position"])
+    logging.warning(
+        "Falling back to latest (not precisely matching) "
+        "canary chromedriver %s (expected %s)",
+        fallback_version_info["version"], self.browser.version)
+    if not base_position:
+      raise DriverNotFoundError("Could not find matching canary chromedriver "
+                                f"for {self.browser.version}")
+    return base_position
+
+  def _find_canary_candidate_url(self, listing_url: str,
+                                 chromium_base_position: int) -> str | None:
+    listing = url_helper.get(listing_url).json()
     versions: list[CanaryDriverCandidate] = []
     logging.debug("Filtering %s candidate URLs.", len(listing["items"]))
     for version in listing["items"]:
-      if "name" not in version:
-        continue
-      if "mediaLink" not in version:
-        continue
-      name = version["name"]
-      if "chromedriver" not in name:
-        continue
-      parts = name.split("/")
-      if "chromedriver" not in parts[-1] or len(parts) < 3:
-        continue
-      base = parts[1]
-      try:
-        int(base)
-      except ValueError:
-        # Ignore base if it is not an int
-        continue
-      versions.append(CanaryDriverCandidate(int(base), version["mediaLink"]))
+      if candidate := self._parse_canary_candidate(version):
+        versions.append(candidate)
     versions.sort()
     logging.debug("Found candidates: %s", versions)
     logging.debug("chromium_base_position=%s", chromium_base_position)
 
     for i, candidate in enumerate(versions):
       if candidate.base_position > chromium_base_position:
-        return DriverUrlResult(listing_url, versions[i - 1].url)
-    return DriverUrlResult(listing_url, None)
+        return versions[i - 1].url
+    return None
+
+  def _parse_canary_candidate(
+      self, version: CanaryStorageItem) -> CanaryDriverCandidate | None:
+    if "name" not in version:
+      return None
+    if "mediaLink" not in version:
+      return None
+    name = version["name"]
+    if "chromedriver" not in name:
+      return None
+    parts = name.split("/")
+    if "chromedriver" not in parts[-1] or len(parts) < 3:
+      return None
+    base = parts[1]
+    try:
+      int(base)
+    except ValueError:
+      # Ignore base if it is not an int
+      return None
+    return CanaryDriverCandidate(int(base), version["mediaLink"])
 
 
 class DriverNotFoundError(ValueError):

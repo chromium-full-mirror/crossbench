@@ -78,6 +78,23 @@ class ChromeBaseFeatures(Freezable, abc.ABC):
     self.assert_not_frozen()
     self._disabled = OrderedSet()
 
+  def try_set(self, flag_name: str, flag_value: str | None) -> bool:
+    if flag_name == self.ENABLE_FLAG:
+      if flag_value is None:
+        self.clear_enabled()
+      else:
+        for feature in flag_value.split(","):
+          self.enable(feature)
+      return True
+    if flag_name == self.DISABLE_FLAG:
+      if flag_value is None:
+        self.clear_disabled()
+      else:
+        for feature in flag_value.split(","):
+          self.disable(feature)
+      return True
+    return False
+
   def update(self, other: ChromeBaseFeatures) -> None:
     if not isinstance(other, type(self)):
       raise TypeError(f"Cannot merge {type(self)} with {type(other)}")

@@ -24,6 +24,9 @@ if TYPE_CHECKING:
   from crossbench.plt.base import Platform
   from crossbench.plt.types import ListCmdArgs
 
+# 5 is arbitrary, but a reasonable number of paths to print out.
+_MAX_PRINTED_BINARIES: Final[int] = 5
+
 
 class MinidumpSymbolizer(abc.ABC):
 
@@ -120,7 +123,17 @@ class MinidumpSymbolizer(abc.ABC):
       minidump: The path to the minidump being symbolized.
     """
     logging.info("Dumping Breakpad symbols.")
+    tools = self._find_breakpad_tools()
+    if not tools:
+      return
+    generate_breakpad_symbols_command, dump_syms_path = tools
+    symbol_binaries = self.get_symbol_binaries(minidump)
+    cmds = self._collect_breakpad_cmds(symbols_dir, symbol_binaries,
+                                       generate_breakpad_symbols_command,
+                                       dump_syms_path)
+    self._run_breakpad_dump_cmds(cmds)
 
+  def _find_breakpad_tools(self) -> tuple[pth.LocalPath, pth.LocalPath] | None:
     generate_breakpad_symbols_command = helper.find_crash_binary(
         self._platform, "generate_breakpad_symbols.py", self._build_dir,
         path_finder.GenerateBreakpadSymbolsFinder)
@@ -133,22 +146,24 @@ class MinidumpSymbolizer(abc.ABC):
       logging.warning(
           "generate_breakpad_symbols binary not found, cannot symbolize "
           "minidumps")
-      return
+      return None
 
     dump_syms_path = helper.find_crash_binary(self._platform, "dump_syms",
                                               self._build_dir,
                                               path_finder.DumpSymsFinder)
     if not dump_syms_path:
       logging.warning("dump_syms binary not found, cannot symbolize minidumps")
-      return
+      return None
+    return generate_breakpad_symbols_command, dump_syms_path
 
-    symbol_binaries = self.get_symbol_binaries(minidump)
-
+  def _collect_breakpad_cmds(
+      self, symbols_dir: pth.LocalPath, symbol_binaries: list[pth.LocalPath],
+      generate_breakpad_symbols_command: pth.LocalPath,
+      dump_syms_path: pth.LocalPath) -> list[ListCmdArgs]:
     cmds: list[ListCmdArgs] = []
-    cached_binaries = []
-    missing_binaries = []
-    for binary_path_raw in symbol_binaries:
-      binary_path: pth.LocalPath = binary_path_raw
+    cached_binaries: list[pth.LocalPath] = []
+    missing_binaries: list[pth.LocalPath] = []
+    for binary_path in symbol_binaries:
       if not binary_path.exists():
         missing_binaries.append(binary_path)
         continue
@@ -160,46 +175,63 @@ class MinidumpSymbolizer(abc.ABC):
       if cache_path.is_dir():
         cached_binaries.append(binary_path)
         continue
-      cmd: ListCmdArgs = []
-      if generate_breakpad_symbols_command.suffix == ".py":
-        cmd.append(sys.executable)
-      cmd.extend([
-          generate_breakpad_symbols_command,
-          f"--binary={binary_path}",
-          f"--symbols-dir={symbols_dir}",
-          f"--build-dir={self._build_dir}",
-          f"--dump-syms-path={dump_syms_path}",
-      ])
-      if platform_override := self.get_breakpad_platform_override():
-        cmd.append(f"--platform={platform_override}")
-      cmds.append(cmd)
-
+      cmds.append(
+          self._format_breakpad_cmd(binary_path, symbols_dir,
+                                    generate_breakpad_symbols_command,
+                                    dump_syms_path))
+    total_count: int = len(symbol_binaries)
     if missing_binaries:
-      logging.warning(
-          "Unable to find %d of %d binaries for minidump symbolization. This "
-          "is likely not an actual issue, but is worth investigating if the "
-          "minidump fails to symbolize properly.", len(missing_binaries),
-          len(symbol_binaries))
-      # 5 is arbitrary, but a reasonable number of paths to print out.
-      if len(missing_binaries) < 5:
-        logging.warning("Missing binaries: %s", missing_binaries)
-      else:
-        logging.warning(
-            "Run test with high verbosity to get the list of missing binaries.")
-        logging.debug("Missing binaries: %s", missing_binaries)
-
+      self._log_missing_binaries(missing_binaries, total_count)
     if cached_binaries:
-      logging.info(
-          "Skipping symbol dumping for %d of %d binaries due to cached symbols "
-          "being present.", len(cached_binaries), len(symbol_binaries))
-      if len(cached_binaries) < 5:
-        logging.info("Skipped binaries: %s", cached_binaries)
-      else:
-        logging.info(
-            "Run test with high verbosity to get the list of binaries with "
-            "cached symbols.")
-        logging.debug("Skipped binaries: %s", cached_binaries)
+      self._log_cached_binaries(cached_binaries, total_count)
+    return cmds
 
+  def _format_breakpad_cmd(self, binary_path: pth.LocalPath,
+                           symbols_dir: pth.LocalPath,
+                           generate_breakpad_symbols_command: pth.LocalPath,
+                           dump_syms_path: pth.LocalPath) -> ListCmdArgs:
+    cmd: ListCmdArgs = []
+    if generate_breakpad_symbols_command.suffix == ".py":
+      cmd.append(sys.executable)
+    cmd.extend([
+        generate_breakpad_symbols_command,
+        f"--binary={binary_path}",
+        f"--symbols-dir={symbols_dir}",
+        f"--build-dir={self._build_dir}",
+        f"--dump-syms-path={dump_syms_path}",
+    ])
+    if platform_override := self.get_breakpad_platform_override():
+      cmd.append(f"--platform={platform_override}")
+    return cmd
+
+  def _log_missing_binaries(self, missing_binaries: list[pth.LocalPath],
+                            total_count: int) -> None:
+    logging.warning(
+        "Unable to find %d of %d binaries for minidump symbolization. This "
+        "is likely not an actual issue, but is worth investigating if the "
+        "minidump fails to symbolize properly.", len(missing_binaries),
+        total_count)
+    if len(missing_binaries) < _MAX_PRINTED_BINARIES:
+      logging.warning("Missing binaries: %s", missing_binaries)
+    else:
+      logging.warning(
+          "Run test with high verbosity to get the list of missing binaries.")
+      logging.debug("Missing binaries: %s", missing_binaries)
+
+  def _log_cached_binaries(self, cached_binaries: list[pth.LocalPath],
+                           total_count: int) -> None:
+    logging.info(
+        "Skipping symbol dumping for %d of %d binaries due to cached symbols "
+        "being present.", len(cached_binaries), total_count)
+    if len(cached_binaries) < _MAX_PRINTED_BINARIES:
+      logging.info("Skipped binaries: %s", cached_binaries)
+    else:
+      logging.info(
+          "Run test with high verbosity to get the list of binaries with "
+          "cached symbols.")
+      logging.debug("Skipped binaries: %s", cached_binaries)
+
+  def _run_breakpad_dump_cmds(self, cmds: list[ListCmdArgs]) -> None:
     # We need to prevent the number of file handles that we open from reaching
     # the soft limit set for the current process. This can either be done by
     # ensuring that the limit is suitably large using the resource module or by
@@ -220,20 +252,7 @@ class MinidumpSymbolizer(abc.ABC):
     # TODO: make this configurable or use a proper pool via Platform.
     process_limit = self._platform.cpu_cores(logical=True) * 2
     while cmds or processes:
-      # Clear any processes that have finished.
-      processes_to_delete = []
-      for p, cmd in processes.items():
-        if p.poll() is not None:
-          stdout, stderr = p.communicate()
-          if p.returncode:
-            if stdout:
-              logging.error(stdout.decode())
-            if stderr:
-              logging.error(stderr.decode())
-            logging.warning("Failed to execute %s", cmd)
-          processes_to_delete.append(p)
-      for p in processes_to_delete:
-        del processes[p]
+      self._clear_finished_processes(processes)
       # Add as many more processes as we can.
       while len(processes) < process_limit and cmds:
         cmd = cmds.pop(-1)
@@ -242,3 +261,19 @@ class MinidumpSymbolizer(abc.ABC):
         processes[p] = cmd
       # 1 second is fairly arbitrary.
       time.sleep(1)
+
+  def _clear_finished_processes(
+      self, processes: dict[subprocess.Popen, ListCmdArgs]) -> None:
+    processes_to_delete = []
+    for p, cmd in processes.items():
+      if p.poll() is not None:
+        stdout, stderr = p.communicate()
+        if p.returncode:
+          if stdout:
+            logging.error(stdout.decode())
+          if stderr:
+            logging.error(stderr.decode())
+          logging.warning("Failed to execute %s", cmd)
+        processes_to_delete.append(p)
+    for p in processes_to_delete:
+      del processes[p]

@@ -249,55 +249,165 @@ class BrowserConfig(ConfigObject):
     if not maybe_path_or_identifier:
       raise argparse.ArgumentTypeError("Got empty browser identifier.")
     if not driver_type:
-      if cls._is_known_android_browser(maybe_path_or_identifier):
-        driver_type = BrowserDriverType.ANDROID
-      elif driver:
-        driver_type = driver.driver_type
-      else:
-        driver_type = BrowserDriverType.default()
-    identifier = maybe_path_or_identifier.lower()
-    path = None
+      driver_type = cls._resolve_default_driver_type(maybe_path_or_identifier,
+                                                     driver)
     if cls.is_path_like(maybe_path_or_identifier):
       if cls._is_downloadable_identifier(maybe_path_or_identifier):
         return maybe_path_or_identifier
-      # Assume a path since short-names never contain back-/slashes.
-      if driver_type.is_remote_browser:
-        path = PathParser.path(maybe_path_or_identifier)
-      else:
-        path = cls.resolve_path(
-            PathParser.existing_path(maybe_path_or_identifier))
+      path: pth.AnyPath | None = cls._resolve_path_like(
+          maybe_path_or_identifier, driver_type)
     else:
-      if ":" in maybe_path_or_identifier:
-        raise argparse.ArgumentTypeError(
-            "Got unexpected short-form string "
-            f"{maybe_path_or_identifier!r}. \n"
-            "  - Use a complex browser config with separate "
-            "'browser' and 'driver' attributes, or\n"
-            "  - Use the short-form directly on the parent config attribute: \n"
-            f"   {{my-browser: '{maybe_path_or_identifier}'}}")
-      if maybe_path := cls._try_parse_short_name(identifier, driver_type):
-        return maybe_path
-      if cls._is_downloadable_identifier(maybe_path_or_identifier):
-        return maybe_path_or_identifier
-      if driver_type in (
-          BrowserDriverType.ANDROID,
-          BrowserDriverType.ANDROID_CDP,
-      ):
-        if ANDROID_PACKAGE_RE.fullmatch(maybe_path_or_identifier):
-          return pth.AnyPosixPath(maybe_path_or_identifier)
-    if not path:
+      if non_path_result := cls._parse_non_path_identifier(
+          maybe_path_or_identifier, driver_type):
+        return non_path_result
       path = pth.try_resolve_existing_path(maybe_path_or_identifier)
       if not path:
         raise argparse.ArgumentTypeError(
             f"Unknown browser path or short name: '{maybe_path_or_identifier}'")
+    assert path is not None
+    return cls._validate_resolved_browser_path(path, driver_type, browser_type)
+
+  @classmethod
+  def _resolve_default_driver_type(
+      cls,
+      maybe_path_or_identifier: str,
+      driver: DriverConfig | None = None) -> BrowserDriverType:
+    if cls._is_known_android_browser(maybe_path_or_identifier):
+      return BrowserDriverType.ANDROID
+    if driver:
+      return driver.driver_type
+    return BrowserDriverType.default()
+
+  @classmethod
+  def _resolve_path_like(cls, maybe_path_or_identifier: str,
+                         driver_type: BrowserDriverType) -> pth.AnyPath:
+    # Assume a path since short-names never contain back-/slashes.
+    if driver_type.is_remote_browser:
+      return PathParser.path(maybe_path_or_identifier)
+    return cls.resolve_path(PathParser.existing_path(maybe_path_or_identifier))
+
+  @classmethod
+  def _parse_non_path_identifier(
+      cls, maybe_path_or_identifier: str,
+      driver_type: BrowserDriverType) -> pth.AnyPathLike | None:
+    if ":" in maybe_path_or_identifier:
+      raise argparse.ArgumentTypeError(
+          "Got unexpected short-form string "
+          f"{maybe_path_or_identifier!r}. \n"
+          "  - Use a complex browser config with separate "
+          "'browser' and 'driver' attributes, or\n"
+          "  - Use the short-form directly on the parent config attribute: \n"
+          f"   {{my-browser: '{maybe_path_or_identifier}'}}")
+    identifier = maybe_path_or_identifier.lower()
+    if maybe_path := cls._try_parse_short_name(identifier, driver_type):
+      return maybe_path
+    if cls._is_downloadable_identifier(maybe_path_or_identifier):
+      return maybe_path_or_identifier
+    if driver_type.is_android:
+      if ANDROID_PACKAGE_RE.fullmatch(maybe_path_or_identifier):
+        return pth.AnyPosixPath(maybe_path_or_identifier)
+    return None
+
+  @classmethod
+  def _try_parse_short_name(
+      cls, identifier: str,
+      driver_type: BrowserDriverType) -> pth.AnyPath | None:
+    # We're not using a dict-based lookup here, since not all browsers are
+    # available on all platforms
+    # TODO: handle remote platforms.
+    platform = plt.PLATFORM
+    if path := cls._try_parse_chrome_short_name(identifier, driver_type,
+                                                platform):
+      return path
+    if path := cls._try_parse_edge_short_name(identifier, platform):
+      return path
+    if path := cls._try_parse_safari_short_name(identifier, platform):
+      return path
+    if path := cls._try_parse_firefox_short_name(identifier, platform):
+      return path
+    return cls._try_parse_misc_short_name(identifier)
+
+  @classmethod
+  def _try_parse_chrome_short_name(
+      cls, identifier: str, driver_type: BrowserDriverType,
+      platform: plt.Platform) -> pth.AnyPath | None:
+    if identifier in ("chrome", "chrome-stable", "chr-stable", "chr"):
+      if driver_type.is_android:
+        return pth.AnyPosixPath("com.android.chrome")
+      return all_browsers.Chrome.stable_path(platform)
+    if identifier == "chrome-app":
+      if driver_type.is_android:
+        return pth.AnyPosixPath("com.google.android.apps.chrome")
+      return None
+    if identifier in ("chrome-beta", "chr-beta"):
+      if driver_type.is_android:
+        return pth.AnyPosixPath("com.chrome.beta")
+      return all_browsers.Chrome.beta_path(platform)
+    if identifier in ("chrome-dev", "chr-dev"):
+      if driver_type.is_android:
+        return pth.AnyPosixPath("com.chrome.dev")
+      return all_browsers.Chrome.dev_path(platform)
+    if identifier in ("chrome-canary", "chr-canary"):
+      if driver_type.is_android:
+        return pth.AnyPosixPath("com.chrome.canary")
+      return all_browsers.Chrome.canary_path(platform)
+    if identifier == "chromium":
+      if driver_type.is_android:
+        return pth.AnyPosixPath("org.chromium.chrome")
+      return all_browsers.Chromium.default_path(platform)
+    return None
+
+  @classmethod
+  def _try_parse_edge_short_name(cls, identifier: str,
+                                 platform: plt.Platform) -> pth.AnyPath | None:
+    if identifier in ("edge", "edge-stable"):
+      return all_browsers.Edge.stable_path(platform)
+    if identifier == "edge-beta":
+      return all_browsers.Edge.beta_path(platform)
+    if identifier == "edge-dev":
+      return all_browsers.Edge.dev_path(platform)
+    if identifier == "edge-canary":
+      return all_browsers.Edge.canary_path(platform)
+    return None
+
+  @classmethod
+  def _try_parse_safari_short_name(
+      cls, identifier: str, platform: plt.Platform) -> pth.AnyPath | None:
+    if identifier in ("safari", "sf", "safari-stable", "sf-stable"):
+      return all_browsers.Safari.default_path(platform)
+    if identifier in ("safari-technology-preview", "safari-tech-preview",
+                      "safari-tp", "sf-tp", "stp", "tp"):
+      return all_browsers.Safari.technology_preview_path(platform)
+    return None
+
+  @classmethod
+  def _try_parse_firefox_short_name(
+      cls, identifier: str, platform: plt.Platform) -> pth.AnyPath | None:
+    if identifier in ("firefox", "firefox-stable", "ff", "ff-stable"):
+      return all_browsers.Firefox.default_path(platform)
+    if identifier in ("firefox-dev", "firefox-developer-edition", "ff-dev"):
+      return all_browsers.Firefox.developer_edition_path(platform)
+    if identifier in ("firefox-nightly", "ff-nightly", "ff-trunk"):
+      return all_browsers.Firefox.nightly_path(platform)
+    return None
+
+  @classmethod
+  def _try_parse_misc_short_name(cls, identifier: str) -> pth.AnyPath | None:
+    if identifier in ("webview", "org.chromium.webview_shell"):
+      return pth.AnyPosixPath("org.chromium.webview_shell")
+    if identifier == "webview_embedder":
+      return pth.AnyPosixPath("webview_embedder")
+    return None
+
+  @classmethod
+  def _validate_resolved_browser_path(
+      cls, path: pth.AnyPath, driver_type: BrowserDriverType,
+      browser_type: BrowserType | None) -> pth.AnyPath:
     if browser_type:
       return path
     if cls.is_supported_browser_path(path):
       return path
-    if driver_type in (
-        BrowserDriverType.ANDROID,
-        BrowserDriverType.ANDROID_CDP,
-    ):
+    if driver_type.is_android:
       if cls._is_known_android_browser(path.name):
         return path
       # Additionally support unknown chrome apk helper binaries.
@@ -321,80 +431,6 @@ class BrowserConfig(ConfigObject):
         downloader_cls.is_valid(maybe_path_or_identifier, platform)
         for downloader_cls in (ChromeDownloader, FirefoxDownloader,
                                WebKitDownloader))
-
-  @classmethod
-  def _try_parse_short_name(
-      cls, identifier: str,
-      driver_type: BrowserDriverType) -> pth.AnyPath | None:
-    # We're not using a dict-based lookup here, since not all browsers are
-    # available on all platforms
-    # TODO: handle remote platforms.
-    platform = plt.PLATFORM
-    if identifier in ("chrome", "chrome-stable", "chr-stable", "chr"):
-      if driver_type in (
-          BrowserDriverType.ANDROID,
-          BrowserDriverType.ANDROID_CDP,
-      ):
-        return pth.AnyPosixPath("com.android.chrome")
-      return all_browsers.Chrome.stable_path(platform)
-    if identifier in ("chrome-app"):
-      if driver_type in (
-          BrowserDriverType.ANDROID,
-          BrowserDriverType.ANDROID_CDP,
-      ):
-        return pth.AnyPosixPath("com.google.android.apps.chrome")
-    if identifier in ("chrome-beta", "chr-beta"):
-      if driver_type in (
-          BrowserDriverType.ANDROID,
-          BrowserDriverType.ANDROID_CDP,
-      ):
-        return pth.AnyPosixPath("com.chrome.beta")
-      return all_browsers.Chrome.beta_path(platform)
-    if identifier in ("chrome-dev", "chr-dev"):
-      if driver_type in (
-          BrowserDriverType.ANDROID,
-          BrowserDriverType.ANDROID_CDP,
-      ):
-        return pth.AnyPosixPath("com.chrome.dev")
-      return all_browsers.Chrome.dev_path(platform)
-    if identifier in ("chrome-canary", "chr-canary"):
-      if driver_type in (
-          BrowserDriverType.ANDROID,
-          BrowserDriverType.ANDROID_CDP,
-      ):
-        return pth.AnyPosixPath("com.chrome.canary")
-      return all_browsers.Chrome.canary_path(platform)
-    if identifier == "chromium":
-      if driver_type in (
-          BrowserDriverType.ANDROID,
-          BrowserDriverType.ANDROID_CDP,
-      ):
-        return pth.AnyPosixPath("org.chromium.chrome")
-      return all_browsers.Chromium.default_path(platform)
-    if identifier in ("edge", "edge-stable"):
-      return all_browsers.Edge.stable_path(platform)
-    if identifier == "edge-beta":
-      return all_browsers.Edge.beta_path(platform)
-    if identifier == "edge-dev":
-      return all_browsers.Edge.dev_path(platform)
-    if identifier == "edge-canary":
-      return all_browsers.Edge.canary_path(platform)
-    if identifier in ("safari", "sf", "safari-stable", "sf-stable"):
-      return all_browsers.Safari.default_path(platform)
-    if identifier in ("safari-technology-preview", "safari-tech-preview",
-                      "safari-tp", "sf-tp", "stp", "tp"):
-      return all_browsers.Safari.technology_preview_path(platform)
-    if identifier in ("firefox", "firefox-stable", "ff", "ff-stable"):
-      return all_browsers.Firefox.default_path(platform)
-    if identifier in ("firefox-dev", "firefox-developer-edition", "ff-dev"):
-      return all_browsers.Firefox.developer_edition_path(platform)
-    if identifier in ("firefox-nightly", "ff-nightly", "ff-trunk"):
-      return all_browsers.Firefox.nightly_path(platform)
-    if identifier in ("webview", "org.chromium.webview_shell"):
-      return pth.AnyPosixPath("org.chromium.webview_shell")
-    if identifier == "webview_embedder":
-      return pth.AnyPosixPath("webview_embedder")
-    return None
 
   @classmethod
   def is_supported_browser_path(cls, path: pth.AnyPath) -> bool:

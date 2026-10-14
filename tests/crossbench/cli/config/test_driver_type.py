@@ -70,6 +70,14 @@ class BrowserDriverTypeTestCase(unittest.TestCase):
       self.assertEqual(driver_type.is_remote_driver, driver_type
                        in remote_driver_types)
 
+  def test_is_android(self):
+    android_types = {
+        BrowserDriverType.ANDROID,
+        BrowserDriverType.ANDROID_CDP,
+    }
+    for driver_type in BrowserDriverType:
+      self.assertEqual(driver_type.is_android, driver_type in android_types)
+
   def test_is_remote_browser(self):
     remote_browser_types = {
         BrowserDriverType.ANDROID,

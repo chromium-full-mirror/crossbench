@@ -102,33 +102,9 @@ class ChromeFlags(Flags):
                          flag_name: str,
                          flag_value: str | None = None,
                          should_override: bool = False) -> bool:
-    if flag_name == ChromeFeatures.ENABLE_FLAG:
-      if flag_value is None:
-        self._features.clear_enabled()
-      else:
-        for feature in flag_value.split(","):
-          self._features.enable(feature)
+    if self._features.try_set(flag_name, flag_value):
       return True
-    if flag_name == ChromeFeatures.DISABLE_FLAG:
-      if flag_value is None:
-        self._features.clear_disabled()
-      else:
-        for feature in flag_value.split(","):
-          self._features.disable(feature)
-      return True
-    if flag_name == ChromeBlinkFeatures.ENABLE_FLAG:
-      if flag_value is None:
-        self.blink_features.clear_enabled()
-      else:
-        for feature in flag_value.split(","):
-          self._blink_features.enable(feature)
-      return True
-    if flag_name == ChromeBlinkFeatures.DISABLE_FLAG:
-      if flag_value is None:
-        self.blink_features.clear_disabled()
-      else:
-        for feature in flag_value.split(","):
-          self._blink_features.disable(feature)
+    if self._blink_features.try_set(flag_name, flag_value):
       return True
     if flag_name == self.JS_FLAG:
       if flag_value is None:

@@ -401,6 +401,24 @@ class BrowserConfigTestCase(BaseConfigTestCase):
         ADB_DEVICES_SINGLE_OUTPUT,
     ]
     self.assertEqual(
+        BrowserConfig.parse("android:chrome-app"),
+        BrowserConfig(
+            pth.AnyPosixPath("com.google.android.apps.chrome"),
+            DriverConfig(BrowserDriverType.ANDROID)))
+    self.assertSequenceEqual(self.platform.sh_results, [])
+
+    self.platform.sh_results = [
+        ADB_DEVICES_SINGLE_OUTPUT,
+    ]
+    with self.assertRaises(argparse.ArgumentTypeError):
+      BrowserConfig.parse("android:app")
+    self.assertSequenceEqual(self.platform.sh_results, [])
+
+    self.platform.sh_results = [
+        ADB_DEVICES_SINGLE_OUTPUT,
+        ADB_DEVICES_SINGLE_OUTPUT,
+    ]
+    self.assertEqual(
         BrowserConfig.parse("android:chrome-canary"),
         BrowserConfig(
             pth.AnyPosixPath("com.chrome.canary"),
