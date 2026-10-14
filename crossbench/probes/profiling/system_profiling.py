@@ -7,8 +7,8 @@ from __future__ import annotations
 import functools
 import logging
 import shlex
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Iterable, Self, \
-    Sequence, cast
+from typing import TYPE_CHECKING, ClassVar, Final, Iterable, Self, Sequence, \
+    TypeAlias, cast
 
 from typing_extensions import override
 
@@ -43,10 +43,13 @@ RENDERER_CMD_PATH: Final = pth.LocalPath(
 MAX_PERF_EVENT_PARANOID: Final[int] = 2
 
 
-def perf_frequency(value: Any) -> str | int:
+def perf_frequency(value: object) -> str | int:
   if value == "max":
     return "max"
   return NumberParser.positive_int(value, "frequency")
+
+
+_UnsupportedSetting: TypeAlias = tuple[str, object]
 
 
 class ProfilingProbe(Probe):
@@ -436,10 +439,10 @@ class ProfilingProbe(Probe):
     self._validate_unsupported_settings(browser, unsupported_settings,
                                         "Android")
 
-  def _validate_unsupported_settings(self, browser: Browser,
-                                     unsupported_settings: Iterable[tuple[str,
-                                                                          Any]],
-                                     platforms: str) -> None:
+  def _validate_unsupported_settings(
+      self, browser: Browser,
+      unsupported_settings: Iterable[_UnsupportedSetting],
+      platforms: str) -> None:
     for name, value in unsupported_settings:
       if value:
         raise ProbeIncompatibleBrowser(

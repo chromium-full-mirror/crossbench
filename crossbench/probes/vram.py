@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import datetime as dt
 import threading
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Self
+from typing import TYPE_CHECKING, ClassVar, Final, Self
 
 from typing_extensions import override
 
@@ -146,7 +146,7 @@ class VramProbeContext(JsonResultProbeContext[VramProbe]):
     if not peak:
       return {}
 
-    metrics: dict[str, Any] = {}
+    metrics: dict[str, float] = {}
     for gpu_id, peak_mem in peak.items():
       metrics[f"{gpu_id}/peak_mb"] = peak_mem
       base_mem = baseline.get(gpu_id, 0.0)

@@ -9,8 +9,8 @@ import argparse
 import dataclasses
 import enum
 import re
-from typing import TYPE_CHECKING, Any, Final, Hashable, Mapping, Pattern, \
-    Self, TypeAlias
+from typing import TYPE_CHECKING, Final, Hashable, Mapping, Pattern, Self, \
+    TypeAlias
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -56,7 +56,8 @@ class CPUFrequencyMap(ConfigObject, metaclass=abc.ABCMeta):
 
   @classmethod
   @override
-  def parse_dict(cls, config: Mapping[str, Any], **kwargs) -> CPUFrequencyMap:
+  def parse_dict(cls, config: Mapping[str, object],
+                 **kwargs) -> CPUFrequencyMap:
     cls.expect_no_extra_kwargs(kwargs)
     if _WILDCARD_CONFIG_KEY in config:
       return WildcardCPUFrequencyMap.create(config)
@@ -73,7 +74,7 @@ class CPUFrequencyMap(ConfigObject, metaclass=abc.ABCMeta):
     return ConfigParser(cls)
 
   @classmethod
-  def _parse_frequency(cls, value: Any) -> FrequencyType:
+  def _parse_frequency(cls, value: object) -> FrequencyType:
     if value == _ExtremeFrequency.MIN:
       return _ExtremeFrequency.MIN
 
@@ -130,7 +131,7 @@ class WildcardCPUFrequencyMap(CPUFrequencyMap):
   @override
   def create(
       cls,
-      frequencies: Mapping[str, Any] | None = None,
+      frequencies: Mapping[str, object] | None = None,
       target_frequency: FrequencyType | None = None,
   ) -> Self:
     if target_frequency is not None:
@@ -171,7 +172,7 @@ class ExplicitCPUFrequencyMap(CPUFrequencyMap):
   @override
   def create(
       cls,
-      frequencies: Mapping[str, Any] | None = None,
+      frequencies: Mapping[str, object] | None = None,
   ) -> Self:
     typed_map: dict[str, FrequencyType] = {}
     for k, v in (frequencies or {}).items():

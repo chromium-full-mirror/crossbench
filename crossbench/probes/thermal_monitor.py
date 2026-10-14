@@ -9,7 +9,7 @@ import json
 import logging
 import re
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, ClassVar, Iterable
+from typing import TYPE_CHECKING, ClassVar, Iterable
 
 from typing_extensions import override
 
@@ -65,7 +65,7 @@ class ThermalStatus(IntEnum):
     return None
 
   @classmethod
-  def parse(cls, value: Any) -> ThermalStatus:
+  def parse(cls, value: object) -> ThermalStatus:
     return ObjectParser.enum("ThermalStatus", cls, value, cls)
 
 

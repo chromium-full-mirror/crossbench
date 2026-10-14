@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Self
+from typing import TYPE_CHECKING, ClassVar, Self
 
 from typing_extensions import override
 
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
   from crossbench.runner.actions import Actions
   from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.runner.groups.stories import StoriesRunGroup
-  from crossbench.types import Json
+  from crossbench.types import Json, JsonDict
 
 
 def parse_javascript(value: str) -> str:
@@ -92,9 +92,9 @@ class JSProbeContext(JsonResultProbeContext[JSProbe]):
 
   def __init__(self, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
-    self._json_data: dict[str, Any] = {}
+    self._json_data: JsonDict = {}
 
-  def _update_metrics(self, data: dict[str, Any]) -> None:
+  def _update_metrics(self, data: JsonDict) -> None:
     existing_metrics = {k: v for k, v in self._json_data.items() if k in data}
     logging.debug("JSProbe: The following metrics will be overwritten: %s",
                   existing_metrics)

@@ -6,9 +6,8 @@ from __future__ import annotations
 
 import logging
 import shutil
-from typing import TYPE_CHECKING, Any, ClassVar, Iterable, Self
+from typing import TYPE_CHECKING, ClassVar, Iterable, Self, TypedDict
 
-from immutabledict import immutabledict
 from typing_extensions import override
 
 from crossbench.helper import fs_helper
@@ -28,6 +27,13 @@ if TYPE_CHECKING:
   from crossbench.runner.groups.repetitions import RepetitionsRunGroup
   from crossbench.runner.groups.stories import StoriesRunGroup
   from crossbench.runner.run import Run
+
+  class WprRecorderKwargs(TypedDict):
+    http_port: int
+    https_port: int
+    inject_scripts: Iterable[pth.LocalPath] | None
+    key_file: pth.LocalPath | None
+    cert_file: pth.LocalPath | None
 
 
 class WebPageReplayProbe(Probe):
@@ -87,13 +93,13 @@ class WebPageReplayProbe(Probe):
                use_test_root_certificate: bool = False,
                record_setup: bool = True) -> None:
     super().__init__()
-    self._recorder_kwargs: immutabledict[str, Any] = immutabledict(
-        http_port=http_port,
-        https_port=https_port,
-        inject_scripts=inject_scripts,
-        key_file=key_file,
-        cert_file=cert_file,
-    )
+    self._recorder_kwargs: WprRecorderKwargs = {
+        "http_port": http_port,
+        "https_port": https_port,
+        "inject_scripts": inject_scripts,
+        "key_file": key_file,
+        "cert_file": cert_file,
+    }
 
     self._https_port = https_port
     self._http_port = http_port
@@ -109,7 +115,7 @@ class WebPageReplayProbe(Probe):
     return self._http_port
 
   @property
-  def recorder_kwargs(self) -> immutabledict:
+  def recorder_kwargs(self) -> WprRecorderKwargs:
     return self._recorder_kwargs
 
   @property
@@ -196,14 +202,13 @@ class WprRecorderProbeContext(ProbeContext[WebPageReplayProbe]):
     self._wprgo_log: pth.LocalPath = self.local_result_path.with_name(
         "wpr_record.log")
     self._host: str = "127.0.0.1"
-    kwargs = dict(self.probe.recorder_kwargs)
-    kwargs.update({
-        "platform": run.host_platform,
-        "log_path": self._wprgo_log,
-        "archive_path": self.result_path,
-        "bin_path": WprGoFinder(run.host_platform).wpr(run.host_platform),
-    })
-    self._recorder = WprRecorder(**kwargs)
+    self._recorder = WprRecorder(
+        platform=run.host_platform,
+        log_path=self._wprgo_log,
+        archive_path=self.result_path,
+        bin_path=WprGoFinder(run.host_platform).wpr(run.host_platform),
+        **self.probe.recorder_kwargs,
+    )
     self._browser_platform = run.browser_platform
     self._ports: PortScope = run.host_platform.ports
 

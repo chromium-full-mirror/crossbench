@@ -5,6 +5,10 @@
 from __future__ import annotations
 
 import dataclasses
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+  from crossbench.types import JsonDict
 
 
 @dataclasses.dataclass(frozen=True)
@@ -14,3 +18,6 @@ class ProcessMeminfo:
   pss_total: int
   rss_total: int
   swap_total: int
+
+  def to_json(self) -> JsonDict:
+    return dataclasses.asdict(self)

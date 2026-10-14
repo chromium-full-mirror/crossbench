@@ -11,8 +11,8 @@ import logging
 import os
 import re
 import subprocess
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Final, Iterable, \
-    Self, cast
+from typing import TYPE_CHECKING, Callable, ClassVar, Final, Iterable, Self, \
+    cast
 
 from typing_extensions import override
 
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
   from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.runner.run import Run
 
-  LogTaskT: TypeAlias = tuple[Callable[..., pth.AnyPath], tuple[Any, ...]]
+  LogTaskT: TypeAlias = tuple[Callable[..., pth.AnyPath], tuple[object, ...]]
 
 _LOG_FLAG: Final = "--log"
 _PROF_FLAG: Final = "--prof"
@@ -418,7 +418,7 @@ def _process_logviewer_json(platform: Platform, d8_binary: pth.AnyPath,
 
 def _run_v8_tool(platform: Platform, d8_binary: pth.AnyPath,
                  tool_script: pth.AnyPath, output_file: pth.AnyPath,
-                 args: tuple[Any, ...]) -> pth.AnyPath:
+                 args: tuple[pth.AnyPathLike, ...]) -> pth.AnyPath:
   env = os.environ.copy()
   env["D8_PATH"] = str(platform.local_path(d8_binary).resolve())
   with platform.local_path(output_file).open("w", encoding="utf-8") as f:

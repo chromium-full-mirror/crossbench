@@ -8,7 +8,7 @@ import json
 import logging
 import statistics
 from math import floor, log10
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Sequence
+from typing import TYPE_CHECKING, Callable, Iterable, Sequence, TypeGuard
 
 from crossbench.probes import helper
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
   from crossbench.types import Json, JsonDict
 
 
-def is_number(value: Any) -> bool:
+def is_number(value: object) -> TypeGuard[int | float]:
   return isinstance(value, (int, float))
 
 
@@ -108,7 +108,7 @@ class Metric:
     # rough estimate of the quality of the data
     return statistics.stdev(self.values)
 
-  def append(self, value: Any) -> None:
+  def append(self, value: float) -> None:
     self.values.append(value)
     self._is_numeric = self._is_numeric and is_number(value)
 
@@ -267,7 +267,7 @@ class MetricsMerger:
           values.append(value)
 
   def to_json(self,
-              value_fn: Callable[[Any], Json] | None = None,
+              value_fn: Callable[[Metric], Json] | None = None,
               sort: bool = True) -> JsonDict:
     items = []
     for key, value in self._data.items():
@@ -308,11 +308,11 @@ class CSVFormatter:
 
   def __init__(self,
                metrics: MetricsMerger,
-               value_fn: Callable[[Any], Any] | None = None,
-               headers: Sequence[tuple[Any, ...]] = (),
+               value_fn: Callable[[Metric], Json] | None = None,
+               headers: Sequence[tuple[object, ...]] = (),
                include_parts: bool = True,
                sort: bool = True):
-    self._table: list[Sequence[Any]] = []
+    self._table: list[Sequence[object]] = []
     converted = metrics.to_json(value_fn, sort)
     items = self.format_items(converted, sort=sort)
     max_path_depth: int = self.extract_max_depth(items, include_parts)
@@ -328,7 +328,7 @@ class CSVFormatter:
     max_path_depth += 1
     return max_path_depth
 
-  def append_headers(self, headers: Sequence[tuple[Any, ...]],
+  def append_headers(self, headers: Sequence[tuple[object, ...]],
                      max_path_depth: int) -> None:
     header_padding = ("",) * max_path_depth
     for header in headers:
@@ -357,5 +357,5 @@ class CSVFormatter:
     return sorted(items)
 
   @property
-  def table(self) -> list[Sequence[Any]]:
+  def table(self) -> list[Sequence[object]]:
     return self._table

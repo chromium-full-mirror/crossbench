@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Self
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -40,7 +40,7 @@ class TraceProcessorQueryConfig(ConfigObject):
 
   @classmethod
   @override
-  def parse_dict(cls, config: dict[str, Any],
+  def parse_dict(cls, config: dict[str, object],
                  **kwargs) -> TraceProcessorQueryConfig:
     keys = {"device_override", "device_lookup", "sql_device_override"}
     if keys.intersection(config) and cls is TraceProcessorQueryConfig:

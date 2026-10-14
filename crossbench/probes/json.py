@@ -10,7 +10,8 @@ import json
 import logging
 import re
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Generic, TypeVar, \
+    cast
 
 import xlsxwriter
 from tabulate import tabulate
@@ -18,7 +19,7 @@ from typing_extensions import Final, override
 from xlsxwriter.utility import xl_rowcol_to_cell
 
 from crossbench.probes import helper
-from crossbench.probes.metric import CSVFormatter, MetricsMerger, \
+from crossbench.probes.metric import CSVFormatter, Metric, MetricsMerger, \
     metric_geomean
 from crossbench.probes.probe import Probe
 from crossbench.probes.probe_context import ProbeContext
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
   from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.runner.groups.repetitions import RepetitionsRunGroup
   from crossbench.runner.run import Run
-  from crossbench.types import Json, TableData
+  from crossbench.types import Json, JsonDict, TableData
 
 IS_NUMERIC_RE: Final[re.Pattern] = re.compile(r"[0-9.e+\-]+")
 LOG_SUMMARY_KEYS: Final[tuple[str, ...]] = (
@@ -92,9 +93,9 @@ class JsonResultProbe(Probe, metaclass=abc.ABCMeta):
     return self.write_group_result(group, merger, csv_formatter=CSVFormatter)
 
   def merge_browsers_json_list(self, group: BrowsersRunGroup) -> ProbeResult:
-    merged_json: dict[str, dict[str, Any]] = {}
+    merged_json: dict[str, JsonDict] = {}
     for story_group in group.story_groups:
-      browser_result: dict[str, Any] = {}
+      browser_result: JsonDict = {}
       merged_json[story_group.browser.unique_name] = browser_result
       browser_result["info"] = story_group.info
       browser_json_path = story_group.results[self].json
@@ -114,7 +115,8 @@ class JsonResultProbe(Probe, metaclass=abc.ABCMeta):
     csv_file_list: list[pth.LocalPath] = []
     for story_group in group.story_groups:
       csv_file_list.append(story_group.results[self].csv)
-    merged_table = helper.merge_csv(csv_file_list, row_header_len=-1)
+    merged_table: TableData = cast(
+        "TableData", helper.merge_csv(csv_file_list, row_header_len=-1))
     merged_json_path = group.get_local_probe_result_path(self, exists_ok=True)
     merged_csv_path = merged_json_path.with_suffix(".csv")
     assert not merged_csv_path.exists(), (
@@ -131,7 +133,7 @@ class JsonResultProbe(Probe, metaclass=abc.ABCMeta):
       group: RunGroup,
       merged_data: dict | list | MetricsMerger,
       csv_formatter: type[CSVFormatter] | None = CSVFormatter,
-      value_fn: Callable[[Any], Any] = metric_geomean) -> ProbeResult:
+      value_fn: Callable[[Metric], Json] = metric_geomean) -> ProbeResult:
     merged_json_path = group.get_local_probe_result_path(self)
     with merged_json_path.open("w", encoding="utf-8") as f:
       if isinstance(merged_data, (dict, list)):
@@ -149,7 +151,7 @@ class JsonResultProbe(Probe, metaclass=abc.ABCMeta):
   def write_group_csv_result(self, group: RunGroup, merged_data: MetricsMerger,
                              merged_json_path: pth.LocalPath,
                              csv_formatter: type[CSVFormatter],
-                             value_fn: Callable[[Any], Any]) -> ProbeResult:
+                             value_fn: Callable[[Metric], Json]) -> ProbeResult:
     merged_csv_path = merged_json_path.with_suffix(".csv")
     assert not merged_csv_path.exists(), (
         f"Cannot override existing CSV result: {merged_csv_path}")
@@ -160,7 +162,7 @@ class JsonResultProbe(Probe, metaclass=abc.ABCMeta):
     # 0 | metric 0 full path, metric path[0] ... metric path[N], metric 0 value
     #     ...                                                    ...
     # M | metric M full path, ...                                metric M value
-    headers: list[tuple[str, Any]] = []
+    headers: list[tuple[str, Json]] = []
     for label, info_value in group.info.items():
       headers.append((label, info_value))
     csv_data = csv_formatter(
@@ -180,7 +182,7 @@ class JsonResultProbe(Probe, metaclass=abc.ABCMeta):
     flattened: TableData = [[label, *values] for label, values in table.items()]
     logging.critical(tabulate(flattened, tablefmt="plain"))
 
-  def _extract_result_metrics_table(self, metrics: dict[str, Any],
+  def _extract_result_metrics_table(self, metrics: JsonDict,
                                     table: dict[str, list[str]]) -> None:
     """Add individual metrics to the table in here.
     Typically you only add score and total values for each benchmark or

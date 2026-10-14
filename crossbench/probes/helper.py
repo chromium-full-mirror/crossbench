@@ -5,11 +5,11 @@
 from __future__ import annotations
 
 import csv
-from typing import TYPE_CHECKING, Any, Callable, Final, Mapping, Sequence
+from typing import TYPE_CHECKING, Callable, Final, Mapping, Sequence, cast
 
 if TYPE_CHECKING:
   from crossbench import path as pth
-  from crossbench.types import TableData
+  from crossbench.types import JsonDict, TableData
 
 INTERNAL_NAME_PREFIX: Final[str] = "cb."
 
@@ -43,13 +43,13 @@ class Flatten:
         key_fn (optional): Maps property paths (tuple[str,...]) to strings used
           as final result keys, or None to skip property paths.
     """
-    self._accumulator: dict[str, Any] = {}
+    self._accumulator: JsonDict = {}
     self._key_fn: KeyFnType = key_fn or default_flatten_key_fn
     self._sort: bool = sort
     self.append(*args)
 
   @property
-  def data(self) -> dict[str, Any]:
+  def data(self) -> JsonDict:
     if not self._sort:
       return dict(self._accumulator)
     items = sorted(self._accumulator.items(), key=lambda item: item[0])
@@ -60,10 +60,11 @@ class Flatten:
     for merged_data in args:
       self._flatten(toplevel_path, merged_data, ignore_toplevel)
 
-  def _is_leaf_item(self, item: Any) -> bool:
+  def _is_leaf_item(self, item: object) -> bool:
     if isinstance(item, (str, float, int, list)):
       return True
-    if "values" in item and isinstance(item["values"], list):
+    if isinstance(item, Mapping) and "values" in item and isinstance(
+        item["values"], list):
       return True
     return False
 
@@ -89,14 +90,16 @@ class Flatten:
         self._flatten(path, item)
 
 
-def _ljust_row(sequence: list, n: int, fill_value: Any = None) -> list:
-  return sequence + ([fill_value] * (n - len(sequence)))
+def _ljust_row(sequence: Sequence[str | None],
+               n: int,
+               fill_value: str | None = None) -> list[str | None]:
+  return list(sequence) + ([fill_value] * (n - len(sequence)))
 
 
 def merge_csv(csv_list: Sequence[pth.LocalPath],
               headers: list[str] | None = None,
               row_header_len: int = 1,
-              delimiter: str = "\t") -> list[list[Any]]:
+              delimiter: str = "\t") -> list[list[str | None]]:
   """
   Merge multiple CSV files.
   File 1:
@@ -123,7 +126,7 @@ def merge_csv(csv_list: Sequence[pth.LocalPath],
             , File 1,           , File 2,
   Row Header, Data 1.1, Data 1.2, Data 2.1, Data 2.2
   """
-  table: list[list[Any]] = []
+  table: list[list[str | None]] = []
   # Initial row-headers from the first csv file.
   known_row_headers: set[tuple[str, ...]] = set()
   row_header_len = _merge_csv_prepare_row_headers(table, known_row_headers,
@@ -149,7 +152,7 @@ def merge_csv(csv_list: Sequence[pth.LocalPath],
   return table
 
 
-def _merge_csv_prepare_row_headers(table: list[list[Any]],
+def _merge_csv_prepare_row_headers(table: list[list[str | None]],
                                    known_row_headers: set[tuple[str, ...]],
                                    csv_file: pth.LocalPath, row_header_len: int,
                                    delimiter: str) -> int:
@@ -159,7 +162,7 @@ def _merge_csv_prepare_row_headers(table: list[list[Any]],
         row_header_len = _detect_row_header_len(csv_row)
       assert csv_row, "Mergeable CSV files must have row names."
       row_headers = csv_row[:row_header_len]
-      table.append(row_headers)
+      table.append(list(row_headers))
       csv_row_header_key = tuple(row_headers)
       known_row_headers.add(csv_row_header_key)
   return row_header_len
@@ -176,7 +179,8 @@ def _detect_row_header_len(row: list[str]) -> int:
   return 1
 
 
-def _merge_csv_append(csv_data: TableData, table: list[list[Any]],
+def _merge_csv_append(csv_data: TableData,
+                      table: list[list[str | None]],
                       table_headers: list[str | None], row_header_len: int,
                       headers: list[str] | None,
                       known_row_headers: set[tuple[str, ...]],
@@ -193,8 +197,9 @@ def _merge_csv_append(csv_data: TableData, table: list[list[Any]],
     table_headers.extend(_ljust_row(col_header, max_csv_row_len))
 
   # Pre-computed potential padding lists.
-  skipped_table_row_padding = [None] * max_csv_row_len
-  new_row_padding = [None] * (table_row_len - row_header_len - max_csv_row_len)
+  skipped_table_row_padding: list[None] = [None] * max_csv_row_len
+  new_row_padding: list[None] = [None] * (
+      table_row_len - row_header_len - max_csv_row_len)
 
   table_index = 0
   for csv_row in csv_data:
@@ -203,13 +208,18 @@ def _merge_csv_append(csv_data: TableData, table: list[list[Any]],
 
     if table_index >= len(table):
       # Append all additional rows to the end of the table.
-      new_row = list(csv_row_header) + new_row_padding + csv_padded_row
+      new_row: list[str | None] = [
+          *csv_row_header,
+          *new_row_padding,
+          *csv_padded_row,
+      ]
       table.append(new_row)
       table_index += 1
       continue
 
     table_row = table[table_index]
-    table_row_header = tuple(table_row[:row_header_len])
+    table_row_header = cast("tuple[str, ...]",
+                            tuple(table_row[:row_header_len]))
 
     if table_row_header == csv_row_header:
       # Simple case, row-headers are matching the current table.
@@ -227,12 +237,13 @@ def _merge_csv_append(csv_data: TableData, table: list[list[Any]],
     try_insert_alpha_sorted = csv_row_header_key not in known_row_headers
     while True:
       table_row = table[table_index]
-      table_row_header = tuple(table_row[:row_header_len])
+      table_row_header = cast("tuple[str, ...]",
+                              tuple(table_row[:row_header_len]))
       if table_row_header == csv_row_header:
         table_row.extend(csv_padded_row)
         break
       if try_insert_alpha_sorted and csv_row_header_key < table_row_header:
-        new_row = list(csv_row_header) + new_row_padding + csv_padded_row
+        new_row = [*csv_row_header, *new_row_padding, *csv_padded_row]
         # Try maintaining alpha-sorting by inserting before the next row.
         table.insert(table_index, new_row)
         known_row_headers.add(csv_row_header_key)
@@ -241,7 +252,7 @@ def _merge_csv_append(csv_data: TableData, table: list[list[Any]],
       table_index += 1
       if table_index >= len(table):
         # Append all additional rows to the end of the table.
-        new_row = list(csv_row_header) + new_row_padding + csv_padded_row
+        new_row = [*csv_row_header, *new_row_padding, *csv_padded_row]
         table.append(new_row)
         break
     table_index += 1

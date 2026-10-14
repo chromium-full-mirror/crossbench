@@ -4,10 +4,9 @@
 
 from __future__ import annotations
 
-import dataclasses
 import datetime as dt
 import json
-from typing import TYPE_CHECKING, ClassVar, NotRequired, Self, TypedDict
+from typing import TYPE_CHECKING, ClassVar, NotRequired, Self, TypedDict, cast
 
 from typing_extensions import override
 
@@ -19,11 +18,12 @@ if TYPE_CHECKING:
   from crossbench.plt.process_meminfo import ProcessMeminfo
   from crossbench.probes.results import ProbeResult
   from crossbench.runner.run import Run
+  from crossbench.types import Json, JsonDict
 
 
 class MeminfoJson(TypedDict):
   info_stack: list[str]
-  processes: list[dict[str, object]]
+  processes: list[JsonDict]
   title: NotRequired[str]
   system: NotRequired[dict[str, float]]
 
@@ -107,7 +107,7 @@ class MeminfoProbeContext(ProbeContext[MeminfoProbe]):
 
     meminfo_json: MeminfoJson = {
         "info_stack": list(info_stack),
-        "processes": [],
+        "processes": [p.to_json() for p in process_meminfos],
     }
 
     if title is not None:
@@ -117,10 +117,9 @@ class MeminfoProbeContext(ProbeContext[MeminfoProbe]):
       meminfo_json["system"] = self.browser_platform.system_meminfo(
           self._timeout_from_deadline(deadline))
 
-    for process_meminfo in process_meminfos:
-      meminfo_json["processes"].append(dataclasses.asdict(process_meminfo))
-
-    self.browser.performance_mark("meminfo", detail=meminfo_json)
+    # TODO: remove once mypy is replaced by pyrefly
+    # https://peps.python.org/pep-0728
+    self.browser.performance_mark("meminfo", detail=cast("Json", meminfo_json))
     with self._dump_file(title, info_stack).open("x", encoding="utf-8") as f:
       json.dump(meminfo_json, f)
 
