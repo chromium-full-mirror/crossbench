@@ -162,6 +162,7 @@ class ChromeOsSshPlatform(LinuxSshPlatform):
     # displays.
     return ({"resolution": self.display_resolution(), "refresh_rate": -1},)
 
+  @functools.lru_cache(maxsize=1)
   @override
   def display_resolution(self) -> DisplayResolution:
     display_info_json = self.sh_stdout("cros-health-tool", "telem",
