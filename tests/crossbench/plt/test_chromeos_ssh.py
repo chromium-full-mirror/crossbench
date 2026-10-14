@@ -22,6 +22,16 @@ from tests.crossbench.plt.test_linux_ssh import LinuxSshMockPlatformTestCase
 
 class ChromeOsSshMockPlatformTestCase(LinuxSshMockPlatformTestCase):
   SSH_USER = "chronos"
+  _WAKELOCK_CMD = ("set_power_policy"
+                   " --ac_screen_dim_delay=0"
+                   " --ac_screen_off_delay=0"
+                   " --ac_idle_action=do_nothing"
+                   " --battery_screen_dim_delay=0"
+                   " --battery_screen_off_delay=0"
+                   " --battery_idle_action=do_nothing"
+                   " --dim_wake_lock=1"
+                   " --screen_wake_lock=1"
+                   " --system_wake_lock=1")
   platform: ChromeOsSshPlatform
 
   @override
@@ -115,6 +125,28 @@ class ChromeOsSshMockPlatformTestCase(LinuxSshMockPlatformTestCase):
         password="password")
 
     self.assertEqual(port, expected_port)
+
+  def test_wakelock(self) -> None:
+    self._expect_sh_ssh(self._WAKELOCK_CMD)
+    self._expect_sh_ssh("set_power_policy")
+    with self.platform.wakelock():
+      with self.assertRaises(AssertionError):
+        with self.platform.wakelock():
+          pass
+
+  def test_create_debugging_session_with_wakelock(self) -> None:
+    expected_port = 80
+    self._expect_sh_ssh(self._WAKELOCK_CMD)
+    self._expect_sh_ssh(
+        "/usr/local/autotest/bin/autologin.py -u username -p password")
+    self._expect_sh_ssh(self._WAKELOCK_CMD)
+    self._expect_sh_ssh(
+        "cat /home/chronos/DevToolsActivePort", result=f"{expected_port}")
+    self._expect_sh_ssh("set_power_policy")
+    with self.platform.wakelock():
+      port = self.platform.create_debugging_session(
+          browser_flags=(), username="username", password="password")
+      self.assertEqual(port, expected_port)
 
   def test_system_details(self):
     self.platform = self.setup_platform()

@@ -4,11 +4,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import json
 import logging
 import subprocess
-from typing import TYPE_CHECKING, Any, ClassVar, Final
+from typing import TYPE_CHECKING, Any, ClassVar, Final, Iterator
 
 from typing_extensions import override
 
@@ -37,6 +38,7 @@ class ChromeOsSshPlatform(LinuxSshPlatform):
   def __init__(self, *args, enable_arc: bool = False, **kwargs) -> None:
     self._enable_arc: Final[bool] = enable_arc
     self._username: str | None = None
+    self._has_wakelock: bool = False
     super().__init__(*args, **kwargs)
 
   @override
@@ -67,6 +69,35 @@ class ChromeOsSshPlatform(LinuxSshPlatform):
   @override
   def has_display(self) -> bool:
     return True
+
+  @contextlib.contextmanager
+  @override
+  def wakelock(self) -> Iterator[None]:
+    assert not self._has_wakelock, "Wakelock is already active"
+    self._has_wakelock = True
+    self._apply_wakelock()
+    try:
+      yield
+    finally:
+      self._has_wakelock = False
+      self._clear_wakelock()
+
+  def _apply_wakelock(self) -> None:
+    self.sh(
+        "set_power_policy",
+        "--ac_screen_dim_delay=0",
+        "--ac_screen_off_delay=0",
+        "--ac_idle_action=do_nothing",
+        "--battery_screen_dim_delay=0",
+        "--battery_screen_off_delay=0",
+        "--battery_idle_action=do_nothing",
+        "--dim_wake_lock=1",
+        "--screen_wake_lock=1",
+        "--system_wake_lock=1",
+    )
+
+  def _clear_wakelock(self) -> None:
+    self.sh("set_power_policy")
 
   def create_debugging_session(self,
                                browser_flags: tuple[str, ...] | None = None,
@@ -101,6 +132,9 @@ class ChromeOsSshPlatform(LinuxSshPlatform):
       logging.debug(autologin_output)
     except plt.SubprocessError as e:
       raise RuntimeError("Autologin failed.") from e
+    if self._has_wakelock:
+      # autologin.py restarts Chrome, which resets powerd's external policy.
+      self._apply_wakelock()
     try:
       dbg_port = self.cat(self.DEVTOOLS_PORT_PATH).splitlines()[0].strip()
     except plt.SubprocessError as e:
