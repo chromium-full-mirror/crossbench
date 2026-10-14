@@ -8,7 +8,7 @@ import functools
 import json
 import logging
 import subprocess
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, ClassVar, Final
 
 from typing_extensions import override
 
@@ -29,6 +29,10 @@ class ChromeOsSshPlatform(LinuxSshPlatform):
       "/usr/local/autotest/bin/autologin.py")
   DEVTOOLS_PORT_PATH: Final = pth.AnyPosixPath(
       "/home/chronos/DevToolsActivePort")
+
+  # ChromeOS does not support comments in EVEMU scripts and defaults
+  # to a new enough evemu version where this is not needed.
+  _EVEMU_VERSION_HEADER: ClassVar[bytes] = b""
 
   def __init__(self, *args, enable_arc: bool = False, **kwargs) -> None:
     self._enable_arc: Final[bool] = enable_arc

@@ -6,11 +6,16 @@ from __future__ import annotations
 
 import json
 import pathlib
+import subprocess
+from unittest import mock
 
 from typing_extensions import override
 
+from crossbench.action_runner.virtual_device.touchscreen import \
+    TouchscreenVirtualDeviceConfig
 from crossbench.plt.chromeos_ssh import ChromeOsSshPlatform
 from crossbench.plt.display_info import DisplayResolution
+from crossbench.plt.linux import SCRIPTS_DIR
 from tests import test_helper
 from tests.crossbench.plt.test_linux_ssh import LinuxSshMockPlatformTestCase
 
@@ -182,6 +187,49 @@ CHROMEOS_RELEASE_UNIBUILD=1
     self.assertEqual(details["ChromeOS"]["CHROMEOS_RELEASE_BOARD"], "dedede")
     self.assertEqual(details["ChromeOS"]["CHROMEOS_RELEASE_BUILD_NUMBER"],
                      "16093")
+
+  def test_setup_virtual_devices(self) -> None:
+    path = SCRIPTS_DIR / "evemu_wrapper.sh"
+    self.fs.create_file(path, contents="evemu_wrapper")
+    display_info = {
+        "embedded_display": {
+            "resolution_horizontal": 1366,
+            "resolution_vertical": 768,
+        },
+    }
+    self._expect_sh_ssh(
+        "cros-health-tool telem --category=display",
+        result=json.dumps(display_info))
+
+    proc = mock.MagicMock()
+    proc.poll.return_value = None
+    proc.stdout.readline.return_value = b"touch1: /dev/input/event4\n"
+
+    with mock.patch.object(
+        self.platform, "popen", return_value=proc) as mock_popen:
+      with mock.patch.object(self.platform, "sleep"):
+        self.platform.setup_virtual_devices(
+            (TouchscreenVirtualDeviceConfig(name="touch1"),))
+        mock_popen.assert_called_once_with(
+            "sh",
+            "-c",
+            "evemu_wrapper",
+            "--",
+            mock.ANY,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL)
+        written_header = mock_popen.call_args[0][4]
+        self.assertIn("N: touch1", written_header)
+        self.assertIn("A: 35 0 1366 0 0 12", written_header)
+        self.assertIn("A: 36 0 768 0 0 12", written_header)
+        self.assertNotIn("#", written_header)
+        self.assertNotIn("E: ", written_header)
+        state = self.platform._virtual_devices["touch1"]
+        self.assertIs(state.proc, proc)
+
+    self.platform.teardown_virtual_devices()
+    self.assertEqual(self.platform._virtual_devices, {})
 
 
 del LinuxSshMockPlatformTestCase

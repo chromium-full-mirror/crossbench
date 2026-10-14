@@ -7,6 +7,7 @@ from __future__ import annotations
 import datetime as dt
 import gzip
 import pathlib
+import subprocess
 import textwrap
 from unittest import mock
 
@@ -14,6 +15,8 @@ from pyfakefs.fake_filesystem import OSType
 from typing_extensions import override
 
 from crossbench import path as pth
+from crossbench.action_runner.virtual_device.virtual_device_type import \
+    VirtualDeviceType
 from crossbench.helper.version import VersionParseError
 from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.linux import PERF_EVENT_PARANOID_PATH, SCRIPTS_DIR, \
@@ -119,6 +122,65 @@ class _LinuxMockPlatformTestCase(BasePosixMockPlatformTestCase):
         "resolution": DisplayResolution(1728, 946),
         "refresh_rate": 120.0,
     })
+
+  def test_display_resolution(self) -> None:
+    with mock.patch.object(
+        self.platform,
+        "display_details",
+        return_value=({
+            "resolution": DisplayResolution(1728, 946),
+            "refresh_rate": 120.0,
+        },)):
+      self.assertEqual(self.platform.display_resolution(),
+                       DisplayResolution(1728, 946))
+
+  def test_display_resolution_missing_raises(self) -> None:
+    with mock.patch.object(self.platform, "display_details", return_value=()):
+      with self.assertRaisesRegex(RuntimeError,
+                                  "Could not determine display resolution"):
+        self.platform.display_resolution()
+
+  def test_start_virtual_device(self) -> None:
+    path = SCRIPTS_DIR / "evemu_wrapper.sh"
+    self.fs.create_file(path, contents="evemu_wrapper")
+    proc = mock.MagicMock()
+    proc.poll.return_value = None
+    proc.stdout.readline.return_value = (
+        b"Virtual Keyboard (Crossbench): /dev/input/event3\n")
+
+    with mock.patch.object(
+        self.platform, "popen", return_value=proc) as mock_popen:
+      self.platform._start_virtual_device("kb1", VirtualDeviceType.KEYBOARD,
+                                          b"N: Virtual Keyboard\n")
+      mock_popen.assert_called_once_with(
+          "sh",
+          "-c",
+          "evemu_wrapper",
+          "--",
+          "# EVEMU 1.2\nN: Virtual Keyboard\n",
+          stdin=subprocess.PIPE,
+          stdout=subprocess.PIPE,
+          stderr=subprocess.DEVNULL)
+      state = self.platform._virtual_devices["kb1"]
+      self.assertIs(state.proc, proc)
+      self.assertIsNone(state.start_time)
+
+    self.platform.teardown_virtual_devices()
+    self.assertEqual(self.platform._virtual_devices, {})
+
+  def test_start_virtual_device_failure_raises(self) -> None:
+    path = SCRIPTS_DIR / "evemu_wrapper.sh"
+    self.fs.create_file(path, contents="evemu_wrapper")
+    proc = mock.MagicMock()
+    proc.poll.return_value = 1
+    proc.stdout.readline.return_value = b"error creating device\n"
+
+    with mock.patch.object(self.platform, "popen", return_value=proc):
+      with self.assertRaisesRegex(
+          RuntimeError,
+          r"(?s)Failed to initialize virtual keyboard.*sudo modprobe uinput"):
+        self.platform._start_virtual_device("kb1", VirtualDeviceType.KEYBOARD,
+                                            b"N: Virtual Keyboard\n")
 
   def test_meminfo_no_proc(self):
     path = SCRIPTS_DIR / "meminfo.sh"

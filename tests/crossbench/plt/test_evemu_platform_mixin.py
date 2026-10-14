@@ -37,7 +37,10 @@ if TYPE_CHECKING:
       VirtualDeviceType
 
 
-class MockEvemuPlatform(EvemuPlatformMixin, LinuxMockPlatform):
+class MockEvemuPlatform(LinuxMockPlatform):
+  _init_virtual_keyboard = EvemuPlatformMixin._init_virtual_keyboard
+  _init_pointing_virtual_device = (
+      EvemuPlatformMixin._init_pointing_virtual_device)
 
   def __init__(self, wall_clock_mode: bool = True) -> None:
     super().__init__()

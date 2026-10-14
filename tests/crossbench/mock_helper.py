@@ -623,7 +623,27 @@ class MockPopen:
 
 
 class PosixMockPlatformMixin(MockPlatformMixin):
-  pass
+
+  def _init_mock_virtual_device(self, device_name: str,
+                                device_type: VirtualDeviceType) -> None:
+    if self._is_device_running(device_name):
+      return
+    mock_proc = mock.MagicMock(spec=subprocess.Popen)
+    mock_proc.poll.return_value = None
+    mock_proc.stdin = mock.MagicMock()
+    mock_proc.stdout = None
+    self._virtual_devices[device_name] = VirtualDeviceState(
+        mock_proc, device_type=device_type)
+
+  def _init_virtual_keyboard(self, device_name: str) -> None:
+    self._init_mock_virtual_device(device_name, VirtualDeviceType.KEYBOARD)
+
+  def _init_pointing_virtual_device(self,
+                                    device_config: PointingVirtualDeviceConfig,
+                                    header_template: str) -> None:
+    assert header_template, "No evemu header template provided"
+    self._init_mock_virtual_device(device_config.name,
+                                   device_config.device_type)
 
 
 class WinMockPlatformMixin(MockPlatformMixin):
@@ -698,29 +718,8 @@ class MockAdb(Adb):
     pass
 
 
-class AndroidAdbMockPlatform(MockPlatformMixin, AndroidAdbPlatform):
-
-  def _init_mock_virtual_device(self, device_name: str,
-                                device_type: VirtualDeviceType) -> None:
-    if self._is_device_running(device_name):
-      return
-    mock_proc = mock.MagicMock(spec=subprocess.Popen)
-    mock_proc.poll.return_value = None
-    mock_proc.stdin = mock.MagicMock()
-    self._virtual_devices[device_name] = VirtualDeviceState(
-        mock_proc, device_type=device_type)
-
-  @override
-  def _init_virtual_keyboard(self, device_name: str) -> None:
-    self._init_mock_virtual_device(device_name, VirtualDeviceType.KEYBOARD)
-
-  @override
-  def _init_pointing_virtual_device(self,
-                                    device_config: PointingVirtualDeviceConfig,
-                                    header_template: str) -> None:
-    assert header_template, "No evemu header template provided"
-    self._init_mock_virtual_device(device_config.name,
-                                   device_config.device_type)
+class AndroidAdbMockPlatform(PosixMockPlatformMixin, AndroidAdbPlatform):
+  pass
 
 
 class GenericMockPlatform(MockPlatformMixin, Platform):

@@ -11,6 +11,8 @@ import functools
 import logging
 import os
 import re
+import subprocess
+import textwrap
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Iterator
 
 from typing_extensions import override
@@ -20,11 +22,15 @@ from crossbench.helper.size import Size
 from crossbench.parse import NumberParser
 from crossbench.plt.base import SubprocessError
 from crossbench.plt.display_info import DisplayResolution
+from crossbench.plt.evemu_platform_mixin import DEVICE_SETTLE_DELAY, \
+    EvemuPlatformMixin, VirtualDeviceState
 from crossbench.plt.posix import PosixPlatform, RemotePosixPlatform
 from crossbench.plt.process_meminfo import ProcessMeminfo
 from crossbench.plt.signals import LinuxSignals
 
 if TYPE_CHECKING:
+  from crossbench.action_runner.virtual_device.virtual_device_type import \
+      VirtualDeviceType
   from crossbench.plt.display_info import DisplayInfo
   from crossbench.plt.types import TupleCmdArgs
 
@@ -93,7 +99,7 @@ def parse_display_xrandr(xrandr_str: str) -> Iterator[DisplayInfo]:
       }
 
 
-class LinuxPlatform(PosixPlatform):
+class LinuxPlatform(EvemuPlatformMixin, PosixPlatform):
   SEARCH_PATHS: tuple[pth.AnyPath, ...] = (
       pth.AnyPosixPath("."),
       pth.AnyPosixPath("/usr/local/sbin"),
@@ -198,6 +204,12 @@ class LinuxPlatform(PosixPlatform):
     if xrandr_str := self.sh_stdout("xrandr"):
       return tuple(parse_display_xrandr(xrandr_str))
     return ()
+
+  @override
+  def display_resolution(self) -> DisplayResolution:
+    if details := self.display_details():
+      return details[0]["resolution"]
+    raise RuntimeError(f"Could not determine display resolution on {self}")
 
   _MEMINFO_SCRIPT_PROCESS_PATTERN: Final[re.Pattern] = re.compile(
       r"==== process (\d+) ====")
@@ -321,6 +333,53 @@ class LinuxPlatform(PosixPlatform):
     return NumberParser.any_int(
         self.cat(PERF_EVENT_PARANOID_PATH).strip(),
         "kernel.perf_event_paranoid")
+
+  # Standard freedesktop libevemu (used on Linux) defaults to EVEMU 1.0 format
+  # (5 numbers per 'A:' line) unless '# EVEMU 1.2' is present at the top of the
+  # descriptor.
+  _EVEMU_VERSION_HEADER: ClassVar[bytes] = b"# EVEMU 1.2\n"
+  _UINPUT_SETUP_HELP: ClassVar[str] = textwrap.dedent("""\
+      Ensure 'evemu-tools' is installed, the 'uinput' kernel module is loaded,
+      and udev grants read/write access to /dev/uinput and /dev/input/event*:
+        sudo modprobe uinput
+        sudo tee /etc/udev/rules.d/99-uinput.rules <<'EOF'
+      KERNEL=="uinput", MODE="0666"
+      SUBSYSTEM=="input", KERNEL=="event*", MODE="0666"
+      EOF
+        sudo udevadm control --reload-rules && sudo udevadm trigger""")
+
+  @override
+  def _start_virtual_device(self, device_name: str,
+                            device_type: VirtualDeviceType,
+                            header: bytes) -> None:
+    script = (SCRIPTS_DIR / "evemu_wrapper.sh").read_text(encoding="utf-8")
+    descriptor = (self._EVEMU_VERSION_HEADER + header).decode("utf-8")
+    proc = self.popen(
+        "sh",
+        "-c",
+        script,
+        "--",
+        descriptor,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL)
+    assert proc.stdout is not None
+    line = proc.stdout.readline().decode("utf-8").strip()
+    _, separator, device_node = line.rpartition(": ")
+    if not separator or not self.path(device_node).is_relative_to(
+        self.path("/dev/input")):
+      self._stop_process(proc)
+      exit_code = proc.poll()
+      msg = (f"Failed to initialize virtual {device_type.value} "
+             f"'{device_name}' (exit code: {exit_code}, output: {line!r}).\n"
+             f"{self._UINPUT_SETUP_HELP}")
+      logging.error(msg)
+      raise RuntimeError(msg)
+    self.sleep(DEVICE_SETTLE_DELAY)
+    assert device_name not in self._virtual_devices, (
+        f"Virtual device '{device_name}' already exists.")
+    self._virtual_devices[device_name] = VirtualDeviceState(
+        proc=proc, device_type=device_type)
 
 
 class RemoteLinuxPlatform(RemotePosixPlatform, LinuxPlatform):
