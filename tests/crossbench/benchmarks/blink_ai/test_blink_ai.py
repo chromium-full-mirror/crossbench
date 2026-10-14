@@ -331,6 +331,7 @@ class BlinkAITestCase(helper.SubStoryTestCase):
         "OnDeviceModelIdleTimeout:on_device_model_idle_timeout/10s",
         str(default_flags),
     )
+    self.assertIn("OnDeviceAiDefaultEnabled", str(default_flags))
     self.assertNotIn("OnDeviceModelSpeculativeDecoding", str(default_flags))
     self.assertNotIn("AIPromptAPIToolUse", str(default_flags))
 
