@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import enum
 from argparse import ArgumentTypeError
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from crossbench.parse import NumberParser
 
@@ -26,7 +26,7 @@ class Viewport:
   HEADLESS: ClassVar[Viewport]
 
   @classmethod
-  def parse_sized(cls, value: Any) -> Viewport:
+  def parse_sized(cls, value: object) -> Viewport:
     if isinstance(value, Viewport):
       viewport = value
     elif isinstance(value, str):

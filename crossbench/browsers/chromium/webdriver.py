@@ -5,11 +5,12 @@
 from __future__ import annotations
 
 import atexit
+import dataclasses
 import logging
 import re
 import subprocess
 import time
-from typing import TYPE_CHECKING, Any, Final, Sequence
+from typing import TYPE_CHECKING, Final, Self, Sequence
 
 from immutabledict import immutabledict
 from selenium.webdriver.chromium import webdriver as chromium_webdriver
@@ -26,7 +27,7 @@ from crossbench.cli.config.apk_helper import CHROME_APK_HELPER_NAMES
 from crossbench.cli.config.secrets import GoogleUsernamePassword
 from crossbench.cli.ui import ui
 from crossbench.helper import wait
-from crossbench.parse import NumberParser
+from crossbench.parse import NumberParser, ObjectParser
 from crossbench.plt.android_adb import AndroidAdbPlatform
 from crossbench.plt.base import SubprocessError
 from crossbench.plt.bin import Binaries
@@ -47,6 +48,7 @@ if TYPE_CHECKING:
   from crossbench.plt.base import Platform
   from crossbench.plt.process_meminfo import ProcessMeminfo
   from crossbench.runner.groups.session import BrowserSessionRunGroup
+  from crossbench.types import ImmutableJsonDict, JsonDict
 
 # Android is high-tech and reads chrome flags from an app-specific file.
 # TODO: extend support to more than just chrome.
@@ -350,6 +352,33 @@ class ChromiumWebDriverAndroid(ChromiumBasedWebDriver):
       logging.warning("Could not maximize Android window: %s", e)
 
 
+@dataclasses.dataclass(frozen=True)
+class ChromeApkHelperPackageInfo:
+  package_name: str
+  version_name: str
+  properties: ImmutableJsonDict
+
+  @classmethod
+  def from_platform(cls, platform: Platform, path: pth.AnyPath) -> Self:
+    output = platform.host_platform.sh_stdout(path, "package-info")
+    return cls.parse(output)
+
+  @classmethod
+  def parse(cls, output: str) -> Self:
+    properties: JsonDict = {}
+    for line in output.rstrip().splitlines():
+      key, value = line.split(": ")
+      properties[key] = cb_hjson.loads_unique_keys(value)
+    package_name = ObjectParser.non_empty_str(
+        properties.get("Package name"), "Package name")
+    version_name = ObjectParser.non_empty_str(
+        properties.get("versionName"), "versionName")
+    return cls(
+        package_name=package_name,
+        version_name=version_name,
+        properties=immutabledict(properties))
+
+
 class LocalChromiumWebDriverAndroid(ChromiumWebDriverAndroid):
   """
   Custom version that uses a locally built bundle wrapper.
@@ -374,29 +403,19 @@ class LocalChromiumWebDriverAndroid(ChromiumWebDriverAndroid):
     if settings.apk_config:
       raise ValueError(f"{self.type_name()} cannot be used with "
                        "an additional apk_config settings.")
-    self._package_info: Final[immutabledict[str,
-                                            Any]] = self._parse_package_info(
-                                                settings.platform, path)
+    self._package_info: Final[
+        ChromeApkHelperPackageInfo] = ChromeApkHelperPackageInfo.from_platform(
+            settings.platform, path)
     super().__init__(label, path, settings)
 
   @override
   def _lookup_android_package(self, path: pth.AnyPath) -> str:
-    return self._package_info["Package name"]
+    return self._package_info.package_name
 
   # TODO: enable override again.
   # @override
   def _extract_version(self) -> BrowserVersion:
-    return self.version_cls().parse(self._package_info["versionName"])
-
-  def _parse_package_info(self, platform: Platform,
-                          path: pth.AnyPath) -> immutabledict[str, Any]:
-    output = platform.host_platform.sh_stdout(
-        path, "package-info").rstrip().splitlines()
-    package_info = {}
-    for line in output:
-      key, value = line.split(": ")
-      package_info[key] = cb_hjson.loads_unique_keys(value)
-    return immutabledict(package_info)
+    return self.version_cls().parse(self._package_info.version_name)
 
   @override
   def _setup_android_apk(self) -> None:

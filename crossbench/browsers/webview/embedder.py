@@ -9,7 +9,7 @@ import collections
 import logging
 import os
 import shlex
-from typing import TYPE_CHECKING, Any, Final, MutableMapping, MutableSet, \
+from typing import TYPE_CHECKING, Final, MutableMapping, MutableSet, \
     Sequence, cast
 
 from immutabledict import immutabledict
@@ -28,6 +28,7 @@ if TYPE_CHECKING:
       EmbedderBenchmark
   from crossbench.browsers.settings import Settings
   from crossbench.runner.groups.session import BrowserSessionRunGroup
+  from crossbench.types import Json
 
 EMBEDDER_SHORT_NAME_TO_PACKAGE: Final[immutabledict[str, str]] = immutabledict({
     "googlequicksearchbox":
@@ -178,7 +179,7 @@ class WebviewEmbedder(Webview):
   @override
   def performance_mark(self,
                        name: str,
-                       detail: Any = None,
+                       detail: Json = None,
                        prefix: str = "crossbench-") -> None:
     # The driver, and Webview instance might not exist when this is called
     # See also comments above on .start()

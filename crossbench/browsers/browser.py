@@ -33,7 +33,7 @@ if TYPE_CHECKING:
   from crossbench.plt.process_meminfo import ProcessMeminfo
   from crossbench.probes.probe import Probe
   from crossbench.runner.groups.session import BrowserSessionRunGroup
-  from crossbench.types import JsonDict
+  from crossbench.types import Json, JsonDict
 
 
 class Browser(abc.ABC):
@@ -579,7 +579,7 @@ class Browser(abc.ABC):
 
   def performance_mark(self,
                        name: str,
-                       detail: Any = None,
+                       detail: Json = None,
                        prefix: str = "crossbench-") -> None:
     full_name = prefix + name
     if detail is None:

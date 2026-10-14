@@ -112,7 +112,7 @@ class AppleScriptBrowser(Browser, metaclass=abc.ABCMeta):
 
   _browser_process: subprocess.Popen
 
-  def _exec_apple_script(self, apple_script: str, **kwargs) -> Any:
+  def _exec_apple_script(self, apple_script: str, **kwargs) -> str:
     assert self.platform.is_macos, (
         f"Sorry, f{self.__class__} is only supported on MacOS for now")
     wrapper_script, args = AppleScript.with_args(self.app_path, apple_script,

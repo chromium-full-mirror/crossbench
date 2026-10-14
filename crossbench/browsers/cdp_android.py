@@ -29,6 +29,7 @@ if TYPE_CHECKING:
   from crossbench.flags.base import FlagsT
   from crossbench.plt.android_adb import AndroidAdbPlatform
   from crossbench.runner.groups.session import BrowserSessionRunGroup
+  from crossbench.types import JsonDict
 
 
 class CdpAndroidBrowser(ChromiumBased):
@@ -218,9 +219,7 @@ class CdpAndroidBrowser(ChromiumBased):
       self._restore_chrome_flags()
       self._is_running = False
 
-  def _send_cdp(self,
-                method: str,
-                params: dict[str, Any] | None = None) -> dict[str, Any]:
+  def _send_cdp(self, method: str, params: JsonDict | None = None) -> JsonDict:
     return self.platform.send_cdp_command(method, params)
 
   @override
@@ -256,15 +255,18 @@ class CdpAndroidBrowser(ChromiumBased):
         "expression": expression,
         "returnByValue": True,
     })
-    result = res.get("result", {})
+    result = res.get("result")
+    assert isinstance(result, dict), f"Invalid Runtime.evaluate result: {res}"
     if "exceptionDetails" in result:
       details = result["exceptionDetails"]
+      assert isinstance(details, dict), f"Invalid exceptionDetails: {details}"
       error_msg = str(details)
-      if isinstance(details, dict) and isinstance(
-          details.get("exception"), dict):
-        error_msg = details["exception"].get("description", str(details))
+      if isinstance(exception_dict := details.get("exception"), dict):
+        error_msg = str(exception_dict.get("description", details))
       raise ValueError(f"Could not execute JS: {error_msg}")
-    return result.get("result", {}).get("value")
+    inner_result = result.get("result")
+    assert isinstance(inner_result, dict), f"Invalid RemoteObject: {result}"
+    return inner_result.get("value")
 
   @property
   @override

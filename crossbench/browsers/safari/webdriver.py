@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import os
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 from selenium import webdriver
 from selenium.webdriver.safari.options import Options as SafariOptions
@@ -26,6 +26,11 @@ from crossbench.plt.ios import IOSPlatform
 if TYPE_CHECKING:
   from crossbench.browsers.settings import Settings
   from crossbench.runner.groups.session import BrowserSessionRunGroup
+
+
+class SafariDriverKwargs(TypedDict):
+  service: SafariService
+  options: SafariOptions
 
 
 class SafariWebDriver(WebDriverBrowser, Safari):
@@ -70,7 +75,7 @@ class SafariWebDriver(WebDriverBrowser, Safari):
     session.setup_selenium_options(options)
 
     service = SafariService(executable_path=os.fspath(driver_path))
-    driver_kwargs = {"service": service, "options": options}
+    driver_kwargs: SafariDriverKwargs = {"service": service, "options": options}
 
     with ui.spinner(), exception.annotate("Starting safaridriver with retries"):
       driver = self._start_driver_with_retries(driver_path, driver_kwargs)
@@ -91,7 +96,7 @@ class SafariWebDriver(WebDriverBrowser, Safari):
   # TODO(cbruni): implement iOS platform
   def _start_driver_with_retries(
       self, driver_path: pth.AnyPath,
-      driver_kwargs: dict[str, Any]) -> webdriver.Safari:
+      driver_kwargs: SafariDriverKwargs) -> webdriver.Safari:
     # safaridriver for iOS / technology preview seems to be brittle.
     # Let's give it several chances to start up.
     seen_exceptions: set[type[Exception]] = set()

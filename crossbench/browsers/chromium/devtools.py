@@ -9,8 +9,8 @@ import datetime as dt
 import json
 import logging
 from contextlib import closing
-from typing import TYPE_CHECKING, Any, Callable, Final, Iterator, NamedTuple, \
-    Self
+from typing import TYPE_CHECKING, Callable, Final, Iterator, Mapping, \
+    NamedTuple, Self
 
 import websocket
 from websocket import create_connection
@@ -20,6 +20,7 @@ from crossbench.helper import wait
 if TYPE_CHECKING:
   from crossbench.browsers.browser import Browser
   from crossbench.plt.base import Platform
+  from crossbench.types import JsonDict
 
 
 class DevToolsCommandResult(NamedTuple):
@@ -27,7 +28,7 @@ class DevToolsCommandResult(NamedTuple):
   # protocol error.
   success: bool
   # The full response message returned by the websocket.
-  response: dict[str, object]
+  response: JsonDict
 
 
 class DevToolsInBrowserClient:
@@ -154,7 +155,7 @@ class DevToolsRemoteClient:
     logging.debug("DevTools disconnected")
 
   def _send_raw_command(
-      self, command_payload: dict[str, object]) -> DevToolsCommandResult:
+      self, command_payload: Mapping[str, object]) -> DevToolsCommandResult:
     if not self._ws or not self._ws.connected:
       raise RuntimeError("DevTools is not connected. Cannot send command.")
 
@@ -169,50 +170,13 @@ class DevToolsRemoteClient:
       if response.get("id") == expected_id:
         return DevToolsCommandResult(True, response)
 
-  def _get_page_session_id(self) -> str:
-    if self._session_id:
-      return self._session_id
-    _, response = self._send_raw_command({
-        "id": self._get_next_id(),
-        "method": "Target.getTargets",
-    })
-    if not isinstance(result := response.get("result"), dict):
-      raise RuntimeError(f"Target.getTargets failed: {response}")
-    target_infos = result.get("targetInfos", [])
-    page_target_id = None
-    for info in target_infos:
-      if info.get("type") == "page":
-        page_target_id = info.get("targetId")
-        break
-    if not page_target_id:
-      _, response = self._send_raw_command({
-          "id": self._get_next_id(),
-          "method": "Target.createTarget",
-          "params": {
-              "url": "about:blank",
-          },
-      })
-      if not isinstance(result := response.get("result"), dict):
-        raise RuntimeError(f"Target.createTarget failed: {response}")
-      page_target_id = result.get("targetId")
-    if not page_target_id:
-      raise RuntimeError("Failed to obtain a page targetId")
-    _, response = self._send_raw_command({
-        "id": self._get_next_id(),
-        "method": "Target.attachToTarget",
-        "params": {
-            "targetId": page_target_id,
-            "flatten": True,
-        },
-    })
+  def _get_result_dict(self, response: JsonDict, method: str) -> JsonDict:
     result = response.get("result")
-    if not isinstance(result, dict) or "sessionId" not in result:
-      raise RuntimeError(f"Target.attachToTarget failed: {response}")
-    self._session_id = result["sessionId"]
-    return self._session_id
+    if not isinstance(result, dict):
+      raise RuntimeError(f"{method} failed: {response}")
+    return result
 
-  def switch_to_new_tab(self, url: str = "about:blank") -> str:
-    """Creates a new page target and attaches to it as the active session."""
+  def _create_target(self, url: str = "about:blank") -> str:
     _, response = self._send_raw_command({
         "id": self._get_next_id(),
         "method": "Target.createTarget",
@@ -220,28 +184,59 @@ class DevToolsRemoteClient:
             "url": url,
         },
     })
-    if not isinstance(result := response.get("result"), dict):
-      raise RuntimeError(f"Could not create new tab: {response}")
-    page_target_id = result.get("targetId")
-    if not page_target_id:
-      raise RuntimeError(f"Could not get targetId for new tab: {response}")
+    result = self._get_result_dict(response, "Target.createTarget")
+    target_id = result.get("targetId")
+    assert isinstance(target_id, str) and target_id, (
+        f"Invalid targetId in Target.createTarget: {response}")
+    return target_id
+
+  def _attach_to_target(self, target_id: str) -> str:
     _, response = self._send_raw_command({
         "id": self._get_next_id(),
         "method": "Target.attachToTarget",
         "params": {
-            "targetId": page_target_id,
+            "targetId": target_id,
             "flatten": True,
         },
     })
-    result = response.get("result")
-    if not isinstance(result, dict) or "sessionId" not in result:
-      raise RuntimeError(
-          f"Could not attach to new tab {page_target_id}: {response}")
-    self._session_id = result["sessionId"]
+    result = self._get_result_dict(response, "Target.attachToTarget")
+    session_id = result.get("sessionId")
+    assert isinstance(session_id, str) and session_id, (
+        f"Invalid sessionId in Target.attachToTarget: {response}")
+    return session_id
+
+  def _get_page_session_id(self) -> str:
+    if self._session_id:
+      return self._session_id
+    _, response = self._send_raw_command({
+        "id": self._get_next_id(),
+        "method": "Target.getTargets",
+    })
+    result = self._get_result_dict(response, "Target.getTargets")
+    target_infos = result.get("targetInfos")
+    assert isinstance(target_infos, list), f"Invalid targetInfos: {result}"
+    page_target_id: str | None = None
+    for info in target_infos:
+      assert isinstance(info, dict), f"Invalid TargetInfo: {info}"
+      if info.get("type") == "page":
+        target_id = info.get("targetId")
+        assert isinstance(target_id, str) and target_id, (
+            f"Invalid targetId: {info}")
+        page_target_id = target_id
+        break
+    if not page_target_id:
+      page_target_id = self._create_target("about:blank")
+    self._session_id = self._attach_to_target(page_target_id)
     return self._session_id
 
-  def send_command(self,
-                   command_payload: dict[str, object]) -> DevToolsCommandResult:
+  def switch_to_new_tab(self, url: str = "about:blank") -> str:
+    """Creates a new page target and attaches to it as the active session."""
+    page_target_id = self._create_target(url)
+    self._session_id = self._attach_to_target(page_target_id)
+    return self._session_id
+
+  def send_command(
+      self, command_payload: Mapping[str, object]) -> DevToolsCommandResult:
     """Sends a command to DevTools and waits for the matching response.
 
     Commands are routed to a page session by default. Commands for
@@ -259,19 +254,19 @@ class DevToolsRemoteClient:
     Returns:
       DevToolsCommandResult with (success, response).
     """
-    command_payload = dict(command_payload)
-    command_payload.setdefault("id", self._get_next_id())
-    method = str(command_payload.get("method", ""))
-    if "sessionId" in command_payload:
-      if command_payload["sessionId"] is None:
-        del command_payload["sessionId"]
+    payload: dict[str, object] = dict(command_payload)
+    payload.setdefault("id", self._get_next_id())
+    method = str(payload.get("method", ""))
+    if "sessionId" in payload:
+      if payload["sessionId"] is None:
+        del payload["sessionId"]
     elif not method.startswith(BROWSER_CDP_PREFIXES):
       if session_id := self._get_page_session_id():
-        command_payload["sessionId"] = session_id
-    success, response = self._send_raw_command(command_payload)
+        payload["sessionId"] = session_id
+    success, response = self._send_raw_command(payload)
     return DevToolsCommandResult(success and "error" not in response, response)
 
-  def dispatch_command(self, command_payload: dict[str, Any]) -> bool:
+  def dispatch_command(self, command_payload: Mapping[str, object]) -> bool:
     """Dispatches a command to DevTools. Does not wait for any response.
 
     Args:

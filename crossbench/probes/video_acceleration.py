@@ -71,16 +71,20 @@ class VideoAccelerationProbeContext(
         "id": 0,
         "method": "Target.getTargets",
     })
-    if not success:
+    if not success or not targets:
       raise RuntimeError("Failed to query target")
-    if not targets:
-      return None
     result = targets.get("result")
-    if not isinstance(result, dict) or "targetInfos" not in result:
-      return None
-    for target in result["targetInfos"]:
-      if target["type"] == "page":
-        return target["targetId"]
+    assert isinstance(result, dict), (
+        f"Invalid Target.getTargets result: {targets}")
+    target_infos = result.get("targetInfos")
+    assert isinstance(target_infos, list), f"Invalid targetInfos: {result}"
+    for target in target_infos:
+      assert isinstance(target, dict), f"Invalid TargetInfo: {target}"
+      if target.get("type") == "page":
+        target_id = target.get("targetId")
+        assert isinstance(target_id, str) and target_id, (
+            f"Invalid targetId: {target}")
+        return target_id
     return None
 
   def _is_hw_acceleration_determined(self) -> bool:

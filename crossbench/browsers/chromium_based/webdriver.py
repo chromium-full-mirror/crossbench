@@ -9,7 +9,8 @@ import base64
 import datetime as dt
 import logging
 import os
-from typing import TYPE_CHECKING, Any, Final, Iterable, Sequence, TextIO
+from typing import TYPE_CHECKING, Any, Final, Iterable, Sequence, TextIO, \
+    TypeAlias
 
 import requests
 import selenium.common.exceptions
@@ -46,6 +47,7 @@ if TYPE_CHECKING:
 
 
 _DEFAULT_TAB_TIMEOUT: Final[dt.timedelta] = dt.timedelta(seconds=0)
+ScriptIdKwargs: TypeAlias = dict[str, str]
 
 
 class ChromiumBasedWebDriver(
@@ -57,7 +59,7 @@ class ChromiumBasedWebDriver(
 
   def __init__(self, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
-    self._script_id_kwargs_by_window_id: Final[dict[str, Any]] = {}
+    self._script_id_kwargs_by_window_id: Final[dict[str, ScriptIdKwargs]] = {}
     self._tracer: DevToolsTracer | None = None
     self._stdout_log_file: TextIO | None = None
 
@@ -426,7 +428,7 @@ class ChromiumBasedWebDriver(
     self._tracer = DevToolsTracer(self._private_driver)
     self._tracer.start()
 
-  def stop_profiling(self) -> Any:
+  def stop_profiling(self) -> bytearray:
     assert isinstance(self._private_driver, ChromiumDriver)
     assert self._tracer is not None
     output = self._tracer.end()

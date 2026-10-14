@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import base64
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Final, Protocol
 
 from crossbench.helper.wait import WaitRange
 
@@ -17,6 +17,11 @@ if TYPE_CHECKING:
       WebSocketConnection
 
 
+class _TracingCompleteEvent(Protocol):
+  """Protocol for CDP Tracing.tracingComplete event objects."""
+  stream: object
+
+
 class DevToolsTracer:
 
   def __init__(self, driver: webdriver.Remote) -> None:
@@ -25,7 +30,7 @@ class DevToolsTracer:
     self._websocket: Final[WebSocketConnection] = module_and_socket[1]
     # It's a devtools.io.StreamHandle. The devtools module is imported
     # dynamically so adding a type annotation is infeasible.
-    self._out_stream: Any | None = None
+    self._out_stream: object = None
 
   def start(self) -> None:
     config = self._devtools.tracing.TraceConfig()
@@ -66,5 +71,5 @@ class DevToolsTracer:
       if eof:
         return output
 
-  def _on_tracing_complete(self, event: Any) -> None:
+  def _on_tracing_complete(self, event: _TracingCompleteEvent) -> None:
     self._out_stream = event.stream

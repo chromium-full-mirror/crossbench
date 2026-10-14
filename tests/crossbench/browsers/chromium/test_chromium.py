@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import pathlib
 import re
@@ -15,8 +16,8 @@ from crossbench import path as pth
 from crossbench.browsers.browser import Browser
 from crossbench.browsers.chromium.base import ChromiumBaseMixin
 from crossbench.browsers.chromium.driver_finder import ChromeDriverFinder
-from crossbench.browsers.chromium.webdriver import ChromiumWebDriver, \
-    LocalChromiumWebDriverAndroid
+from crossbench.browsers.chromium.webdriver import ChromeApkHelperPackageInfo, \
+    ChromiumWebDriver, LocalChromiumWebDriverAndroid
 from crossbench.browsers.chromium_based import helper
 from crossbench.browsers.chromium_based.webdriver import ChromiumBasedWebDriver
 from crossbench.browsers.settings import Settings
@@ -47,6 +48,33 @@ class LocalChromeWebDriverAndroidTestCase(BaseCrossbenchTestCase):
     self.assertFalse(
         LocalChromiumWebDriverAndroid.is_apk_helper(
             pth.AnyPath("/home/user/Documents/chrome/src/out/arm64/chrome")))
+
+  def test_package_info_parse(self):
+    raw_output = (
+        'Package name: "org.chromium.chrome"\n'
+        "versionCode: 808900004\n"
+        'versionName: "157.0.8089.0"\n'
+        "minSdkVersion: 29\n"
+        "targetSdkVersion: 37\n"
+        "Supported ABIs: ['arm64-v8a']\n"
+        "Decoded versionCode: "
+        "build_number=8089 patch_number=0 sku=CHROME abi=arm_64_high\n")
+    info = ChromeApkHelperPackageInfo.parse(raw_output)
+    self.assertEqual(info.package_name, "org.chromium.chrome")
+    self.assertEqual(info.version_name, "157.0.8089.0")
+    self.assertEqual(info.properties["versionCode"], 808900004)
+    self.assertEqual(info.properties["minSdkVersion"], 29)
+    self.assertEqual(info.properties["targetSdkVersion"], 37)
+    self.assertEqual(info.properties["Supported ABIs"], ["arm64-v8a"])
+    self.assertEqual(
+        info.properties["Decoded versionCode"],
+        "build_number=8089 patch_number=0 sku=CHROME abi=arm_64_high")
+
+  def test_package_info_parse_invalid(self):
+    with self.assertRaises(argparse.ArgumentTypeError):
+      ChromeApkHelperPackageInfo.parse('versionName: "157.0.8089.0"\n')
+    with self.assertRaises(argparse.ArgumentTypeError):
+      ChromeApkHelperPackageInfo.parse('Package name: "org.chromium.chrome"\n')
 
   def test_is_local_build_mock_browser(self):
     self.assertTrue(self.browsers)
