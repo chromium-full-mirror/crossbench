@@ -205,9 +205,6 @@ ignore = [
     "ARG",      # Allow unused args in tests
     "TID251",   # Allow tests to use pathlib for now
 ]
-"crossbench/action_runner/chromeos_scripts/*" = [
-    "INP001",   # Need module __init__.py
-]
 
 [tool.ruff.lint.flake8-type-checking]
 # Some types need to be runtime evaluated and thus

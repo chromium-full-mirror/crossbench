@@ -8,8 +8,6 @@ import dataclasses
 from typing import TYPE_CHECKING, Any, Self, cast
 
 from crossbench.action_runner.base import ActionRunner
-from crossbench.action_runner.chromeos_input_action_runner import \
-    ChromeOSInputActionRunner
 from crossbench.action_runner.unified_input_action_runner import \
     UnifiedInputActionRunner
 from crossbench.action_runner.virtual_device.all import \
@@ -42,11 +40,11 @@ class ActionRunnerType(ConfigEnum):
   BASIC = ("basic", str(ActionRunner.__doc__))
   UNIFIED = ("unified", str(UnifiedInputActionRunner.__doc__))
   ANDROID = UNIFIED
-  CHROMEOS = ("chromeos", str(ChromeOSInputActionRunner.__doc__))
+  CHROMEOS = UNIFIED
 
   @classmethod
   def _missing_(cls, value: Any) -> Self | None:
-    if str(value).lower() == "android":
+    if str(value).lower() in ("android", "chromeos"):
       return cast(Self, cls.UNIFIED)
     return super()._missing_(value)
 
@@ -78,9 +76,6 @@ class ActionRunnerConfig(ConfigObject):
       case ActionRunnerType.UNIFIED:
         return UnifiedInputActionRunner(run, self.virtual_devices,
                                         step_by_step_mode)
-      case ActionRunnerType.CHROMEOS:
-        return ChromeOSInputActionRunner(run, self.virtual_devices,
-                                         step_by_step_mode)
       case ActionRunnerType.BASIC:
         # TODO: rename
         return ActionRunner(run, self.virtual_devices, step_by_step_mode)
@@ -93,10 +88,7 @@ class ActionRunnerConfig(ConfigObject):
                           platform: Platform,
                           run: Run,
                           step_by_step_mode: bool = False) -> ActionRunner:
-    if platform.is_android:
+    if platform.is_android or platform.is_chromeos:
       return UnifiedInputActionRunner(run, self.virtual_devices,
                                       step_by_step_mode)
-    if platform.is_chromeos:
-      return ChromeOSInputActionRunner(run, self.virtual_devices,
-                                       step_by_step_mode)
     return ActionRunner(run, self.virtual_devices, step_by_step_mode)

@@ -11,8 +11,6 @@ from unittest import mock
 
 from crossbench import plt
 from crossbench.action_runner.base import ActionRunner
-from crossbench.action_runner.chromeos_input_action_runner import \
-    ChromeOSInputActionRunner
 from crossbench.action_runner.config import DEFAULT_VIRTUAL_DEVICES, \
     ActionRunnerConfig, ActionRunnerType
 from crossbench.action_runner.unified_input_action_runner import \
@@ -63,13 +61,14 @@ class ActionRunnerConfigTest(unittest.TestCase):
     self.assertEqual(action_runner_config.virtual_devices, ())
 
   def test_parse_auto_chromeos(self) -> None:
-    action_runner = ActionRunnerConfig.parse("auto")
+    action_runner_config = ActionRunnerConfig.parse("auto")
     mock_platform = mock.MagicMock()
     mock_platform.is_android = False
     mock_platform.is_chromeos = True
-    self.assertIsInstance(
-        action_runner.instantiate(mock_platform, self.mock_run),
-        ChromeOSInputActionRunner)
+    action_runner = action_runner_config.instantiate(mock_platform,
+                                                     self.mock_run)
+    self.assertIsInstance(action_runner, UnifiedInputActionRunner)
+    self.assertEqual(action_runner_config.virtual_devices, ())
 
   def test_parse_android(self) -> None:
     action_runner_config = ActionRunnerConfig.parse("android")
@@ -86,17 +85,19 @@ class ActionRunnerConfigTest(unittest.TestCase):
     self.assertIsInstance(action_runner_config, ActionRunnerConfig)
     self.assertEqual(action_runner_config.type, ActionRunnerType.UNIFIED)
     self.assertIs(action_runner_config.type, ActionRunnerType.ANDROID)
+    self.assertIs(action_runner_config.type, ActionRunnerType.CHROMEOS)
     action_runner = action_runner_config.instantiate(plt.PLATFORM,
                                                      self.mock_run)
     self.assertIsInstance(action_runner, UnifiedInputActionRunner)
 
   def test_parse_chromeos(self) -> None:
-    action_runner = ActionRunnerConfig.parse("chromeos")
-    self.assertIsInstance(action_runner, ActionRunnerConfig)
-    self.assertEqual(action_runner.type, ActionRunnerType.CHROMEOS)
-    self.assertIsInstance(
-        action_runner.instantiate(plt.PLATFORM, self.mock_run),
-        ChromeOSInputActionRunner)
+    action_runner_config = ActionRunnerConfig.parse("chromeos")
+    self.assertIsInstance(action_runner_config, ActionRunnerConfig)
+    self.assertIs(action_runner_config.type, ActionRunnerType.CHROMEOS)
+    action_runner = action_runner_config.instantiate(plt.PLATFORM,
+                                                     self.mock_run)
+    self.assertIsInstance(action_runner, UnifiedInputActionRunner)
+    self.assertEqual(action_runner_config.virtual_devices, ())
 
   def test_default_virtual_devices(self) -> None:
     action_runner_config = ActionRunnerConfig()
