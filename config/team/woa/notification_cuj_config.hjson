@@ -1,0 +1,10 @@
+{
+  "cujs": {
+    "agsa-notification": [
+      {
+        "action": "wait"
+        "duration": "15s"
+      }
+    ]
+  }
+}

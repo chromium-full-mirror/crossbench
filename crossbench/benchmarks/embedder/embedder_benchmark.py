@@ -8,8 +8,11 @@ import abc
 import argparse
 import datetime as dt
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Iterator, Sequence, cast
+import re
+from typing import TYPE_CHECKING, Any, ClassVar, Final, Iterator, Mapping, \
+    Sequence, cast
 
+from immutabledict import immutabledict
 from typing_extensions import override
 
 from crossbench import path as pth
@@ -46,12 +49,17 @@ class EmbedderStory(Story, metaclass=abc.ABCMeta):
       run_browser.adb_force_stop()
       run.browser_platform.sh("am", "kill-all")
       run.browser_platform.clear_memory_page_cache()
-    cmd: TupleCmdArgs = (
-        "am", "start", "-S", "-W", "-n",
-        f"{run_browser.android_package}/.{run_benchmark.android_activity}")
-    if run_benchmark.android_action != "":
-      cmd = (*cmd, "-a",
-             f"{run_browser.android_package}.{run_benchmark.android_action}")
+    activity = run_benchmark.android_activity
+    if "." not in activity:
+      activity = f".{activity}"
+    cmd: TupleCmdArgs = ("am", "start", "-S", "-W", "-n",
+                         f"{run_browser.android_package}/{activity}")
+    if action := run_benchmark.android_action:
+      if "." not in action:
+        action = f"{run_browser.android_package}.{action}"
+      cmd = (*cmd, "-a", action)
+    for key, value in run_benchmark.android_extras.items():
+      cmd = (*cmd, "-e", key, value)
     run.browser_platform.sh(*cmd)
     logging.info("Starting Embedder Benchmark...")
 
@@ -82,6 +90,8 @@ class EmbedderBenchmark(SubStoryBenchmark):
   """
   NAME: ClassVar = "embedder"
   DEFAULT_STORY_CLS: ClassVar = EmbedderStory
+  _ANDROID_EXTRA_RE: Final[re.Pattern[str]] = re.compile(
+      r"(?P<key>[^=:]+)[=:](?P<value>.*)", re.DOTALL)
 
   def __init__(
       self,
@@ -94,6 +104,7 @@ class EmbedderBenchmark(SubStoryBenchmark):
       embedder_drop_caches: bool = False,
       android_action: str = "GOOGLE_SEARCH",
       android_activity: str = "SearchActivity",
+      android_extras: Sequence[str | tuple[str, str]] | Mapping[str, str] = (),
   ) -> None:
     for story in stories:
       assert isinstance(story, self.DEFAULT_STORY_CLS)
@@ -105,6 +116,8 @@ class EmbedderBenchmark(SubStoryBenchmark):
     self._embedder_drop_caches = embedder_drop_caches
     self._android_action = android_action
     self._android_activity = android_activity
+    self._android_extras: immutabledict[str, str] = (
+        self._parse_android_extras(android_extras))
 
   @property
   def embedder_process_name(self) -> str:
@@ -136,6 +149,43 @@ class EmbedderBenchmark(SubStoryBenchmark):
   def android_activity(self) -> str:
     return self._android_activity
 
+  @property
+  def android_extras(self) -> immutabledict[str, str]:
+    return self._android_extras
+
+  @classmethod
+  def parse_android_extra(cls, value: str) -> tuple[str, str]:
+    extra = ObjectParser.non_empty_str(value, "android_extra")
+    if match := cls._ANDROID_EXTRA_RE.fullmatch(extra):
+      return match.group("key"), match.group("value")
+    raise argparse.ArgumentTypeError(
+        f"Invalid --android-extras format {extra!r}: "
+        "expected 'key=value' or 'key:value'.")
+
+  @classmethod
+  def _parse_android_extras(
+      cls,
+      raw_extras: Sequence[str | tuple[str, str]] | Mapping[str, str],
+  ) -> immutabledict[str, str]:
+    if isinstance(raw_extras, Mapping):
+      for key, value in raw_extras.items():
+        ObjectParser.non_empty_str(key, "android_extras key")
+        ObjectParser.any_str(value, f"android_extras[{key!r}]")
+      return immutabledict(raw_extras)
+    extras: dict[str, str] = {}
+    for extra in raw_extras:
+      if isinstance(extra, str):
+        key, value = cls.parse_android_extra(extra)
+      else:
+        key, value = extra
+        ObjectParser.non_empty_str(key, "android_extras key")
+        ObjectParser.any_str(value, f"android_extras[{key!r}]")
+      if key in extras:
+        raise argparse.ArgumentTypeError(
+            f"Duplicate --android-extras key: {key!r}")
+      extras[key] = value
+    return immutabledict(extras)
+
   @classmethod
   @override
   def cli_description(cls) -> str:
@@ -146,8 +196,8 @@ class EmbedderBenchmark(SubStoryBenchmark):
   @override
   def add_cli_arguments(cls, parser: CBArgumentParser) -> CBArgumentParser:
     super().add_cli_arguments(parser)
-    # Workaround to allow passing multiple --embedder-push-files using a flag
-    # config that needs to have unique keys.
+    # Workaround to allow passing multiple --embedder-push-files or
+    # --android-extras using a flag config that needs to have unique keys.
     parser.allow_abbrev = True
     parser.add_argument(
         "--cujs-config",
@@ -191,6 +241,13 @@ class EmbedderBenchmark(SubStoryBenchmark):
         type=ObjectParser.non_empty_str,
         help=("The Android activity name in setup that is passed to the adb\n"
               "intent `am start -n` option."))
+    parser.add_argument(
+        "--android-extras",
+        type=cls.parse_android_extra,
+        action="append",
+        default=[],
+        help=("Intent string extras (-e <key> <value>) to pass to the Android\n"
+              "start command, formatted as 'key=value' or 'key:value'."))
     return parser
 
   @classmethod
@@ -216,6 +273,7 @@ class EmbedderBenchmark(SubStoryBenchmark):
     kwargs["embedder_drop_caches"] = args.embedder_drop_caches
     kwargs["android_action"] = args.android_action
     kwargs["android_activity"] = args.android_activity
+    kwargs["android_extras"] = args.android_extras
     return kwargs
 
   @classmethod
