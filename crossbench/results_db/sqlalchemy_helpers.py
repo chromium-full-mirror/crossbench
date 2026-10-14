@@ -4,9 +4,8 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import orm
 from sqlalchemy.orm import Session, relationship
 
 __all__ = (
@@ -17,16 +16,18 @@ __all__ = (
     "mapped_column",
 )
 
-# Try importing SQLAlchemy 2.0+ features.
-try:
-  from sqlalchemy.orm import DeclarativeBase, Mapped
-  mapped_column = orm.mapped_column
-except ImportError:
-  # Fallback for SQLAlchemy 1.4 compatibility (e.g. in Google3).
-  from sqlalchemy import Column
-  from sqlalchemy.ext.declarative import declarative_base
-  DeclarativeBase = declarative_base()  # type: ignore
-  Mapped = Any  # type: ignore
+if TYPE_CHECKING:
+  from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+else:
+  # Try importing SQLAlchemy 2.0+ features.
+  try:
+    from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+  except ImportError:
+    # Fallback for SQLAlchemy 1.4 compatibility (e.g. in Google3).
+    from sqlalchemy import Column
+    from sqlalchemy.ext.declarative import declarative_base
+    DeclarativeBase = declarative_base()
+    Mapped = Any
 
-  def mapped_column(*args: Any, **kwargs: Any) -> Any:
-    return Column(*args, **kwargs)
+    def mapped_column(*args: Any, **kwargs: Any) -> Any:
+      return Column(*args, **kwargs)

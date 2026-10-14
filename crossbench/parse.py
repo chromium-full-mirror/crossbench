@@ -804,7 +804,8 @@ class NumberParser(BaseParser):
         isinstance(value, str)) or (not isinstance(value, (int, float, str))):
       raise argparse.ArgumentTypeError(
           f"Expected integer {name}, but got {type_str(value)}: {value!r}")
-    if isinstance(value, float) and not value.is_integer():
+    if (isinstance(value, float) and not isinstance(value, int) and
+        not value.is_integer()):
       raise argparse.ArgumentTypeError(f"Invalid integer {name}: {value!r}")
     try:
       return int(value)

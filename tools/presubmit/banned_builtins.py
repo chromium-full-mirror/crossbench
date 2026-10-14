@@ -37,7 +37,7 @@ class BannedBuiltinVisitor(ast.NodeVisitor):
           node.func.value.id == "builtins"):
       func_name = node.func.attr
 
-    if func_name in BANNED_BUILTIN_FUNCTIONS:
+    if func_name and func_name in BANNED_BUILTIN_FUNCTIONS:
       self.violations.append((node.lineno, node.col_offset + 1, func_name))
     self.generic_visit(node)
 

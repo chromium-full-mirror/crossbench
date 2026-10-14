@@ -191,10 +191,6 @@ class ChromiumBasedWebDriver(
         service_args=service_args,
         log_output=self._stdout_log_file,
     )
-    if hasattr(service, "log_file"):
-      # TODO: remove once we upgrade the min selenium version
-      # Workaround for older selenium versions which ignore the log_file kwarg.
-      service.log_file = self._stdout_log_file
 
     # TODO: support remote platforms
     driver = self._create_driver(options, service)

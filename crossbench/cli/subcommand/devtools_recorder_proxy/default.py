@@ -175,7 +175,7 @@ class CrossbenchDevToolsRecorderProxy:
     self._state.transition(State.CONNECTED, State.CONNECTED, to=State.CONNECTED)
     return await self._status_command()
 
-  async def _run_command(self, args: dict[str, str]) -> tuple[Response, str]:
+  async def _run_command(self, args: JsonDict) -> tuple[Response, str]:
     self._state.transition(State.CONNECTED, to=State.RUNNING)
     assert self._crossbench_process is None
     cb_path = CROSSBENCH_ROOT / "cb.py"
@@ -193,12 +193,14 @@ class CrossbenchDevToolsRecorderProxy:
         json.dump(args["json"], f)
       assert self._tmp_json.exists(), f"{self._tmp_json} does not exist."
       assert cb_path.exists(), f"{cb_path} does not exist."
+      raw_cmd = args.get("cmd")
+      assert isinstance(raw_cmd, str)
       cmd = [
           "load",
           "--env-validation=warn",
           "--verbose",
           f"--devtools-recorder={self._tmp_json.absolute()}",
-          *shlex.split(args.get("cmd")),
+          *shlex.split(raw_cmd),
       ]
     logging.info("CROSSBENCH COMMAND: %s", cmd)
     self._crossbench_process = await asyncio.create_subprocess_exec(

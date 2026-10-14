@@ -32,6 +32,8 @@ from crossbench.probes.trace_processor.trace_processor import \
     TraceProcessorProbe
 
 if TYPE_CHECKING:
+  from perfetto.trace_uri_resolver.registry import TraceReference
+
   from crossbench.benchmarks.web_power.base import WebPowerBenchmarkBase
   from crossbench.probes.results import ProbeResult
   from crossbench.runner.groups.browsers import BrowsersRunGroup
@@ -329,7 +331,7 @@ class WebPowerProbe(BenchmarkProbeMixin, Probe):
 
     browser_to_model = base_df.set_index("cb_browser")["device_model"].to_dict()
 
-    sql_to_traces: dict[str, list[str]] = {}
+    sql_to_traces: dict[str, list[TraceReference]] = {}
     trace_to_meta: dict[str, TraceMetadata] = {}
 
     for trace in traces:

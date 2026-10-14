@@ -93,12 +93,12 @@ class Actions(TimeScope):
 
   def __exit__(self, exc_type: type[BaseException] | None,
                exc_value: BaseException | None,
-               exc_traceback: TracebackType | None) -> None:
+               traceback: TracebackType | None) -> None:
     self._is_active = False
     if self._performance_mark:
       self._browser.performance_mark(f"{self._performance_mark}-stop")
-    self._exception_annotation.__exit__(exc_type, exc_value, exc_traceback)
-    super().__exit__(exc_type, exc_value, exc_traceback)
+    self._exception_annotation.__exit__(exc_type, exc_value, traceback)
+    super().__exit__(exc_type, exc_value, traceback)
     logging.debug("Action end: %s", self._message)
     if self._measure:
       self._run.durations[f"actions-duration {self.message}"] = self.duration

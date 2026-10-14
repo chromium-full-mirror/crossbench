@@ -88,7 +88,8 @@ class WebPowerPageLoadBenchmark(WebPowerBenchmarkBase):
 
   IS_SCENARIO_CLASS = True
   NAME: ClassVar = f"{WebPowerBenchmarkBase.NAME}-page-load"
-  DEFAULT_STORY_CLS: ClassVar = WebPowerPageLoadStory
+  DEFAULT_STORY_CLS: ClassVar[
+      type[WebPowerPageLoadStory]] = WebPowerPageLoadStory
   STORY_FILTER_CLS: ClassVar = WebPowerPageLoadStoryFilter
 
   @classmethod

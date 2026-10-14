@@ -201,7 +201,7 @@ class ExceptionAnnotator:
     result = []
     for entry in self._exceptions:
       exception = entry.exception
-      if isinstance(exception, *args):
+      if isinstance(exception, args):
         result.append(exception)
     return result
 

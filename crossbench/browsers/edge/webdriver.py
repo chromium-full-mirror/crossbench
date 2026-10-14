@@ -24,6 +24,8 @@ from crossbench.browsers.chromium.webdriver import ChromiumBasedWebDriver
 from crossbench.browsers.edge.base import EdgeBaseMixin
 
 if TYPE_CHECKING:
+  from selenium.webdriver.chromium.options import ChromiumOptions
+  from selenium.webdriver.chromium.service import ChromiumService
   from selenium.webdriver.chromium.webdriver import ChromiumDriver
 
   from crossbench import plt
@@ -45,10 +47,10 @@ class EdgeWebDriver(EdgeBaseMixin, ChromiumBasedWebDriver):
     return finder.download()
 
   @override
-  def _create_driver(
-      self,
-      options: EdgeOptions,  # type: ignore
-      service: EdgeService) -> ChromiumDriver:  # type: ignore
+  def _create_driver(self, options: ChromiumOptions,
+                     service: ChromiumService) -> ChromiumDriver:
+    assert isinstance(options, EdgeOptions)
+    assert isinstance(service, EdgeService)
     return webdriver.Edge(options=options, service=service)
 
   @classmethod

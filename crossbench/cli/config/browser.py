@@ -469,15 +469,7 @@ class BrowserConfig(ConfigObject):
   @classmethod
   @override
   def config_parser(cls) -> ConfigParser[Self]:
-
-    class BrowserConfigParser(ConfigParser[Self]):
-
-      def kwargs_from_config(self, config_data: dict[str, object],
-                             **extra_kwargs) -> dict[str, object]:
-        kwargs = super().kwargs_from_config(config_data, **extra_kwargs)
-        return kwargs
-
-    parser = BrowserConfigParser(cls)
+    parser = ConfigParser(cls)
     parser.add_argument(
         "browser_type",
         aliases=("type",),

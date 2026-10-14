@@ -72,7 +72,7 @@ class WebPowerIdleBenchmark(WebPowerBenchmarkBase):
 
   IS_SCENARIO_CLASS = True
   NAME: ClassVar = f"{WebPowerBenchmarkBase.NAME}-idle"
-  DEFAULT_STORY_CLS: ClassVar = WebPowerIdleStory
+  DEFAULT_STORY_CLS: ClassVar[type[WebPowerIdleStory]] = WebPowerIdleStory
   STORY_FILTER_CLS: ClassVar = WebPowerIdleStoryFilter
 
   @classmethod

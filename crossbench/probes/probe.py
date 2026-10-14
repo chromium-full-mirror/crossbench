@@ -112,8 +112,8 @@ class Probe(ProbeResultKey, abc.ABC):
     return ProbeConfigParser(cls)
 
   @classmethod
-  def parse_str(cls, config_str: str) -> Self:
-    return cls.config_parser().parse_str(config_str)
+  def parse_str(cls, value: str) -> Self:
+    return cls.config_parser().parse_str(value)
 
   @classmethod
   def parse_dict(cls, config_data: dict) -> Self:

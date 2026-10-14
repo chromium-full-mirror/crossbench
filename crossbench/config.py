@@ -1288,7 +1288,7 @@ class ConfigParser(Generic[ConfigResultObjectT]):
   def new_instance_from_kwargs(
       self, kwargs: dict[str, object]) -> ConfigResultObjectT:
     if issubclass(self._cls, ConfigObject):
-      return self._cls.create(**kwargs)
+      return cast(ConfigResultObjectT, self._cls.create(**kwargs))
     return self._cls(**kwargs)
 
   def _handle_unused_config_data(self,

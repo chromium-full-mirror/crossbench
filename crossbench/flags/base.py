@@ -42,7 +42,7 @@ class Freezable:
     raise FrozenFlagsError(msg)
 
 
-FlagsData: TypeAlias = Union[None, dict[str, str], "Flags",
+FlagsData: TypeAlias = Union[None, dict[str, str], "BasicFlags",
                              Iterable[str | tuple[str, str | None]]]
 
 
@@ -122,8 +122,8 @@ class BasicFlags(Freezable, collections.UserDict):
   def __init__(self, initial_data: FlagsData = None) -> None:
     super().__init__(initial_data)
 
-  def __setitem__(self, flag_name: str, flag_value: str | None) -> None:
-    return self.set(flag_name, flag_value)
+  def __setitem__(self, key: str, item: str | None) -> None:
+    return self.set(key, item)
 
   def set(self,
           flag_name: str,
@@ -178,16 +178,20 @@ class BasicFlags(Freezable, collections.UserDict):
 
     if initial_data is None:
       return
-    if isinstance(initial_data, (Flags, dict)):
-      for flag_name, flag_value in initial_data.items():
-        self.set(flag_name, flag_value, should_override)
-    else:
-      for flag_name_or_items in initial_data:
-        if isinstance(flag_name_or_items, str):
-          self.set(flag_name_or_items, None, should_override)
-        else:
-          flag_name, flag_value = flag_name_or_items
+    match initial_data:
+      case BasicFlags():
+        for flag_name, flag_value in initial_data.items():
           self.set(flag_name, flag_value, should_override)
+      case dict():
+        for flag_name, flag_value in initial_data.items():
+          self.set(str(flag_name), flag_value, should_override)
+      case _:
+        for flag_name_or_items in initial_data:
+          if isinstance(flag_name_or_items, str):
+            self.set(flag_name_or_items, None, should_override)
+          else:
+            flag_name, flag_value = flag_name_or_items
+            self.set(flag_name, flag_value, should_override)
 
   def merge(self, other: FlagsData) -> None:
     self.update(other)

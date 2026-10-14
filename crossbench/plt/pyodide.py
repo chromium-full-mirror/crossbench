@@ -10,6 +10,7 @@ import sys
 import time
 from typing import TYPE_CHECKING, Any
 
+import google.cloud.storage.blob as gcloud_blob  # type: ignore
 from typing_extensions import override
 
 from crossbench.plt import linux as plt_linux
@@ -27,7 +28,7 @@ def is_pyodide_env() -> bool:
   return sys.platform == "emscripten"
 
 
-class PyodideGcsBlob:
+class PyodideGcsBlob(gcloud_blob.Blob):
   """GCS Blob wrapper for Pyodide WebAssembly environment."""
 
   def __init__(
@@ -45,14 +46,18 @@ class PyodideGcsBlob:
       self._webadb = js.webadb
 
   @property
+  @override
   def md5_hash(self) -> str:
     return self._md5_hash
 
   @property
+  @override
   def size(self) -> int:
     return self._size
 
-  def reload(self) -> None:
+  @override
+  def reload(self, *args: object, **kwargs: object) -> None:
+    del args, kwargs
     if self._webadb is None:
       raise RuntimeError("webadb is unavailable in Pyodide.")
     raw_meta = self._webadb.gcsGetMetadata(self._gcs_url)
@@ -62,12 +67,17 @@ class PyodideGcsBlob:
     self._md5_hash = str(meta.get("md5Hash", ""))
     self._size = int(meta.get("size", 0))
 
-  def download_to_filename(self, filename: str) -> None:
+  @override
+  def download_to_filename(self, filename: str, *args: object,
+                           **kwargs: object) -> None:
+    del args, kwargs
     if self._webadb is None:
       raise RuntimeError("webadb is unavailable in Pyodide.")
     self._webadb.gcsDownloadFile(self._gcs_url, filename)
 
-  def exists(self) -> bool:
+  @override
+  def exists(self, *args: object, **kwargs: object) -> bool:
+    del args, kwargs
     if not self._md5_hash:
       try:
         self.reload()

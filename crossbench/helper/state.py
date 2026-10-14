@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import enum
-from typing import Generic, Iterable, TypeVar
+from typing import Generic, Iterable, TypeVar, cast
 
 
 class UnexpectedStateError(RuntimeError):
@@ -75,14 +75,17 @@ class StateMachine(Generic[StateT]):
     if self._state not in args:
       raise UnexpectedStateError(self._state, args)
 
+  def _all_states(self) -> Iterable[StateT]:
+    return cast(Iterable[StateT], type(self._state))
+
   def expect_before(self, state: StateT) -> None:
     if self._state >= state:
-      valid_states = (s for s in type(self._state) if s < state)
+      valid_states = (s for s in self._all_states() if s < state)
       raise UnexpectedStateError(self._state, valid_states)
 
   def expect_at_least(self, state: StateT) -> None:
     if self._state < state:
-      valid_states = (s for s in type(self._state) if s >= state)
+      valid_states = (s for s in self._all_states() if s >= state)
       raise UnexpectedStateError(self._state, valid_states)
 
   def __str__(self) -> str:

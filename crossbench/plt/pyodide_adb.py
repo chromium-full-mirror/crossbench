@@ -304,7 +304,7 @@ class PyodideAndroidAdbPlatform(android_adb.AndroidAdbPlatform):
 
   @override
   def get_gcs_blob(self, gcs_url: str) -> PyodideGcsBlob:
-    return self.host_platform.get_gcs_blob(gcs_url)
+    return cast(PyodideGcsBlob, self.host_platform.get_gcs_blob(gcs_url))
 
   def _check_interrupted(self) -> None:
     if self.webadb and self.webadb.isInterrupted():
@@ -509,11 +509,11 @@ class PyodideStreamingPopen(subprocess.Popen):
     return self.returncode
 
   @override
-  def send_signal(self, signal: int | Signals) -> None:
+  def send_signal(self, sig: int | Signals) -> None:
     if self.returncode is not None:
       return
     self._platform.webadb.killProcess(self._proc_id)
-    self.returncode = -int(signal)
+    self.returncode = -int(sig)
     self._sync_logs()
 
   @override

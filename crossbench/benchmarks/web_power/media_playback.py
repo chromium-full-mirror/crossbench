@@ -249,7 +249,8 @@ class WebPowerMediaPlaybackBenchmark(WebPowerBenchmarkBase):
 
   IS_SCENARIO_CLASS = True
   NAME: ClassVar = f"{WebPowerBenchmarkBase.NAME}-media-playback"
-  DEFAULT_STORY_CLS: ClassVar = WebPowerMediaPlaybackStory
+  DEFAULT_STORY_CLS: ClassVar[
+      type[WebPowerMediaPlaybackStory]] = WebPowerMediaPlaybackStory
   STORY_FILTER_CLS: ClassVar = WebPowerMediaPlaybackStoryFilter
   SITE_REQUIRED: ClassVar[bool] = False
 

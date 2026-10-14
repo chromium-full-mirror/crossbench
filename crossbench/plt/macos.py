@@ -294,11 +294,11 @@ class MacOSPlatform(PosixPlatform):
 
   @override
   def _search_binary_in_search_path(
-      self, app_or_bin_path: pth.AnyPath) -> pth.AnyPath | None:
-    is_app = app_or_bin_path.suffix == ".app"
+      self, app_or_bin: pth.AnyPath) -> pth.AnyPath | None:
+    is_app = app_or_bin.suffix == ".app"
     for search_path in self.SEARCH_PATHS:
       # Recreate Path object for easier pyfakefs testing
-      result_path = self.path(search_path) / app_or_bin_path
+      result_path = self.path(search_path) / app_or_bin
       if app_path := self._validate_search_binary_candidate(
           is_app, result_path):
         return app_path

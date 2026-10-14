@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar, Final, Iterable
+from typing import TYPE_CHECKING, Final, Iterable
 
 from perfetto.trace_uri_resolver.resolver import TraceUriResolver
 from typing_extensions import override
@@ -19,7 +19,8 @@ if TYPE_CHECKING:
 
 
 class CrossbenchTraceUriResolver(TraceUriResolver):
-  PREFIX: ClassVar = "crossbench"
+  # TraceUriResolver.PREFIX is annotated as `str` rather than `ClassVar[str]`.
+  PREFIX: str = "crossbench"
 
   def __init__(self,
                traces: Iterable[Run] | TraceProcessorProbeContext) -> None:

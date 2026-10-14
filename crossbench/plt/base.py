@@ -1277,7 +1277,7 @@ class Platform(abc.ABC):
     return path
 
   def download_gcs_file(self, gcs_url: str, local_path: pth.LocalPath) -> None:
-    blob: gcloud_blob.Blob = self.prepare_gcs_request(gcs_url)
+    blob = self.prepare_gcs_request(gcs_url)
     local_path.parent.mkdir(parents=True, exist_ok=True)
     try:
       blob.download_to_filename(str(local_path))

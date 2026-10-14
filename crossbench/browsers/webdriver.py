@@ -12,7 +12,8 @@ import subprocess
 import time
 import traceback
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Final, Iterator, NoReturn, Sequence, cast
+from typing import TYPE_CHECKING, Any, Final, Iterator, NoReturn, Sequence, \
+    cast
 
 import selenium.common.exceptions
 import urllib3
@@ -118,7 +119,7 @@ class WebDriverBrowser(Browser, metaclass=abc.ABCMeta):
     self._driver_path: pth.AnyPath | None = self._settings.driver_path
     self._driver_log_file: pth.LocalPath | None = None
     self._driver_pid: int = 0
-    self._pid: int = 0
+    self._pid: int | None = 0
     self.log_file: pth.LocalPath | None = None
 
   @property
@@ -459,7 +460,7 @@ class WebDriverBrowser(Browser, metaclass=abc.ABCMeta):
                     self._pid)
 
 
-class RemoteWebDriver(WebDriverBrowser, Browser):
+class RemoteWebDriver(WebDriverBrowser):
   """Represent a remote WebDriver that has already been started"""
 
   @classmethod

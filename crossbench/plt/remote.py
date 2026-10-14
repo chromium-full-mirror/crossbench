@@ -78,9 +78,9 @@ class RemotePopen(subprocess.Popen):
     return self._remote_pid
 
   @override
-  def send_signal(self, signal: int | Signals) -> None:
-    signal = self._platform.signals(signal)
-    self._platform.send_signal(self.remote_pid, signal)
+  def send_signal(self, sig: int | Signals) -> None:
+    sig = self._platform.signals(sig)
+    self._platform.send_signal(self.remote_pid, sig)
 
   @override
   def terminate(self) -> None:

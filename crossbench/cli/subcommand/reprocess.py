@@ -91,7 +91,11 @@ class ReprocessSubcommand(CrossbenchSubcommand):
     new_scores: pd.DataFrame = probe_cls.process_result_dir(
         result_dir, base_df, reprocess=True)
     print(
-        tabulate(new_scores, headers="keys", tablefmt="plain", showindex=False))
+        tabulate(
+            new_scores.to_dict(orient="list"),
+            headers="keys",
+            tablefmt="plain",
+            showindex=False))
 
   @classmethod
   def _get_device_model_from_run(cls, run_dir: pth.LocalPath) -> str:

@@ -33,7 +33,7 @@ if TYPE_CHECKING:
   from crossbench.runner.groups.stories import StoriesRunGroup
   from crossbench.runner.run import Run
   from crossbench.stories.story import Story
-  from crossbench.types import Json
+  from crossbench.types import Json, JsonDict
 
 
 class JetStreamProbe(
@@ -171,14 +171,15 @@ class JetStreamProbeContext(JsonResultProbeContext):
     json_data["Total"] = self._compute_total_metrics(json_data)
     return json_data
 
-  def _compute_total_metrics(self, json_data: dict[str,
-                                                   Any]) -> dict[str, float]:
+  def _compute_total_metrics(self, json_data: JsonDict) -> JsonDict:
     # Manually add all total scores
     accumulated_metrics = defaultdict(list)
     for metrics in json_data.values():
+      assert isinstance(metrics, dict)
       for metric, value in metrics.items():
+        assert isinstance(value, (int, float))
         accumulated_metrics[metric].append(value)
-    total: dict[str, float] = {}
+    total: JsonDict = {}
     for metric, values in accumulated_metrics.items():
       total[metric] = statistics.geometric_mean(values)
     return total

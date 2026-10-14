@@ -45,7 +45,7 @@ VERSION_STRING: Final[str] = "2.6.0"
 def _metric_stats(df: pd.DataFrame) -> dict[str, dict[str, Any]]:
   metric_stats = {}
   for metric, metric_df in df.groupby("metric"):
-    values = metric_df["value"].dropna().values
+    values = metric_df["value"].dropna().to_numpy()
     n = len(values)
     if n == 0:
       continue

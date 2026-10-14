@@ -27,7 +27,7 @@ if TYPE_CHECKING:
   from crossbench.cli.parser import CBArgumentParser
   from crossbench.runner.actions import Actions
   from crossbench.stories.story import Story
-  from crossbench.types import Json, StoryTagLookupT
+  from crossbench.types import Json, JsonDict, StoryTagLookupT
 
   ShuffleSeedT = str | int | None
 
@@ -65,10 +65,11 @@ class Speedometer3ProbeContext(SpeedometerProbeContext, metaclass=abc.ABCMeta):
     return ObjectParser.non_empty_dict(json_data, "speedometer metrics")
 
   @override
-  def flatten_json_data(self, json_data: Any) -> Json:
-    result: dict[str, float] = {}
+  def flatten_json_data(self, json_data: Json) -> Json:
+    result: JsonDict = {}
     assert isinstance(json_data, dict), f"Expected dict, got {type(json_data)}"
     for name, metric in json_data.items():
+      assert isinstance(metric, dict)
       result[name] = metric["mean"]
     return result
 

@@ -123,8 +123,10 @@ class MotionMark1ProbeContext(JsonResultProbeContext):
   def flatten_json_data(self, json_data: list) -> Json:
     assert isinstance(json_data, list) and len(json_data) == 1, (
         "Motion12MarkProbe requires a results list.")
+    first_data = json_data[0]
+    assert isinstance(first_data, dict)
     return Flatten(
-        json_data[0], key_fn=_clean_up_path_segments,
+        first_data, key_fn=_clean_up_path_segments,
         sort=self.probe.SORT_KEYS).data
 
 

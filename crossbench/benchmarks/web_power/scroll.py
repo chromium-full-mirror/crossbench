@@ -131,7 +131,7 @@ class WebPowerScrollBenchmark(WebPowerBenchmarkBase):
 
   IS_SCENARIO_CLASS = True
   NAME: ClassVar = f"{WebPowerBenchmarkBase.NAME}-scroll"
-  DEFAULT_STORY_CLS: ClassVar = WebPowerScrollStory
+  DEFAULT_STORY_CLS: ClassVar[type[WebPowerScrollStory]] = WebPowerScrollStory
   STORY_FILTER_CLS: ClassVar = WebPowerScrollStoryFilter
 
   @classmethod
