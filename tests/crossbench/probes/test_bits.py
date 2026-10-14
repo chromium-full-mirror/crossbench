@@ -15,7 +15,9 @@ from unittest import mock
 from typing_extensions import override
 
 from crossbench import path as pth
-from crossbench.probes.bits import BitsProbe, BitsProbeContext, _ClockSync
+from crossbench.probes.bits import BitsMergePolicy, BitsProbe, \
+    BitsProbeContext, _ClockSync
+from crossbench.probes.cb_perfetto.perfetto import PerfettoProbe
 from crossbench.probes.probe import ProbeIncompatibleBrowser
 from crossbench.probes.probe_error import ProbeValidationError
 from crossbench.probes.results import EmptyProbeResult, LocalProbeResult
@@ -166,6 +168,47 @@ class BitsProbeTestCase(BaseProbeTestCase):
           "bits_path": str(self.bits_path),
           "bits_out": "run_id",
           "port": -8080,
+      })
+
+  def _assert_merges(self, probe: BitsProbe, merges: bool) -> None:
+    """The merge policy is only observable through merge_browsers()."""
+    group = mock.MagicMock()
+    with (
+        mock.patch(
+            "crossbench.probes.bits.merge.merge_results", return_value=[]) as
+        mock_merge,
+        mock.patch.object(
+            BitsProbe,
+            "symlinked_single_run_result",
+            return_value=EmptyProbeResult()) as mock_default,
+    ):
+      probe.merge_browsers(group)
+    self.assertEqual(mock_merge.called, merges)
+    self.assertEqual(mock_default.called, not merges)
+
+  def test_bits_probe_parsing_default_merge_policy(self) -> None:
+    probe = BitsProbe.parse_dict({"bits_path": str(self.bits_path)})
+    self._assert_merges(probe, merges=False)
+
+  def test_bits_probe_parsing_merge_policy(self) -> None:
+    for key in ("merge_policy", "merge-policy"):
+      for value, merges in (
+          ("separate", False),
+          ("merge", True),
+          ("MERGE", True),
+      ):
+        with self.subTest(key=key, value=value):
+          probe = BitsProbe.parse_dict({
+              "bits_path": str(self.bits_path),
+              key: value,
+          })
+          self._assert_merges(probe, merges)
+
+  def test_bits_probe_parsing_invalid_merge_policy(self) -> None:
+    with self.assertRaises(argparse.ArgumentTypeError):
+      BitsProbe.parse_dict({
+          "bits_path": str(self.bits_path),
+          "merge_policy": "zip",
       })
 
   def test_validate_browser_incompatible(self) -> None:
@@ -378,7 +421,9 @@ class ClockSyncTestCase(unittest.TestCase):
                      _ClockSync.SAMPLE_COUNT)
 
 
-class BitsProbePerfettoTestCase(BaseProbeTestCase):
+class _BitsProbeContextTestCase(BaseProbeTestCase):
+  """Shared setup: a context whose BITS commands are mocked out, writing the
+  BITS trace on --write_perfetto if trace_bytes is given."""
   HOST_REALTIME_NS = 1_791_367_605_185_683_067
   DEVICE_BOOTTIME_NS = 505_175_536_601_118
 
@@ -415,6 +460,9 @@ class BitsProbePerfettoTestCase(BaseProbeTestCase):
     json_path = context.local_result_path / BitsProbe.BITS_JSON_NAME
     with json_path.open(encoding="utf-8") as f:
       return json.load(f)
+
+
+class BitsProbePerfettoTestCase(_BitsProbeContextTestCase):
 
   def test_save_perfetto(self) -> None:
     context, perfetto_path = self._create_context(b"perfetto-bytes")
@@ -478,10 +526,29 @@ class BitsProbePerfettoTestCase(BaseProbeTestCase):
 
     group = mock.MagicMock()
     group.runs = [run]
+    group.results = {}
     with mock.patch("logging.critical") as mock_critical:
       probe.log_browsers_result(group)
       mock_critical.assert_any_call("BITS Perfetto trace results:")
       mock_critical.assert_any_call("  - %s : %s", trace_path, "14.00 B")
+
+  def test_log_results_merged(self) -> None:
+    probe = BitsProbe(self.bits_path, "test_run_id")
+    trace_path = pth.LocalPath(
+        self.platform.default_tmp_dir) / "test_run_id.pftrace"
+    self.fs.create_file(trace_path, contents=b"perfetto-bytes")
+    archive_path = pth.LocalPath(self.platform.default_tmp_dir) / "merged.zip"
+    self.fs.create_file(archive_path, contents=b"zip")
+    run = mock.MagicMock()
+    run.results = {probe: LocalProbeResult(file=(trace_path,))}
+
+    group = mock.MagicMock()
+    group.runs = [run]
+    group.results = {probe: LocalProbeResult(file=(archive_path,))}
+    with mock.patch("logging.critical") as mock_critical:
+      probe.log_browsers_result(group)
+      mock_critical.assert_any_call("  - %s : %s", trace_path, "14.00 B")
+      mock_critical.assert_any_call("  - %s : %s", archive_path, "3.00 B")
 
   def test_log_results_empty(self) -> None:
     probe = BitsProbe(self.bits_path, "test_run_id")
@@ -490,9 +557,64 @@ class BitsProbePerfettoTestCase(BaseProbeTestCase):
 
     group = mock.MagicMock()
     group.runs = [run]
+    group.results = {}
     with mock.patch("logging.critical") as mock_critical:
       probe.log_browsers_result(group)
       mock_critical.assert_not_called()
+
+
+class BitsProbeMergeTestCase(BaseProbeTestCase):
+  """merge_policy=merge: the runs' BITS traces get merged once all are done,
+  by crossbench.probes.bits.merge."""
+
+  @override
+  def setUp(self) -> None:
+    super().setUp()
+    self.bits_path = pth.LocalPath(self.platform.default_tmp_dir) / "bits"
+    self.fs.create_file(self.bits_path)
+    self.results_dir = pth.LocalPath(self.platform.default_tmp_dir) / "results"
+    self.group = mock.MagicMock()
+    self.group.path = self.results_dir
+    self.group.get_local_probe_result_path.return_value = (
+        self.results_dir / "bits")
+    self.archives = [self.results_dir / "bits" / "chrome_story_0.zip"]
+    for archive in self.archives:
+      self.fs.create_file(archive, contents=b"zip")
+
+  def test_merge_browsers(self) -> None:
+    probe = BitsProbe(self.bits_path, merge_policy=BitsMergePolicy.MERGE)
+    with mock.patch(
+        "crossbench.probes.bits.merge.merge_results",
+        return_value=self.archives) as mock_merge:
+      result = probe.merge_browsers(self.group)
+    mock_merge.assert_called_once_with(self.results_dir,
+                                       self.results_dir / "bits")
+    self.group.get_local_probe_result_path.assert_called_once_with(probe)
+    self.assertEqual(result.get_all("zip"), self.archives)
+
+  def test_merge_browsers_propagates_errors(self) -> None:
+    probe = BitsProbe(self.bits_path, merge_policy=BitsMergePolicy.MERGE)
+    with (
+        mock.patch(
+            "crossbench.probes.bits.merge.merge_results",
+            side_effect=ValueError("No runs found")),
+        self.assertRaisesRegex(ValueError, "No runs found"),
+    ):
+      probe.merge_browsers(self.group)
+
+  def test_merge_browsers_separate(self) -> None:
+    probe = BitsProbe(self.bits_path)
+    with (
+        mock.patch("crossbench.probes.bits.merge.merge_results") as mock_merge,
+        mock.patch.object(
+            BitsProbe,
+            "symlinked_single_run_result",
+            return_value=EmptyProbeResult()) as mock_default,
+    ):
+      result = probe.merge_browsers(self.group)
+    mock_merge.assert_not_called()
+    mock_default.assert_called_once_with(self.group)
+    self.assertTrue(result.is_empty)
 
 
 class BitsProbeServiceTestCase(BaseProbeTestCase):
@@ -505,6 +627,8 @@ class BitsProbeServiceTestCase(BaseProbeTestCase):
     self.service_script = tmp_dir / "bits_service.sh"
     self.fs.create_file(self.bits_path)
     self.runner = mock.MagicMock()
+    self.runner.has_probe.return_value = False
+    self.runner.is_probe_disabled.return_value = False
     self.mock_proc = mock.MagicMock()
     self.mock_proc.pid = 12345
     sh_patcher = mock.patch.object(self.platform, "sh")
@@ -575,6 +699,40 @@ class BitsProbeServiceTestCase(BaseProbeTestCase):
     self.mock_popen.assert_not_called()
     probe.teardown()
     self.mock_terminate.assert_not_called()
+
+  def test_setup_merge_policy_with_perfetto(self) -> None:
+    self.mock_sh.return_value = self._sh_result("device_1\n")
+    probe = BitsProbe(self.bits_path, merge_policy=BitsMergePolicy.MERGE)
+    self.runner.has_probe.return_value = True
+    probe.setup(self.runner)
+    self.runner.has_probe.assert_called_once_with(PerfettoProbe.NAME)
+    self.mock_sh.assert_called_once()
+    probe.teardown()
+
+  def test_setup_merge_policy_requires_perfetto(self) -> None:
+    probe = BitsProbe(self.bits_path, merge_policy=BitsMergePolicy.MERGE)
+    with self.assertRaisesRegex(ProbeValidationError,
+                                r"requires the perfetto probe\.$"):
+      probe.setup(self.runner)
+    self.mock_sh.assert_not_called()
+
+  def test_setup_merge_policy_perfetto_disabled(self) -> None:
+    probe = BitsProbe(self.bits_path, merge_policy=BitsMergePolicy.MERGE)
+    self.runner.is_probe_disabled.return_value = True
+    with self.assertRaisesRegex(
+        ProbeValidationError,
+        r"requires the perfetto probe, which is disabled via --no-probe\.$"):
+      probe.setup(self.runner)
+    self.runner.is_probe_disabled.assert_called_once_with(PerfettoProbe.NAME)
+    self.mock_sh.assert_not_called()
+
+  def test_setup_separate_does_not_require_perfetto(self) -> None:
+    self.mock_sh.return_value = self._sh_result("device_1\n")
+    probe = BitsProbe(self.bits_path)
+    probe.setup(self.runner)
+    self.runner.has_probe.assert_not_called()
+    self.mock_sh.assert_called_once()
+    probe.teardown()
 
   def test_setup_service_missing_script(self) -> None:
     self.mock_sh.return_value = self._sh_error()

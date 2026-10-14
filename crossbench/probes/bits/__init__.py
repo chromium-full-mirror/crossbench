@@ -14,11 +14,15 @@ from typing import IO, TYPE_CHECKING, ClassVar, Iterator, Self
 
 from typing_extensions import override
 
+from crossbench.config import ConfigEnum
 from crossbench.helper import fs_helper
 from crossbench.parse import DurationParser, NumberParser, PathParser
+from crossbench.probes.bits import merge as bits_merge
+from crossbench.probes.cb_perfetto.perfetto import PerfettoProbe
 from crossbench.probes.probe import Probe, ProbeConfigParser, ProbeContext, \
     ProbeIncompatibleBrowser
 from crossbench.probes.probe_error import ProbeValidationError
+from crossbench.probes.results import LocalProbeResult
 
 if TYPE_CHECKING:
   from crossbench import path as pth
@@ -75,6 +79,15 @@ class _ClockSync:
     }
 
 
+class BitsMergePolicy(ConfigEnum):
+  """What to do with the BITS Perfetto traces once all runs are done."""
+  SEPARATE = ("separate", "Keep the BITS trace of each run as is.")
+  MERGE = ("merge",
+           "Additionally zip the BITS trace of each run with the device's "
+           "Perfetto trace and a perfetto_manifest aligning their clocks, "
+           "like the bits-merge subcommand. Requires the perfetto probe.")
+
+
 class BitsProbe(Probe):
   """
   Probe for the external BITS/Kibble power measurement tool.
@@ -99,6 +112,13 @@ class BitsProbe(Probe):
   phase; "offset_ns" (device - host) is what has to be added to the BITS
   timestamps to place them on the device's timeline, and "round_trip_ns" is
   how long the device read took, bounding the error of the pairing.
+
+  With merge_policy=merge, once all runs are done, the BITS trace of each
+  run is additionally zipped together with the device's Perfetto trace and a
+  perfetto_manifest that applies "offset_ns", so that trace_processor (and
+  the Perfetto UI) loads both onto a common timeline. This is the same as
+  running the bits-merge subcommand on the results directory, see
+  crossbench.probes.bits.merge; the archives end up in its bits/ directory.
   """
   NAME: ClassVar[str] = "bits"
   BITS_JSON_NAME: ClassVar[str] = "bits.json"
@@ -143,6 +163,13 @@ class BitsProbe(Probe):
         type=NumberParser.positive_int,
         default=cls.DEFAULT_PORT,
         help="Port number for the BITS tool.")
+    parser.add_argument(
+        "merge_policy",
+        aliases=("merge-policy",),
+        type=BitsMergePolicy,
+        default=BitsMergePolicy.SEPARATE,
+        help="Whether to also merge the BITS Perfetto trace of each run with "
+        "the device's Perfetto trace once all runs are done.")
     return parser
 
   def __init__(
@@ -152,6 +179,7 @@ class BitsProbe(Probe):
       bits_device: str = "",
       duration: dt.timedelta = DEFAULT_DURATION,
       port: int = DEFAULT_PORT,
+      merge_policy: BitsMergePolicy = BitsMergePolicy.SEPARATE,
   ) -> None:
     super().__init__()
     if duration < dt.timedelta(seconds=1):
@@ -164,6 +192,7 @@ class BitsProbe(Probe):
     self._bits_device: str = bits_device
     self._duration: dt.timedelta = duration
     self._port: int = port
+    self._merge_policy: BitsMergePolicy = merge_policy
     self._service_proc: subprocess.Popen | None = None
 
   @property
@@ -262,6 +291,8 @@ class BitsProbe(Probe):
   @override
   def setup(self, runner: Runner) -> None:
     super().setup(runner)
+    if self._merge_policy == BitsMergePolicy.MERGE:
+      self._validate_perfetto_probe(runner)
 
     # Note: If BITS is already running on a different port than self.port,
     # starting a new instance here will fail due to USB conflicts over the
@@ -274,6 +305,15 @@ class BitsProbe(Probe):
       status = "BITS service is already running"
     device = self._resolve_target_device(devices)
     logging.info("%s (port: %s, device: %s).", status, self.port, device)
+
+  def _validate_perfetto_probe(self, runner: Runner) -> None:
+    """Fail early rather than after all runs, when merging would."""
+    if runner.has_probe(PerfettoProbe.NAME):
+      return
+    reason = "merge-policy=merge requires the perfetto probe"
+    if runner.is_probe_disabled(PerfettoProbe.NAME):
+      reason += ", which is disabled via --no-probe"
+    raise ProbeValidationError(self, f"{reason}.")
 
   # TODO: Consider adding Probe.teardown() following wider discussion.
   def teardown(self) -> None:
@@ -291,11 +331,25 @@ class BitsProbe(Probe):
     return BitsProbeContext
 
   @override
+  def merge_browsers(self, group: BrowsersRunGroup) -> ProbeResult:
+    match self._merge_policy:
+      case BitsMergePolicy.SEPARATE:
+        return super().merge_browsers(group)
+      case BitsMergePolicy.MERGE:
+        archives = bits_merge.merge_results(
+            group.path, group.get_local_probe_result_path(self))
+        return LocalProbeResult(file=archives)
+      case _:
+        raise ValueError(f"Unknown merge policy: {self._merge_policy}")
+
+  @override
   def log_browsers_result(self, group: BrowsersRunGroup) -> None:
     traces = [
         trace for run in group.runs if self in run.results
         for trace in run.results[self].get_all("pftrace")
     ]
+    if group_results := group.results.get(self):
+      traces.extend(group_results.get_all("zip"))
     if not traces:
       return
     logging.info("-" * 80)
