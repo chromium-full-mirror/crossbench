@@ -41,6 +41,7 @@ class LinuxSshMockPlatformTestCase(BasePosixMockPlatformTestCase):
   def _expect_sh_ssh(self, *args, result="", returncode: int = 0):
     self.host_platform.expect_sh(
         "ssh",
+        *plt.LinuxSshPlatform.SSH_OPTIONS,
         "-p",
         str(self.SSH_PORT),
         f"{self.SSH_USER}@{self.HOST}",
@@ -49,7 +50,9 @@ class LinuxSshMockPlatformTestCase(BasePosixMockPlatformTestCase):
         returncode=returncode)
 
   def _expect_sh_ssh_shell(self, *args, result=""):
-    cmd_string = f"ssh -p {self.SSH_PORT!s} {self.SSH_USER}@{self.HOST} "
+    ssh_opts = " ".join(plt.LinuxSshPlatform.SSH_OPTIONS)
+    cmd_string = (
+        f"ssh {ssh_opts} -p {self.SSH_PORT!s} {self.SSH_USER}@{self.HOST} ")
     cmd_string += " ".join(map(str, args))
     self.host_platform.expect_sh(cmd_string, result=result)
 
@@ -196,7 +199,8 @@ class LinuxSshMockPlatformTestCase(BasePosixMockPlatformTestCase):
   def test_push_creates_dest_dir(self):
     self._expect_sh_ssh("mkdir -p remote/dest/path")
     self.host_platform.expect_sh(
-        "scp", "-P", self.SSH_PORT, "source/path/file",
+        "scp", *plt.LinuxSshPlatform.SSH_OPTIONS, "-P", self.SSH_PORT,
+        "source/path/file",
         f"{self.SSH_USER}@{self.HOST}:remote/dest/path/file")
     self.platform.push(
         self.host_platform.path("source/path/file"),
@@ -205,15 +209,15 @@ class LinuxSshMockPlatformTestCase(BasePosixMockPlatformTestCase):
   def test_push_dir(self):
     self._expect_sh_ssh("mkdir -p remote/dest/path")
     self.host_platform.expect_sh(
-        "scp", "-P", self.SSH_PORT, "-r", "source/path/dir",
-        f"{self.SSH_USER}@{self.HOST}:remote/dest/path/dir")
+        "scp", *plt.LinuxSshPlatform.SSH_OPTIONS, "-P", self.SSH_PORT, "-r",
+        "source/path/dir", f"{self.SSH_USER}@{self.HOST}:remote/dest/path/dir")
     source_dir = self.host_platform.path("source/path/dir")
     self.fs.create_dir(source_dir)
     self.platform.push(source_dir, self.platform.path("remote/dest/path/dir"))
 
   def test_pull_creates_dest_dir(self):
     self.host_platform.expect_sh(
-        "scp", "-P", self.SSH_PORT,
+        "scp", *plt.LinuxSshPlatform.SSH_OPTIONS, "-P", self.SSH_PORT,
         f"{self.SSH_USER}@{self.HOST}:remote/source/path/file",
         "local/dest/path/file")
     self.platform.pull(
@@ -245,6 +249,7 @@ class LinuxSshMockPlatformTestCase(BasePosixMockPlatformTestCase):
       # on the remote background PID ($PID).
       mock_popen_init.assert_called_once_with([
           "ssh",
+          *plt.LinuxSshPlatform.SSH_OPTIONS,
           "-p",
           str(self.SSH_PORT),
           f"{self.SSH_USER}@{self.HOST}",
@@ -263,13 +268,15 @@ class LinuxSshMockPlatformTestCase(BasePosixMockPlatformTestCase):
       # (which lets remote `wait $PID` finish and exit the SSH session),
       # rather than sending a local signal on host_platform.
       mock_local_send_signal.assert_not_called()
-      self.assertEqual(self.host_platform.sh_cmds[-1],
-                       ("ssh", "-p", str(self.SSH_PORT),
-                        f"{self.SSH_USER}@{self.HOST}", "kill -9 4242"))
+      self.assertEqual(
+          self.host_platform.sh_cmds[-1],
+          ("ssh", *plt.LinuxSshPlatform.SSH_OPTIONS, "-p", str(
+              self.SSH_PORT), f"{self.SSH_USER}@{self.HOST}", "kill -9 4242"))
 
   def test_build_shell_cmd(self):
     ssh_prefix = [
         "ssh",
+        *plt.LinuxSshPlatform.SSH_OPTIONS,
         "-p",
         str(self.SSH_PORT),
         f"{self.SSH_USER}@{self.HOST}",

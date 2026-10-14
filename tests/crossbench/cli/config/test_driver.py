@@ -105,7 +105,8 @@ class DriverConfigTestCase(BaseConfigTestCase):
     }
     ssh_user = config_dict["settings"]["ssh_user"]
     ssh_host = config_dict["settings"]["host"]
-    self.platform.expect_sh("ssh", "-p", config_dict["settings"]["ssh_port"],
+    self.platform.expect_sh("ssh", *ChromeOsSshPlatform.SSH_OPTIONS, "-p",
+                            config_dict["settings"]["ssh_port"],
                             f"{ssh_user}@{ssh_host}",
                             f"'[' -e {ChromeOsSshPlatform.AUTOLOGIN_PATH} ']'")
     config = DriverConfig.parse(config_dict)

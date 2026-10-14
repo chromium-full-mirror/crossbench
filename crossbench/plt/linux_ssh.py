@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import shlex
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any, Final, Mapping
 
 from typing_extensions import override
 
@@ -19,10 +19,20 @@ if TYPE_CHECKING:
   from crossbench.plt.base import Platform
   from crossbench.plt.details import CpuDetails
   from crossbench.plt.port_manager import PortManager
-  from crossbench.plt.types import CmdArg, CmdArgs, ListCmdArgs
+  from crossbench.plt.types import CmdArg, CmdArgs, ListCmdArgs, TupleCmdArgs
 
 
 class LinuxSshPlatform(SshPlatformMixin, RemoteLinuxPlatform):
+  SSH_OPTIONS: Final[TupleCmdArgs] = (
+      "-o",
+      "ControlMaster=auto",
+      "-o",
+      "ControlPath=/tmp/crossbench-ssh-%C",
+      "-o",
+      "ControlPersist=600",
+      "-o",
+      "CanonicalizeHostname=no",
+  )
 
   def __init__(self, host_platform: Platform, host: str, port: int,
                ssh_port: int, ssh_user: str) -> None:
@@ -69,6 +79,7 @@ class LinuxSshPlatform(SshPlatformMixin, RemoteLinuxPlatform):
     remote_cmd = str(args[0]) if shell else shlex.join(map(str, args))
     return [
         "ssh",
+        *self.SSH_OPTIONS,
         "-p",
         f"{self._ssh_port}",
         f"{self._ssh_user}@{self._host}",
@@ -92,7 +103,12 @@ class LinuxSshPlatform(SshPlatformMixin, RemoteLinuxPlatform):
   def push(self, from_path: pth.LocalPath, to_path: pth.AnyPath) -> pth.AnyPath:
     self.mkdir(to_path.parent, parents=True, exist_ok=True)
 
-    scp_cmd: ListCmdArgs = ["scp", "-P", f"{self._ssh_port}"]
+    scp_cmd: ListCmdArgs = [
+        "scp",
+        *self.SSH_OPTIONS,
+        "-P",
+        f"{self._ssh_port}",
+    ]
     if from_path.is_dir():
       scp_cmd.append("-r")
     scp_cmd += [f"{from_path}", f"{self._ssh_user}@{self._host}:{to_path}"]
@@ -105,6 +121,7 @@ class LinuxSshPlatform(SshPlatformMixin, RemoteLinuxPlatform):
 
     scp_cmd: CmdArgs = [
         "scp",
+        *self.SSH_OPTIONS,
         "-P",
         f"{self._ssh_port}",
         f"{self._ssh_user}@{self._host}:{from_path}",

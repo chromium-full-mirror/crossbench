@@ -89,12 +89,14 @@ class TestBrowserVariantsConfig(BaseConfigTestCase):
       yield
 
   def _expect_linux_ssh(self, cmd, **kwargs):
-    return self.platform.expect_sh("ssh", "-p", "22", "user@my-linux-machine",
-                                   cmd, **kwargs)
+    return self.platform.expect_sh("ssh", *plt.LinuxSshPlatform.SSH_OPTIONS,
+                                   "-p", "22", "user@my-linux-machine", cmd,
+                                   **kwargs)
 
   def _expect_chromeos_ssh(self, cmd, **kwargs):
-    return self.platform.expect_sh("ssh", "-p", "22",
-                                   "root@my-chromeos-machine", cmd, **kwargs)
+    return self.platform.expect_sh("ssh", *plt.LinuxSshPlatform.SSH_OPTIONS,
+                                   "-p", "22", "root@my-chromeos-machine", cmd,
+                                   **kwargs)
 
   def test_parse_browser_config_template(self):
     self.fs.add_real_file(self.EXAMPLE_CONFIG_PATH)
