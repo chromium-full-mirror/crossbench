@@ -28,7 +28,6 @@ if TYPE_CHECKING:
   from crossbench.action_runner.config import VirtualDeviceConfig
   from crossbench.action_runner.virtual_device.pointing import \
       PointingVirtualDeviceConfig
-  from crossbench.plt.types import TupleCmdArgs
 
 # Simplified mapping for common W3C to Linux EV_KEY codes
 # See linux/input-event-codes.h
@@ -124,15 +123,11 @@ ABS_MT_POSITION_Y: Final[int] = 0x0036
 ABS_MT_TRACKING_ID: Final[int] = 0x0039
 ABS_MT_PRESSURE: Final[int] = 0x003a
 
-# Note: The trailing 'E: 0.000000 0000 0000 0000' (EV_SYN / SYN_REPORT) line is
-# required by Android's uinput (EvemuParser), which remains in its header
-# parsing state and does not register the virtual device with /dev/uinput until
-# it receives the first 'E:' event line indicating the device descriptor
-# section is complete.
-_EVEMU_KEYBOARD_HEADER: Final[bytes] = b"""# EVEMU 1.2
-N: Virtual Keyboard (Crossbench)
+# Note: Do not include '#' comment lines (such as '# EVEMU 1.2') in these
+# headers. ChromeOS's libutouch-evemu parses device descriptors via fscanf()
+# without skipping comments and fails if the file does not start with 'N:'.
+_EVEMU_KEYBOARD_HEADER: Final[bytes] = b"""N: Virtual Keyboard (Crossbench)
 I: 0003 18d2 2c42 0111
-# Properties: none
 P: 00 00 00 00 00 00 00 00
 B: 00 0b 00 00 00 00 00 00 00
 B: 01 fe ff ff ff ff ff 7f ff
@@ -153,25 +148,25 @@ B: 04 10 00 00 00 00 00 00 00
 B: 05 00 00 00 00 00 00 00 00
 B: 11 00 00 00 00 00 00 00 00
 B: 12 00 00 00 00 00 00 00 00
-E: 0.000000 0000 0000 0000
 """
 
-# Delay added by Android's EvemuParser (REGISTRATION_DELAY_NANOS = 500ms) after
-# registering a virtual device before the first E: event is injected.
-_DEVICE_REGISTRATION_DELAY: Final[dt.timedelta] = dt.timedelta(milliseconds=500)
 # Additional time for the OS input pipeline and WindowManager configuration
 # changes to settle after a virtual input device is hot-plugged during setup.
-_DEVICE_SETTLE_DELAY: Final[dt.timedelta] = dt.timedelta(milliseconds=500)
+DEVICE_SETTLE_DELAY: Final[dt.timedelta] = dt.timedelta(milliseconds=500)
 
 # Buffer added to timestamps on consecutive injections to ensure events arrive
 # on the device ahead of their target playback time, preventing uinput/evemu
 # from discarding inter-event delays in "catch-up" mode due to transport latency
 # or clock drift.
-_INPUT_LEAD_BUFFER: Final[dt.timedelta] = dt.timedelta(milliseconds=200)
+INPUT_LEAD_BUFFER: Final[dt.timedelta] = dt.timedelta(milliseconds=200)
 # Buffer added to the sleep duration after injection to allow the virtual
 # device process and OS input pipeline to fully drain and dispatch queued
 # events before Crossbench proceeds.
-_INPUT_DRAIN_BUFFER: Final[dt.timedelta] = dt.timedelta(milliseconds=300)
+INPUT_DRAIN_BUFFER: Final[dt.timedelta] = dt.timedelta(milliseconds=300)
+# Initial non-zero timestamp used for relative-delta players (like evemu-play),
+# which treat {tv_sec=0, tv_usec=0} as an uninitialized sentinel and would
+# otherwise skip the delay between the first and second events.
+INITIAL_RELATIVE_TIMESTAMP: Final[dt.timedelta] = dt.timedelta(seconds=1)
 
 
 @dataclasses.dataclass
@@ -179,14 +174,10 @@ class VirtualDeviceState:
   proc: subprocess.Popen
   device_type: VirtualDeviceType = VirtualDeviceType.KEYBOARD
   start_time: dt.timedelta | None = None
+  last_timestamp: dt.timedelta = INITIAL_RELATIVE_TIMESTAMP
 
 
-# As with _EVEMU_KEYBOARD_HEADER, the trailing 'E: 0.000000 0000 0000 0000'
-# event line is required so Android's uinput (EvemuParser) knows the device
-# configuration header is finished and registers the virtual touchscreen device
-# during setup_virtual_devices().
-_EVEMU_TOUCHSCREEN_HEADER: Final[str] = """# EVEMU 1.2
-N: {name}
+_EVEMU_TOUCHSCREEN_HEADER: Final[str] = """N: {name}
 I: 0018 04f3 4835 0100
 P: 02 00 00 00 00 00 00 00
 B: 00 0b 00 00 00 00 00 00 00
@@ -220,11 +211,9 @@ A: 36 0 {max_y} 0 0 12
 A: 37 0 2 0 0 0
 A: 39 0 65535 0 0 0
 A: 3a 0 255 0 0 0
-E: 0.000000 0000 0000 0000
 """
 
-_EVEMU_MOUSE_HEADER: Final[str] = """# EVEMU 1.2
-N: {name}
+_EVEMU_MOUSE_HEADER: Final[str] = """N: {name}
 I: 0003 18d1 0003 0100
 P: 00 00 00 00 00 00 00 00
 B: 00 0b 00 00 00 00 00 00 00
@@ -239,7 +228,6 @@ A: 2f 0 9 0 0 0
 A: 35 0 {max_x} 0 0 0
 A: 36 0 {max_y} 0 0 0
 A: 39 0 9 0 0 0
-E: 0.000000 0000 0000 0000
 """
 
 
@@ -254,8 +242,9 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
     self._virtual_devices: dict[str, VirtualDeviceState] = {}
 
   @abc.abstractmethod
-  def _get_evemu_device_cmd(self,
-                            device_type: VirtualDeviceType) -> TupleCmdArgs:
+  def _start_virtual_device(self, device_name: str,
+                            device_type: VirtualDeviceType,
+                            header: bytes) -> None:
     pass
 
   @override
@@ -277,16 +266,22 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
             f"Unsupported virtual device type: {device_config.device_type}")
     super().setup_virtual_devices(virtual_devices)
 
+  def _stop_process(self, proc: subprocess.Popen) -> None:
+    if proc.poll() is not None:
+      return
+    if stdin := proc.stdin:
+      stdin.close()
+    if stdout := proc.stdout:
+      stdout.close()
+    try:
+      proc.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+      proc.terminate()
+
   @override
   def teardown_virtual_devices(self) -> None:
     for state in self._virtual_devices.values():
-      if state.proc.poll() is None:
-        if state.proc.stdin:
-          state.proc.stdin.close()
-        try:
-          state.proc.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-          state.proc.terminate()
+      self._stop_process(state.proc)
     self._virtual_devices.clear()
     super().teardown_virtual_devices()
 
@@ -303,26 +298,6 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
         width if width is not None else resolution.width,
         height if height is not None else resolution.height,
     )
-
-  def _start_virtual_device(self, device_name: str,
-                            device_type: VirtualDeviceType,
-                            header: bytes) -> None:
-    cmd = self._get_evemu_device_cmd(device_type)
-    proc = self.popen(*cmd, stdin=subprocess.PIPE)
-    assert proc.stdin is not None
-    try:
-      proc.stdin.write(header)
-      proc.stdin.flush()
-    except (BrokenPipeError, OSError) as e:
-      exit_code = proc.poll()
-      raise RuntimeError(
-          f"Failed to initialize virtual {device_type.value} '{device_name}' "
-          f"(exit code: {exit_code})") from e
-    write_time = dt.timedelta(seconds=time.monotonic())
-    start_time = write_time + _DEVICE_REGISTRATION_DELAY
-    self.sleep(_DEVICE_REGISTRATION_DELAY + _DEVICE_SETTLE_DELAY)
-    self._virtual_devices[device_name] = VirtualDeviceState(
-        proc, device_type=device_type, start_time=start_time)
 
   def _init_virtual_keyboard(self, device_name: str) -> None:
     if self._is_device_running(device_name):
@@ -383,32 +358,48 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
     """Injects abstract input events by translating them into an evemu script.
 
     Blocks until all events are processed. Applies a lead buffer on consecutive
-    injections so events arrive ahead of their target timestamps and a drain
-    buffer to ensure all dispatched events finish processing.
+    injections when using wall-clock playback (Android uinput) or continues
+    from the last timestamp when using relative-delta playback (evemu-play),
+    and applies a drain buffer to ensure all dispatched events finish
+    processing.
     """
     state = self._get_or_init_virtual_device(device_name)
-    now = dt.timedelta(seconds=time.monotonic())
-    if state.start_time is None:
-      state.start_time = now
-      start_time = dt.timedelta()
-      lead_buffer = dt.timedelta()
-    else:
-      # Pad injections with a lead buffer so timestamps are in the
-      # future relative to the device playback clock, preventing catch-up mode.
-      lead_buffer = _INPUT_LEAD_BUFFER
+    if state.start_time is not None:
+      # Wall-clock mode (e.g. Android `uinput -`): pad injections with a lead
+      # buffer so timestamps are in the future relative to the device playback
+      # clock, preventing catch-up mode.
+      now = dt.timedelta(seconds=time.monotonic())
+      lead_buffer = INPUT_LEAD_BUFFER
       start_time = (now - state.start_time) + lead_buffer
+    else:
+      # Relative-delta mode (e.g. Linux/ChromeOS `evemu-play`): `evemu-play`
+      # sleeps for the delta between consecutive event timestamps rather than
+      # wall-clock time since registration, so continue directly from the last
+      # emitted timestamp.
+      lead_buffer = dt.timedelta()
+      start_time = state.last_timestamp
 
     script, end_time = self._generate_evemu_events_string(events, start_time)
+    state.last_timestamp = end_time
 
     if not script:
       return
+
+    if state.start_time is None:
+      # ChromeOS's libutouch-evemu parses events with
+      # fscanf(fp, "E: %lu.%06u %04x %04x %d\n", ...). The trailing '\n' in the
+      # format string causes fscanf to block on a pipe until it peeks the first
+      # non-whitespace character of the next line (or EOF). Append an extra
+      # SYN_REPORT at end_time so the actual final SYN_REPORT of this batch is
+      # flushed to the kernel immediately.
+      end_ts = self._format_evemu_timestamp(end_time)
+      script += f"E: {end_ts} {EV_SYN:04x} {SYN_REPORT:04x} 0000\n"
 
     duration = end_time - start_time
     self._execute_evemu_script(device_name, script)
     # Block for the playback duration plus lead and drain buffers so the host
     # waits until the device completes event playback and pipeline dispatch.
-    if duration or lead_buffer:
-      self.sleep(duration + lead_buffer + _INPUT_DRAIN_BUFFER)
+    self.sleep(duration + lead_buffer + INPUT_DRAIN_BUFFER)
 
   def _generate_evemu_events_string(
       self,

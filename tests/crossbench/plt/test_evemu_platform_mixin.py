@@ -6,9 +6,12 @@ from __future__ import annotations
 
 import datetime as dt
 import subprocess
+import time
 import unittest
 from typing import TYPE_CHECKING
 from unittest import mock
+
+from typing_extensions import override
 
 from crossbench.action_runner.action.enums import ButtonClick
 from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
@@ -23,39 +26,53 @@ from crossbench.action_runner.virtual_device.virtual_device_config import \
     VirtualDeviceConfig
 from crossbench.benchmarks.loading.point import Point
 from crossbench.plt.display_info import DisplayResolution
-from crossbench.plt.evemu_platform_mixin import _INPUT_DRAIN_BUFFER, \
-    _INPUT_LEAD_BUFFER, EvemuPlatformMixin
+from crossbench.plt.evemu_platform_mixin import DEVICE_SETTLE_DELAY, \
+    INPUT_DRAIN_BUFFER, INPUT_LEAD_BUFFER, EvemuPlatformMixin, \
+    VirtualDeviceState
 from tests import test_helper
 from tests.crossbench.mock_helper import LinuxMockPlatform
 
 if TYPE_CHECKING:
   from crossbench.action_runner.virtual_device.virtual_device_type import \
       VirtualDeviceType
-  from crossbench.plt.types import TupleCmdArgs
 
 
 class MockEvemuPlatform(EvemuPlatformMixin, LinuxMockPlatform):
 
-  def __init__(self) -> None:
+  def __init__(self, wall_clock_mode: bool = True) -> None:
     super().__init__()
+    self.wall_clock_mode: bool = wall_clock_mode
     self.mock_proc = mock.MagicMock()
     self.mock_proc.poll.return_value = None
     self.mock_proc.stdin = mock.MagicMock()
     self.popen_calls: list[tuple] = []
     self.sleep_calls: list[float | dt.timedelta] = []
 
+  @override
   def display_resolution(self) -> DisplayResolution:
     return DisplayResolution(1080, 1920)
 
-  def _get_evemu_device_cmd(self,
-                            device_type: VirtualDeviceType) -> TupleCmdArgs:
-    del device_type
-    return ("mock-evemu", "-")
+  @override
+  def _start_virtual_device(self, device_name: str,
+                            device_type: VirtualDeviceType,
+                            header: bytes) -> None:
+    proc = self.popen("mock-evemu", "-", stdin=subprocess.PIPE)
+    assert proc.stdin is not None
+    proc.stdin.write(header)
+    proc.stdin.flush()
+    start_time: dt.timedelta | None = None
+    if self.wall_clock_mode:
+      start_time = dt.timedelta(seconds=time.monotonic())
+      self.sleep(DEVICE_SETTLE_DELAY)
+    self._virtual_devices[device_name] = VirtualDeviceState(
+        proc=proc, device_type=device_type, start_time=start_time)
 
+  @override
   def popen(self, *args, **kwargs) -> subprocess.Popen:
     self.popen_calls.append((args, kwargs))
     return self.mock_proc
 
+  @override
   def sleep(self, seconds: float | dt.timedelta) -> None:
     self.sleep_calls.append(seconds)
 
@@ -65,7 +82,7 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
   def setUp(self) -> None:
     super().setUp()
     self.platform = MockEvemuPlatform()
-    with mock.patch("time.monotonic", return_value=100.0):
+    with mock.patch("time.monotonic", return_value=100.5):
       self.platform.setup_virtual_devices((
           KeyboardVirtualDeviceConfig(name="test_kb"),
           TouchscreenVirtualDeviceConfig(
@@ -86,6 +103,10 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
     self.assertIs(platform._virtual_devices["kb1"].proc, platform.mock_proc)
     self.assertEqual(platform.virtual_devices, {"kb1": kb_config})
     platform.mock_proc.stdin.write.assert_called_once()
+    written_header = platform.mock_proc.stdin.write.call_args[0][0].decode(
+        "utf-8")
+    self.assertNotIn("#", written_header)
+    self.assertNotIn("E: ", written_header)
     platform.mock_proc.stdin.flush.assert_called_once()
 
   def test_teardown_virtual_devices(self) -> None:
@@ -120,6 +141,8 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
     self.assertIn("N: touch1", written_header)
     self.assertIn("A: 35 0 1080 0 0 12", written_header)
     self.assertIn("A: 36 0 2400 0 0 12", written_header)
+    self.assertNotIn("#", written_header)
+    self.assertNotIn("E: ", written_header)
     platform.mock_proc.stdin.flush.assert_called_once()
 
   def test_setup_virtual_devices_touchscreen_fallback_resolution(self) -> None:
@@ -153,6 +176,8 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
     self.assertIn("N: mouse1", written_header)
     self.assertIn("A: 35 0 1920 0 0 0", written_header)
     self.assertIn("A: 36 0 1080 0 0 0", written_header)
+    self.assertNotIn("#", written_header)
+    self.assertNotIn("E: ", written_header)
     platform.mock_proc.stdin.flush.assert_called_once()
 
   def test_setup_virtual_devices_mouse_fallback_resolution(self) -> None:
@@ -232,8 +257,7 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
         b"E: 0.700000 0001 001e 0000\n"
         b"E: 0.700000 0000 0000 0000\n")
     self.assertEqual(self.platform.sleep_calls, [
-        dt.timedelta(milliseconds=500) + _INPUT_LEAD_BUFFER +
-        _INPUT_DRAIN_BUFFER,
+        dt.timedelta(milliseconds=500) + INPUT_LEAD_BUFFER + INPUT_DRAIN_BUFFER,
     ])
 
     mock_monotonic.return_value = 101.0
@@ -248,10 +272,8 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
         b"E: 0.900000 0001 0030 0000\n"
         b"E: 0.900000 0000 0000 0000\n")
     self.assertEqual(self.platform.sleep_calls, [
-        dt.timedelta(milliseconds=500) + _INPUT_LEAD_BUFFER +
-        _INPUT_DRAIN_BUFFER,
-        (dt.timedelta(milliseconds=200) + _INPUT_LEAD_BUFFER +
-         _INPUT_DRAIN_BUFFER),
+        dt.timedelta(milliseconds=500) + INPUT_LEAD_BUFFER + INPUT_DRAIN_BUFFER,
+        dt.timedelta(milliseconds=200) + INPUT_LEAD_BUFFER + INPUT_DRAIN_BUFFER,
     ])
 
   @mock.patch("time.monotonic")
@@ -281,10 +303,8 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
         b"E: 5.400000 0001 0030 0000\n"
         b"E: 5.400000 0000 0000 0000\n")
     self.assertEqual(self.platform.sleep_calls, [
-        dt.timedelta(milliseconds=500) + _INPUT_LEAD_BUFFER +
-        _INPUT_DRAIN_BUFFER,
-        (dt.timedelta(milliseconds=200) + _INPUT_LEAD_BUFFER +
-         _INPUT_DRAIN_BUFFER),
+        dt.timedelta(milliseconds=500) + INPUT_LEAD_BUFFER + INPUT_DRAIN_BUFFER,
+        dt.timedelta(milliseconds=200) + INPUT_LEAD_BUFFER + INPUT_DRAIN_BUFFER,
     ])
 
   @mock.patch("time.monotonic", return_value=100.5)
@@ -430,7 +450,7 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
     platform = MockEvemuPlatform()
     self.assertEqual(platform._virtual_devices, {})
 
-    with mock.patch("time.monotonic", side_effect=[100.0, 100.5, 101.0]):
+    with mock.patch("time.monotonic", side_effect=[100.5, 100.5, 101.0]):
       with self.assertLogs(level="WARNING") as cm:
         platform.inject_input_events("default_keyboard",
                                      [KeyEvent("KeyA", is_down=True)])
@@ -489,6 +509,42 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
         RuntimeError, "Virtual device 'unknown_device' was not initialized"):
       platform.inject_input_events("unknown_device",
                                    [KeyEvent("KeyA", is_down=True)])
+
+  def test_relative_delta_mode_consecutive_injections(self) -> None:
+    platform = MockEvemuPlatform(wall_clock_mode=False)
+    platform.setup_virtual_devices((KeyboardVirtualDeviceConfig(name="kb1"),))
+    platform.sleep_calls.clear()
+
+    platform.inject_input_events("kb1", [
+        KeyEvent("KeyA", is_down=True),
+        WaitEvent(dt.timedelta(milliseconds=500)),
+        KeyEvent("KeyA", is_down=False),
+    ])
+    platform.mock_proc.stdin.write.assert_called_with(
+        b"E: 1.000000 0001 001e 0001\n"
+        b"E: 1.000000 0000 0000 0000\n"
+        b"E: 1.500000 0001 001e 0000\n"
+        b"E: 1.500000 0000 0000 0000\n"
+        b"E: 1.500000 0000 0000 0000\n")
+    self.assertEqual(platform.sleep_calls, [
+        dt.timedelta(milliseconds=500) + INPUT_DRAIN_BUFFER,
+    ])
+
+    platform.inject_input_events("kb1", [
+        KeyEvent("KeyB", is_down=True),
+        WaitEvent(dt.timedelta(milliseconds=200)),
+        KeyEvent("KeyB", is_down=False),
+    ])
+    platform.mock_proc.stdin.write.assert_called_with(
+        b"E: 1.500000 0001 0030 0001\n"
+        b"E: 1.500000 0000 0000 0000\n"
+        b"E: 1.700000 0001 0030 0000\n"
+        b"E: 1.700000 0000 0000 0000\n"
+        b"E: 1.700000 0000 0000 0000\n")
+    self.assertEqual(platform.sleep_calls, [
+        dt.timedelta(milliseconds=500) + INPUT_DRAIN_BUFFER,
+        dt.timedelta(milliseconds=200) + INPUT_DRAIN_BUFFER,
+    ])
 
 
 if __name__ == "__main__":

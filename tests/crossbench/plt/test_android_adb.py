@@ -35,8 +35,6 @@ from crossbench.action_runner.virtual_device.touchscreen import \
     TouchscreenVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.virtual_device_config import \
     VirtualDeviceConfig
-from crossbench.action_runner.virtual_device.virtual_device_type import \
-    VirtualDeviceType
 from crossbench.benchmarks.loading.point import Point
 from crossbench.helper.version import VersionParseError
 from crossbench.plt.android_adb import Adb, AndroidAdbPlatform, \
@@ -404,11 +402,6 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
             product="sdk_google_phone_x86"))
     self.assertIn(self.DEVICE_ID, str(self.adb))
 
-  def test_get_evemu_device_cmd(self):
-    self.assertEqual(
-        self.platform._get_evemu_device_cmd(VirtualDeviceType.KEYBOARD),
-        ("uinput", "-"))
-
   @contextlib.contextmanager
   def patch_getprop(
       self,
@@ -443,6 +436,8 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
       self.assertIn("kb1", self.platform._virtual_devices)
       self.assertIs(self.platform._virtual_devices["kb1"].proc, mock_proc)
       mock_proc.stdin.write.assert_called_once()
+      written_header = mock_proc.stdin.write.call_args[0][0].decode("utf-8")
+      self.assertTrue(written_header.endswith("E: 0.000000 0000 0000 0000\n"))
       mock_proc.stdin.flush.assert_called_once()
 
   def test_setup_virtual_devices_unsupported_sdk(self) -> None:
@@ -468,6 +463,7 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
       self.assertIn("N: touch1", written_header)
       self.assertIn("A: 35 0 1080 0 0 12", written_header)
       self.assertIn("A: 36 0 2400 0 0 12", written_header)
+      self.assertTrue(written_header.endswith("E: 0.000000 0000 0000 0000\n"))
       mock_proc.stdin.flush.assert_called_once()
 
   def test_setup_virtual_devices_touchscreen_fallback_resolution(self) -> None:
@@ -498,6 +494,7 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
       self.assertIn("N: mouse1", written_header)
       self.assertIn("A: 35 0 1920 0 0 0", written_header)
       self.assertIn("A: 36 0 1080 0 0 0", written_header)
+      self.assertTrue(written_header.endswith("E: 0.000000 0000 0000 0000\n"))
       mock_proc.stdin.flush.assert_called_once()
 
   def test_setup_virtual_devices_mouse_fallback_resolution(self) -> None:

@@ -610,16 +610,20 @@ class Runner:
     self._state.expect(RunnerState.INITIAL)
     logging.info("🏗️  STATUS FILE: %s", self.status.path)
     with self._platform.wakelock(), self._restoring_device_config():
-      with self._exceptions.annotate("Preparing"):
-        self._setup()
       try:
-        with self._exceptions.capture("Running"):
-          self._run(is_dry_run)
+        with self._exceptions.annotate("Preparing"):
+          self._setup()
+        try:
+          with self._exceptions.capture("Running"):
+            self._run(is_dry_run)
+        finally:
+          with self._exceptions.capture("Benchmark teardown"):
+            self._benchmark.teardown(self)
       finally:
-        with self._exceptions.capture("Benchmark teardown"):
-          self._benchmark.teardown(self)
         for platform in self.platforms:
-          platform.teardown_virtual_devices()
+          with self._exceptions.capture(
+              f"Teardown virtual devices on {platform}"):
+            platform.teardown_virtual_devices()
 
     if self._exceptions.throw:
       # Ensure that we bail out on the first exception.

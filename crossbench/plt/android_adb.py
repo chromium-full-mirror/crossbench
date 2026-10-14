@@ -47,7 +47,8 @@ from crossbench.plt.bin import Binaries
 from crossbench.plt.device_info import DeviceInfo
 from crossbench.plt.display_info import DisplayRefreshRateResult, \
     DisplayResolution
-from crossbench.plt.evemu_platform_mixin import EvemuPlatformMixin
+from crossbench.plt.evemu_platform_mixin import DEVICE_SETTLE_DELAY, \
+    EvemuPlatformMixin, VirtualDeviceState
 from crossbench.plt.port_manager import PortManager
 from crossbench.plt.posix import PosixVersion, RemotePosixPlatform
 from crossbench.plt.process_meminfo import ProcessMeminfo
@@ -64,8 +65,7 @@ if TYPE_CHECKING:
   from crossbench.plt.base import Platform
   from crossbench.plt.details import CpuDetails, PythonDetails
   from crossbench.plt.display_info import DisplayInfo
-  from crossbench.plt.types import CmdArg, ListCmdArgs, PlatformKey, \
-      ProcessIo, TupleCmdArgs
+  from crossbench.plt.types import CmdArg, ListCmdArgs, PlatformKey, ProcessIo
 
 
 class _MoblyDebugFilter(logging.Filter):
@@ -830,6 +830,14 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
   MIN_UINPUT_SDK_VERSION: Final[int] = 37
   MIN_DROP_CACHES_SDK_VERSION: Final[int] = 31
   _SHIFT_KEYS: Final[frozenset[str]] = frozenset(("ShiftLeft", "ShiftRight"))
+  # Android's uinput (EvemuParser) remains in its header parsing state and does
+  # not register the virtual device with /dev/uinput until it receives the
+  # first 'E:' event line indicating the device descriptor section is complete.
+  _EVEMU_HEADER_END_EVENT: Final[bytes] = b"E: 0.000000 0000 0000 0000\n"
+  # Delay added by Android's EvemuParser (REGISTRATION_DELAY_NANOS = 500ms)
+  # after registering a virtual device before the first E: event is injected.
+  _DEVICE_REGISTRATION_DELAY: Final[dt.timedelta] = dt.timedelta(
+      milliseconds=500)
 
   def _uinput_unsupported_msg(self, context: str = "") -> str:
     msg = (f"Virtual device uinput injection is only supported on Android SDK "
@@ -943,10 +951,29 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
     return self.path("/data/local/tmp/")
 
   @override
-  def _get_evemu_device_cmd(self,
-                            device_type: VirtualDeviceType) -> TupleCmdArgs:
-    del device_type
-    return ("uinput", "-")
+  def _start_virtual_device(self, device_name: str,
+                            device_type: VirtualDeviceType,
+                            header: bytes) -> None:
+    proc = self.popen("uinput", "-", stdin=subprocess.PIPE)
+    assert proc.stdin is not None
+    try:
+      proc.stdin.write(header + self._EVEMU_HEADER_END_EVENT)
+      proc.stdin.flush()
+    except (BrokenPipeError, OSError) as e:
+      exit_code = proc.poll()
+      raise RuntimeError(f"Failed to initialize virtual {device_type.value} "
+                         f"'{device_name}' (exit code: {exit_code})") from e
+    # Wait for Android's EvemuParser registration delay (500ms) and OS input
+    # pipeline settle time so the device is ready and the playback clock epoch
+    # aligns with the device's mStartTime.
+    start_time = (
+        dt.timedelta(seconds=time.monotonic()) +
+        self._DEVICE_REGISTRATION_DELAY)
+    self.sleep(self._DEVICE_REGISTRATION_DELAY + DEVICE_SETTLE_DELAY)
+    assert device_name not in self._virtual_devices, (
+        f"Virtual device '{device_name}' already exists.")
+    self._virtual_devices[device_name] = VirtualDeviceState(
+        proc=proc, device_type=device_type, start_time=start_time)
 
   @property
   @override
