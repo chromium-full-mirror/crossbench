@@ -10,7 +10,10 @@ import platform
 import re
 import shutil
 import sys
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
+
+if TYPE_CHECKING:
+  from presubmit_thread_pool import CommandData
 
 USE_PYTHON3 = True
 
@@ -158,11 +161,9 @@ def CheckChange(input_api: Any, output_api: Any, on_commit: bool) -> Any:
   # ---------------------------------------------------------------------------
   # Unittest:
   # ---------------------------------------------------------------------------
-  test_dir, file_pattern = TestFilePatternsToCheck(on_commit,
-                                                   crossbench_test_path)
-  unit_tests = [str(path) for path in test_dir.glob(f"**/{file_pattern}")]
-  tests += input_api.canned_checks.GetUnitTests(
-      input_api, output_api, unit_tests, env=testing_env)
+  if pytest_cmd := GetPytestCommand(input_api, output_api, on_commit,
+                                    crossbench_test_path, testing_env):
+    tests.append(pytest_cmd)
 
   # ---------------------------------------------------------------------------
   # Run all tests:
@@ -257,6 +258,40 @@ def TestFilePatternsToCheck(
     test_dir = crossbench_test_path / "cli"
     file_pattern = "*test_cli_fast_*.py"
   return test_dir, file_pattern
+
+
+def GetPytestCommand(
+    input_api: Any,
+    output_api: Any,
+    on_commit: bool,
+    crossbench_test_path: pathlib.Path,
+    testing_env: dict[str, str],
+) -> CommandData | None:
+  test_dir, file_pattern = TestFilePatternsToCheck(on_commit,
+                                                   crossbench_test_path)
+  pytest_cmd = [
+      input_api.python3_executable,
+      "-m",
+      "pytest",
+      "-n=auto",
+      "-q",
+  ]
+  if on_commit:
+    pytest_cmd.append(str(test_dir))
+  else:
+    unit_tests = [
+        str(path) for path in sorted(test_dir.glob(f"**/{file_pattern}"))
+    ]
+    if not unit_tests:
+      return None
+    pytest_cmd.extend(unit_tests)
+
+  return input_api.Command(
+      name="pytest",
+      cmd=pytest_cmd,
+      message=output_api.PresubmitError,
+      kwargs={"env": testing_env},
+  )
 
 
 def CheckChangeOnUpload(input_api: Any, output_api: Any) -> Any:

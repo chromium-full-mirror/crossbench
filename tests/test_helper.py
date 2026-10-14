@@ -111,10 +111,11 @@ def run_pytest(path: str | pathlib.Path,
   pass_through_args = sys.argv[1:]
   extra_args.extend(pass_through_args)
   # Run tests single-threaded by default when running the test file directly.
-  if "-n" not in extra_args:
-    extra_args.extend(["-n", "1"])
-  if "-r" not in extra_args:
-    extra_args.extend(["-r", "s"])
+  if not any(arg == "-n" or arg.startswith(("-n=", "--numprocesses="))
+             for arg in extra_args):
+    extra_args.append("-n=0")
+  if not any(arg == "-r" or arg.startswith("-r") for arg in extra_args):
+    extra_args.append("-rs")
 
   if plugins is None:
     plugins = [DurationPlugin()]
