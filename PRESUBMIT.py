@@ -103,7 +103,7 @@ def CheckChange(input_api: Any, output_api: Any, on_commit: bool) -> Any:
       ))
 
   # ---------------------------------------------------------------------------
-  # MyPy:
+  # MyPy & Pyrefly:
   # ---------------------------------------------------------------------------
   mypy_files_to_check: list[str] = TyperPaths(input_api, on_commit,
                                               modified_py_files)
@@ -117,6 +117,21 @@ def CheckChange(input_api: Any, output_api: Any, on_commit: bool) -> Any:
                 "mypy",
                 "--check-untyped-defs",
                 "--pretty",
+            ] + mypy_files_to_check,
+            message=output_api.PresubmitError,
+            kwargs={},
+            python3=True,
+        ))
+    tests.append(
+        input_api.Command(
+            name="pyrefly",
+            cmd=[
+                input_api.python3_executable,
+                "-m",
+                "pyrefly",
+                "check",
+                "-c",
+                str(root_path / "pyproject.toml"),
             ] + mypy_files_to_check,
             message=output_api.PresubmitError,
             kwargs={},

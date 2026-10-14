@@ -224,5 +224,22 @@ max-complexity = 15
 [tool.ruff.lint.isort]
 required-imports = [ "from __future__ import annotations" ]
 
-[tool.pyre]
-source_directories = ["crossbench"]
+[tool.pyrefly]
+project-includes = [
+    "PRESUBMIT.py",
+    "crossbench",
+    "tools",
+]
+ignore-missing-imports = [
+    # Built-in Pyodide WebAssembly FFI module (not a PyPI package).
+    "js",
+    # Provided at runtime by depot_tools when running PRESUBMIT.py.
+    "presubmit_thread_pool",
+]
+infer-return-types = "never"
+
+[tool.pyrefly.errors]
+# @functools.lru_cache / @functools.cache on overridden methods is typed as
+# _lru_cache_wrapper in typeshed rather than a method descriptor.
+bad-override-mutable-attribute = "ignore"
+

@@ -47,7 +47,8 @@ class PyodideGcsBlob(gcloud_blob.Blob):
 
   @property
   @override
-  def md5_hash(self) -> str:
+  # Blob.md5_hash is defined via untyped _scalar_property("md5Hash").
+  def md5_hash(self) -> str:  # pyrefly: ignore[bad-override]
     return self._md5_hash
 
   @property
