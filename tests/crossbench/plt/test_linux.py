@@ -18,9 +18,11 @@ from crossbench import path as pth
 from crossbench.action_runner.virtual_device.virtual_device_type import \
     VirtualDeviceType
 from crossbench.helper.version import VersionParseError
+from crossbench.plt.base import Platform
 from crossbench.plt.display_info import DisplayResolution
-from crossbench.plt.linux import PERF_EVENT_PARANOID_PATH, SCRIPTS_DIR, \
-    LinuxPlatform, parse_display_xrandr
+from crossbench.plt.linux import CPUFREQ_POLICY0_PATH, \
+    PERF_EVENT_PARANOID_PATH, PROC_CPUINFO_PATH, SCRIPTS_DIR, LinuxPlatform, \
+    parse_display_xrandr
 from crossbench.plt.posix import PosixVersion
 from crossbench.plt.process_meminfo import ProcessMeminfo
 from tests import test_helper
@@ -121,6 +123,18 @@ class _LinuxMockPlatformTestCase(BasePosixMockPlatformTestCase):
     self.assertDictEqual(parsed[0], {
         "resolution": DisplayResolution(1728, 946),
         "refresh_rate": 120.0,
+    })
+
+    xvfb_xrandr_output = textwrap.dedent("""
+      Screen 0: minimum 1 x 1, current 1280 x 1024, maximum 1280 x 1024
+      screen connected 1280x1024+0+0 0mm x 0mm
+         1280x1024      0.0*
+      """)
+    parsed_xvfb = tuple(parse_display_xrandr(xvfb_xrandr_output))
+    self.assertEqual(len(parsed_xvfb), 1)
+    self.assertDictEqual(parsed_xvfb[0], {
+        "resolution": DisplayResolution(1280, 1024),
+        "refresh_rate": 0.0,
     })
 
   def test_display_resolution(self) -> None:
@@ -274,6 +288,43 @@ Swap:                400 kB
 class LocalLinuxMockPlatformTestCase(BaseLocalMockPlatformTestMixin,
                                      _LinuxMockPlatformTestCase):
   __test__ = True
+
+  @mock.patch("psutil.getloadavg", return_value=(0.1, 0.2, 0.3))
+  @mock.patch("psutil.cpu_percent", return_value=10.0)
+  @mock.patch("psutil.cpu_count", return_value=4)
+  def test_cpu_details_frequency(self, mock_cpu_count, mock_cpu_percent,
+                                 mock_getloadavg) -> None:
+    del mock_cpu_count, mock_cpu_percent, mock_getloadavg
+
+    def get_cpu_details():
+      LinuxPlatform.cpu_details.cache_clear()
+      Platform.cpu_details.cache_clear()
+      return LinuxPlatform.cpu_details(self.platform)
+
+    details = get_cpu_details()
+    self.assertEqual(details["min_frequency"], "N/A")
+    self.assertEqual(details["max_frequency"], "N/A")
+    self.assertEqual(details["current_frequency"], "N/A")
+
+    self.fs.create_file(
+        PROC_CPUINFO_PATH,
+        contents="processor\t: 0\ncpu MHz\t\t: 2400.0\n",
+    )
+    details = get_cpu_details()
+    self.assertEqual(details["min_frequency"], "0.00MHz")
+    self.assertEqual(details["max_frequency"], "0.00MHz")
+    self.assertEqual(details["current_frequency"], "2400.00MHz")
+
+    self.fs.create_file(
+        CPUFREQ_POLICY0_PATH / "scaling_cur_freq", contents="1800000\n")
+    self.fs.create_file(
+        CPUFREQ_POLICY0_PATH / "scaling_min_freq", contents="800000\n")
+    self.fs.create_file(
+        CPUFREQ_POLICY0_PATH / "scaling_max_freq", contents="3200000\n")
+    details = get_cpu_details()
+    self.assertEqual(details["min_frequency"], "800.00MHz")
+    self.assertEqual(details["max_frequency"], "3200.00MHz")
+    self.assertEqual(details["current_frequency"], "1800.00MHz")
 
 
 class RemoteLinuxMockPlatformTestCase(_LinuxMockPlatformTestCase):

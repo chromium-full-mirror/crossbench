@@ -20,7 +20,7 @@ from typing_extensions import override
 from crossbench import path as pth
 from crossbench.helper.size import Size
 from crossbench.parse import NumberParser
-from crossbench.plt.base import SubprocessError
+from crossbench.plt.base import CPUFreqInfo, SubprocessError
 from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.evemu_platform_mixin import DEVICE_SETTLE_DELAY, \
     EvemuPlatformMixin, VirtualDeviceState
@@ -38,6 +38,9 @@ if TYPE_CHECKING:
 SCRIPTS_DIR: Final = pth.LocalPath(__file__).parent / "remote_scripts"
 PERF_EVENT_PARANOID_PATH: Final = pth.AnyPosixPath(
     "/proc/sys/kernel/perf_event_paranoid")
+CPUFREQ_POLICY0_PATH: Final = pth.AnyPosixPath(
+    "/sys/devices/system/cpu/cpufreq/policy0")
+PROC_CPUINFO_PATH: Final = pth.AnyPosixPath("/proc/cpuinfo")
 
 
 @dataclasses.dataclass
@@ -64,7 +67,7 @@ class XrandrDisplayInfo:
     for resolution in self.resolutions:
       # The current refresh ret is marked with a `*`:
       if match := self.REFRESH_RATE_RE.search(resolution):
-        return NumberParser.positive_float(match.group("freq"))
+        return NumberParser.positive_zero_float(match.group("freq"))
     return -1
 
 
@@ -171,6 +174,42 @@ class LinuxPlatform(EvemuPlatformMixin, PosixPlatform):
       if info_bin_path := self.which(info_bin):
         details[info_bin] = self.sh_stdout(info_bin_path)
     return details
+
+  @override
+  def _cpu_freq(self) -> CPUFreqInfo | None:
+    if freq := self._cpu_freq_from_sysfs():
+      return freq
+    return self._cpu_freq_from_proc()
+
+  def _cpu_freq_from_sysfs(self) -> CPUFreqInfo | None:
+    if not self.is_dir(CPUFREQ_POLICY0_PATH):
+      return None
+    cur_freq = self._read_cpufreq_mhz(CPUFREQ_POLICY0_PATH / "scaling_cur_freq")
+    min_freq = self._read_cpufreq_mhz(CPUFREQ_POLICY0_PATH / "scaling_min_freq")
+    max_freq = self._read_cpufreq_mhz(CPUFREQ_POLICY0_PATH / "scaling_max_freq")
+    if cur_freq is None or min_freq is None or max_freq is None:
+      return None
+    return CPUFreqInfo(min=min_freq, max=max_freq, current=cur_freq)
+
+  def _read_cpufreq_mhz(self, path: pth.AnyPosixPath) -> float | None:
+    if not self.is_file(path):
+      return None
+    if content := self.cat(path).strip():
+      return NumberParser.positive_zero_float(content) / 1000.0
+    return None
+
+  def _cpu_freq_from_proc(self) -> CPUFreqInfo | None:
+    if not self.is_file(PROC_CPUINFO_PATH):
+      return None
+    freqs: list[float] = []
+    for line in self.cat(PROC_CPUINFO_PATH).splitlines():
+      if line.lower().startswith("cpu mhz"):
+        _, freq_str = line.split(":", maxsplit=1)
+        freqs.append(NumberParser.positive_zero_float(freq_str.strip()))
+    if not freqs:
+      return None
+    current = sum(freqs) / len(freqs)
+    return CPUFreqInfo(min=0.0, max=0.0, current=current)
 
   @property
   @override
