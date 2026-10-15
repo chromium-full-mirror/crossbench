@@ -42,6 +42,7 @@ class XcodeInstrumentsProbeTestCase(CrossbenchFakeFsTestCase):
     super().setUp()
     self.template = pth.LocalPath("/tmp/counters.tracetemplate")
     self.fs.create_file(self.template)
+    self.template = self.template.resolve()
 
   def test_default_target(self):
     probe = XcodeInstrumentsProbe(template=self.template)
@@ -143,6 +144,7 @@ class XcodeInstrumentsContextTestCase(CrossbenchFakeFsTestCase):
     super().setUp()
     self.template = pth.LocalPath("/tmp/counters.tracetemplate")
     self.fs.create_file(self.template)
+    self.template = self.template.resolve()
 
   def _create_context(self, probe, browser):
     run = mock.Mock()

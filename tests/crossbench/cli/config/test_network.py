@@ -439,7 +439,7 @@ class NetworkConfigTestCase(BaseConfigTestCase):
     config_dict = {"type": "local", "path": str(benchmark_folder), "url": url}
     config = NetworkConfig.parse(dict(config_dict))
     self.assertEqual(config.type, NetworkType.LOCAL)
-    self.assertEqual(config.path, benchmark_folder)
+    self.assertEqual(config.path, benchmark_folder.resolve())
     self.assertEqual(config.url, url)
     self.assertTrue(config_dict)
     config_1 = NetworkConfig.parse(json.dumps(config_dict))

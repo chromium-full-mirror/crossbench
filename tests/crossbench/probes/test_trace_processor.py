@@ -118,6 +118,28 @@ class TraceProcessorProbeFakeFsTestCase(CrossbenchFakeFsTestCase):
 
     self.assertEqual(str(config.trace_processor_bin), str(trace_processor_path))
 
+  def test_parse_relative_module_paths_in_config_file(self):
+    config_dir = pth.LocalPath("/configs/memory")
+    sql_packages_dir = config_dir / "metrics/sql_packages"
+    sql_packages_dir.mkdir(parents=True)
+    config_file = config_dir / "probe_config.hjson"
+    config_file.write_text(
+        json.dumps({
+            "probes": {
+                "trace_processor": {
+                    "module_paths": ["./metrics/sql_packages"],
+                    "queries": self._QUERIES,
+                },
+            },
+        }),
+        encoding="utf-8",
+    )
+    probes = ProbeListConfig.parse(config_file).probes
+    self.assertEqual(len(probes), 1)
+    probe = probes[0]
+    assert isinstance(probe, TraceProcessorProbe)
+    self.assertEqual(probe.module_paths[1], sql_packages_dir.resolve())
+
   def _assert_parse_output_option(self, key: str, aliases: list[str]) -> None:
     for config_key in (key, *aliases):
       for values in ("json", "csv", ["json"], ["csv"], ["json", "csv"]):

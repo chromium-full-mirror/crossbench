@@ -20,7 +20,7 @@ from crossbench import path as pth
 from crossbench.config import ConfigEnum, ConfigObject, ConfigParser, \
     UnusedPropertiesMode, root_dir
 from crossbench.exception import MultiException
-from crossbench.parse import NumberParser, ObjectParser
+from crossbench.parse import NumberParser, ObjectParser, PathParser
 from crossbench.str_enum_with_help import StrEnumWithHelp
 from tests import test_helper
 from tests.crossbench.base import CrossbenchFakeFsTestCase
@@ -499,11 +499,14 @@ class ConfigParserTestCase(unittest.TestCase):
   def test_parse_local_path(self):
     parser = ConfigParser(dict)
     parser.add_argument("path", type=pth.LocalPath)
+    parser.add_argument("parsed_path", type=PathParser.path)
 
     # Test path resolution for relative paths
-    result = parser.parse({"path": "~/foo/bar"})
+    result = parser.parse({"path": "~/foo/bar", "parsed_path": "./baz"})
     expected = pth.LocalPath("~/foo/bar").expanduser().resolve()
+    expected_parsed = pth.LocalPath("./baz").expanduser().resolve()
     self.assertEqual(result["path"], expected)
+    self.assertEqual(result["parsed_path"], expected_parsed)
 
 
 class ConfigObjectTestCase(CrossbenchFakeFsTestCase):

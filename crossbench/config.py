@@ -402,7 +402,10 @@ class ConfigArgParser:
       self._validate_type_without_depending_kwargs(depending_kwargs)
       return self.parse_config_object(config_object_type, data)
     parser_fn: Callable[..., object] = self.type
-    return parser_fn(data, **depending_kwargs)
+    result: object = parser_fn(data, **depending_kwargs)
+    if isinstance(result, pth.LocalPath):
+      return result.expanduser().resolve()
+    return result
 
   def parse_config_object(self, config_object_type: type[ConfigObject],
                           data: object) -> object:
