@@ -331,13 +331,14 @@ packaging==26.2 ; python_full_version < '3.12' \
     # via
     #   google-cloud-bigquery
     #   pytest
-pandas==2.2.3 ; (python_full_version < '3.12' and platform_machine != 'arm64' and platform_machine != 'x86_64' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine == 'arm64' and platform_python_implementation != 'CPython' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.12' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_python_implementation != 'CPython' and sys_platform == 'win32') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32') \
+pandas==2.2.3 ; (python_full_version < '3.12' and platform_machine != 'arm64' and platform_machine != 'x86_64' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'arm64' and platform_python_implementation != 'CPython' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.12' and platform_python_implementation != 'CPython' and sys_platform == 'win32') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32') \
     --hash=sha256:01130cd90655b774d20afa5bd0c1f26f35bdd4488ee551911d8ba8219aa087a8
-pandas==2.2.3+chromium.1 ; (python_full_version < '3.12' and platform_machine == 'arm64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') \
+pandas==2.2.3+chromium.1 ; (python_full_version < '3.12' and platform_machine == 'arm64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'darwin') or (python_full_version < '3.12' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') \
     --hash=sha256:21c49f76db22c6f13370b357112ac28443d0b57c8c8476613385caa5bf8d7d23 \
     --hash=sha256:3322b4dba5f4d132abb393e202f22ec7777db4b9b5e7eddba5060ead0d975169 \
     --hash=sha256:c6f279f603a83f59fbc1b61306e644ca82c48b61ada7b335aa6dbb63c1e38f12 \
-    --hash=sha256:d30cace0d7fc615a216e863bbda793f9eb8ed83b561af458bcbc6d7c421ddc63
+    --hash=sha256:d30cace0d7fc615a216e863bbda793f9eb8ed83b561af458bcbc6d7c421ddc63 \
+    --hash=sha256:f696cd8a87b4bfaed748218485750e6ed330bf738155c9006b9f20c40fdbf811
 pathspec==1.0.4 ; python_full_version < '3.12' \
     --hash=sha256:eeaf9fc7cbc0a4492b666be276f38956baa67cd3faca745462db83d98f1cef87 \
     --hash=sha256:fb6ae2fd4e7c921a165808a552060e722767cfa526f99ca5156ed2ce45a5c723
@@ -521,6 +522,7 @@ scipy==1.10.1 ; python_full_version < '3.12' \
     --hash=sha256:5678f88c68ea866ed9ebe3a989091088553ba12c6090244fdae3e467b1139c35 \
     --hash=sha256:9be3d9dbda1b1d163c0cc55cfe85b155e5b607b4d031317841938e18dfd51a22 \
     --hash=sha256:a83a799b2413c1d5b8e74bed862cb79f479512233becf862cc5ec785a0a80e85 \
+    --hash=sha256:aaea0a6be54462ec027de54fca511540980d1e9eea68b2d5c1dbfe084797be35 \
     --hash=sha256:ab9aad87e27b62fbe21ebe944ec834bfdce879c063daf711a612ae872357b39b \
     --hash=sha256:ae3a9c611db9455013f565b189d93c3aa97d60c6df2e029ead03cae79d67b27b \
     --hash=sha256:d02c7546c7941f29eeac6cad967f3b6907634106497144c20d098506d63188b7 \
