@@ -4,10 +4,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar, Final, Self, cast
+from typing import TYPE_CHECKING, ClassVar, Final, Self
 
 from typing_extensions import override
 
+from crossbench.browsers.chromium_based.chromium_based import ChromiumBased
 from crossbench.parse import PathParser
 from crossbench.probes.probe import Probe, ProbeConfigParser, \
     ProbeIncompatibleBrowser, ProbeKeyT
@@ -19,7 +20,6 @@ from crossbench.probes.xcode_instruments.context import XcodeInstrumentsContext
 if TYPE_CHECKING:
   from crossbench import path as pth
   from crossbench.browsers.browser import Browser
-  from crossbench.browsers.chromium_based.chromium_based import ChromiumBased
   from crossbench.env.runner_env import RunnerEnv
   from crossbench.runner.run import Run
 
@@ -83,7 +83,8 @@ class XcodeInstrumentsProbe(Probe):
     super().attach(browser)
     if browser.attributes().is_chromium_based:
       if self.start_profiling_after_setup(self._target):
-        cast("ChromiumBased", browser).flags.enable_benchmarking_api()
+        assert isinstance(browser, ChromiumBased)
+        browser.flags.enable_benchmarking_api()
 
   @override
   def validate_browser(self, env: RunnerEnv, browser: Browser) -> None:

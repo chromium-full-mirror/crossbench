@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import abc
 import logging
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, Final
 
 from typing_extensions import override
 
@@ -18,7 +18,6 @@ from crossbench.browsers.chromium_based import helper
 from crossbench.browsers.version import BrowserVersionChannel
 from crossbench.browsers.viewport import Viewport
 from crossbench.flags.chrome import ChromeFlags
-from crossbench.types import JsonDict
 
 if TYPE_CHECKING:
   from crossbench.browsers.chromium.version import ChromiumVersion
@@ -29,6 +28,7 @@ if TYPE_CHECKING:
   from crossbench.flags.js_flags import JSFlags
   from crossbench.helper.version import VersionPartsData
   from crossbench.runner.groups.session import BrowserSessionRunGroup
+  from crossbench.types import JsonDict
 
 
 class VersionedFlag:
@@ -271,23 +271,25 @@ class ChromiumBased(Browser):
   @property
   @override
   def flags(self) -> ChromeFlags:
-    return cast(ChromeFlags, self._flags)
+    assert isinstance(self._flags, ChromeFlags)
+    return self._flags
 
   @property
   @override
   def js_flags(self) -> JSFlags:
-    return cast(ChromeFlags, self._flags).js_flags
+    return self.flags.js_flags
 
   @property
   @override
   def features(self) -> ChromeFeatures:
-    return cast(ChromeFlags, self._flags).features
+    return self.flags.features
 
   @override
   def details_json(self) -> JsonDict:
     details: JsonDict = super().details_json()
     if self.log_file:
-      log = cast(JsonDict, details["log"])
+      log = details["log"]
+      assert isinstance(log, dict)
       log[self.type_name()] = str(self.chrome_log_file)
       log["stdout"] = str(self.stdout_log_file)
     details["js_flags"] = tuple(self.js_flags)

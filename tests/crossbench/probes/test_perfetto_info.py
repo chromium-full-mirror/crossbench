@@ -8,6 +8,7 @@ import pathlib
 import unittest
 from unittest import mock
 
+from crossbench.browsers.chromium_based.webdriver import ChromiumBasedWebDriver
 from crossbench.probes.perfetto_info import CategoryDescription, \
     PerfettoInfoProbe, PerfettoInfoProbeContext
 from tests import test_helper
@@ -27,7 +28,7 @@ class TestPerfettoInfoProbe(unittest.TestCase):
     return PerfettoInfoProbeContext(probe, run)
 
   def test_get_cdp_categories(self):
-    browser = mock.MagicMock()
+    browser = mock.MagicMock(spec=ChromiumBasedWebDriver)
     browser.attributes.return_value.is_chromium_based = True
     browser.platform.is_android = False
 
@@ -100,7 +101,7 @@ class TestPerfettoInfoProbe(unittest.TestCase):
     self.assertEqual(empty_cat.data_source, "android.heapprofd")
 
   def test_get_categories_combined(self):
-    browser = mock.MagicMock()
+    browser = mock.MagicMock(spec=ChromiumBasedWebDriver)
     browser.attributes.return_value.is_chromium_based = True
     browser.platform.is_android = True
 

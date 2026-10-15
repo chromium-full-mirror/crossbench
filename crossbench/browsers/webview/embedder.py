@@ -15,14 +15,13 @@ from typing import TYPE_CHECKING, Final, MutableMapping, MutableSet, \
 from immutabledict import immutabledict
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chromium.webdriver import ChromiumDriver
 from typing_extensions import override
 
 from crossbench.browsers.webview.webview import Webview
 from crossbench.cli.ui import ui
 
 if TYPE_CHECKING:
-  from selenium.webdriver.chromium.webdriver import ChromiumDriver
-
   from crossbench import path as pth
   from crossbench.benchmarks.embedder.embedder_benchmark import \
       EmbedderBenchmark
@@ -128,7 +127,8 @@ class WebviewEmbedder(Webview):
         continue
       else:
         # This tab works, we can return the driver.
-        return cast("ChromiumDriver", self._private_driver)
+        assert isinstance(self._private_driver, ChromiumDriver)
+        return self._private_driver
     # We tried all tabs and none worked.
     raise RuntimeError("Failed to attach driver")
 

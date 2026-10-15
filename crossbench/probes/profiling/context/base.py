@@ -7,7 +7,7 @@ from __future__ import annotations
 import abc
 import logging
 from functools import cached_property
-from typing import TYPE_CHECKING, Final, NamedTuple, Sequence, cast
+from typing import TYPE_CHECKING, Final, NamedTuple, Sequence
 
 from typing_extensions import override
 
@@ -112,7 +112,9 @@ class PosixProfilingContext(ProfilingContext):
   @property
   @override
   def browser_platform(self) -> PosixPlatform:
-    return cast(PosixPlatform, super().browser_platform)
+    browser_platform = super().browser_platform
+    assert isinstance(browser_platform, PosixPlatform)
+    return browser_platform
 
   @property
   def traceconv_platform(self) -> Platform:

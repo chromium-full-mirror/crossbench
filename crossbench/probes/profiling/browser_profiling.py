@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import abc
 import enum
-from typing import TYPE_CHECKING, Self, cast
+from typing import TYPE_CHECKING, Self
 
 from selenium.webdriver.safari.options import Options as SafariOptions
 from typing_extensions import override
@@ -191,7 +191,9 @@ class ChromiumWebDriverBrowserProfilingProbeContext(_BaseContext):
 
   @property
   def chromium(self) -> ChromiumBasedWebDriver:
-    return cast(ChromiumBasedWebDriver, self.browser)
+    browser = self.browser
+    assert isinstance(browser, ChromiumBasedWebDriver)
+    return browser
 
   def start(self) -> None:
     self.chromium.start_profiling()

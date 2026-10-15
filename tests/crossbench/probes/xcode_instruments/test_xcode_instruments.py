@@ -9,6 +9,8 @@ from unittest import mock
 
 from crossbench import path as pth
 from crossbench.exception import ArgumentTypeMultiException
+from crossbench.plt.ios import IOSPlatform
+from crossbench.plt.macos import MacOSPlatform
 from crossbench.probes.probe_error import ProbeIncompatibleBrowser, \
     ProbeValidationError
 from crossbench.probes.profiling.enum import TargetMode
@@ -28,8 +30,14 @@ class TargetPlatform(enum.Enum):
 def _mock_browser(target_platform: TargetPlatform, host_is_macos: bool,
                   has_xctrace: bool) -> mock.Mock:
   browser = mock.Mock()
+  if target_platform == TargetPlatform.MACOS:
+    browser.platform = mock.Mock(spec=MacOSPlatform)
+  elif target_platform == TargetPlatform.IOS:
+    browser.platform = mock.Mock(spec=IOSPlatform)
   browser.platform.is_macos = (target_platform == TargetPlatform.MACOS)
   browser.platform.is_ios = (target_platform == TargetPlatform.IOS)
+  if host_is_macos:
+    browser.host_platform = mock.Mock(spec=MacOSPlatform)
   browser.host_platform.is_macos = host_is_macos
   browser.host_platform.which.return_value = ("/usr/bin/xctrace"
                                               if has_xctrace else None)

@@ -13,6 +13,7 @@ from typing_extensions import override
 from crossbench.browsers.chrome.downloader import ChromeDownloader, \
     ChromeDownloaderAndroid, ChromeDownloaderLinux, ChromeDownloaderMacOS, \
     ChromeDownloaderWin
+from crossbench.plt.android_adb import AndroidAdbPlatform
 from tests import test_helper
 from tests.crossbench.browsers.downloader_helper import \
     AbstractDownloaderTestCase
@@ -183,6 +184,7 @@ class BasicChromeDownloaderTestCaseAndroid(AbstractChromeDownloaderTestCase):
   @override
   def setUp(self) -> None:
     super().setUp()
+    self.platform = self._create_mock_platform(spec=AndroidAdbPlatform)
     self.platform.is_linux = False
     self.platform.is_macos = False
     self.platform.is_win = False

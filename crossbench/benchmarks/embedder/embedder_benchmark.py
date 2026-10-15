@@ -10,7 +10,7 @@ import datetime as dt
 import logging
 import re
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Iterator, Mapping, \
-    Sequence, cast
+    Sequence
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -20,6 +20,7 @@ from crossbench.benchmarks.base import SubStoryBenchmark
 from crossbench.benchmarks.embedder.config.cujs import CUJsConfig
 from crossbench.benchmarks.embedder.config.setup_commands import \
     SetupCommandsConfig
+from crossbench.browsers.webview.embedder import WebviewEmbedder
 from crossbench.cli.ui.ui import timer
 from crossbench.parse import ObjectParser
 from crossbench.stories.story import Story
@@ -27,7 +28,6 @@ from crossbench.stories.story import Story
 if TYPE_CHECKING:
   from crossbench.action_runner.config import ActionRunnerConfig
   from crossbench.benchmarks.loading.config.blocks import ActionBlock
-  from crossbench.browsers.webview.embedder import WebviewEmbedder
   from crossbench.cli.parser import CBArgumentParser
   from crossbench.plt.types import TupleCmdArgs
   from crossbench.runner.run import Run
@@ -43,8 +43,10 @@ class EmbedderStory(Story, metaclass=abc.ABCMeta):
   def setup(self, run: Run) -> None:
     # TODO(zbikowski): Add a way to ensure embedder is installed.
     # Launching the Google Quick Search app
-    run_benchmark = cast(EmbedderBenchmark, run.benchmark)
-    run_browser = cast("WebviewEmbedder", run.browser)
+    run_benchmark = run.benchmark
+    assert isinstance(run_benchmark, EmbedderBenchmark)
+    run_browser = run.browser
+    assert isinstance(run_browser, WebviewEmbedder)
     if run_benchmark.embedder_drop_caches:
       run_browser.adb_force_stop()
       run.browser_platform.sh("am", "kill-all")

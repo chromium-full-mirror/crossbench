@@ -8,7 +8,7 @@ import io
 import logging
 import subprocess
 import time
-from typing import TYPE_CHECKING, Iterable, cast
+from typing import TYPE_CHECKING, Iterable
 
 from typing_extensions import override
 
@@ -98,10 +98,11 @@ class AndroidProfilingContext(PosixProfilingContext):
         f"Expected Chromium-based browser, found {type(self.browser)}.")
     if (self.browser.platform.is_android and
         self.browser.attributes().is_chromium_based):
-      chromium = cast(ChromiumBased, self.browser)
+      browser = self.browser
+      assert isinstance(browser, ChromiumBased)
       # Set `--enable-benchmarking-extension` explicitly for
       # retrieving Renderer PID, if needed.
-      chromium.flags.enable_benchmarking_api()
+      browser.flags.enable_benchmarking_api()
     self._stop_existing_simpleperf()
     self.setup_traceconv()
 

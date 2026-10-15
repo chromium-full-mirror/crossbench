@@ -11,8 +11,7 @@ import logging
 import os
 import re
 import subprocess
-from typing import TYPE_CHECKING, Callable, ClassVar, Final, Iterable, Self, \
-    cast
+from typing import TYPE_CHECKING, Callable, ClassVar, Final, Iterable, Self
 
 from typing_extensions import override
 
@@ -243,7 +242,9 @@ class V8LogProbe(ChromiumProbe):
       return
     if not browser.platform.is_linux or browser.version.major <= 106:
       return
-    for search_path in cast(plt.LinuxPlatform, browser.platform).SEARCH_PATHS:
+    browser_platform = browser.platform
+    assert isinstance(browser_platform, plt.LinuxPlatform)
+    for search_path in browser_platform.SEARCH_PATHS:
       if browser.path.is_relative_to(search_path):
         logging.error(
             "Probe with V8 --prof might not work with enterprise profiles")

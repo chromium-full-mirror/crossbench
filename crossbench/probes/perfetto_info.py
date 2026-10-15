@@ -8,11 +8,12 @@ import argparse
 import json
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, TypedDict, cast
+from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 from typing_extensions import Self, override
 
 from crossbench import path as pth
+from crossbench.browsers.chromium_based.webdriver import ChromiumBasedWebDriver
 from crossbench.config import ConfigObject, ConfigParser
 from crossbench.probes.probe import Probe, ProbeContext
 from crossbench.probes.result_location import ResultLocation
@@ -21,8 +22,6 @@ from third_party.protoc.gen.protos.perfetto.common.tracing_service_state_pb2 imp
 
 if TYPE_CHECKING:
   from crossbench.browsers.browser import Browser
-  from crossbench.browsers.chromium_based.webdriver import \
-      ChromiumBasedWebDriver
   from crossbench.env.runner_env import RunnerEnv
   from crossbench.probes.results import ProbeResult
   from crossbench.runner.run import Run
@@ -125,8 +124,9 @@ class PerfettoInfoProbeContext(ProbeContext[PerfettoInfoProbe]):
     return sorted(categories, key=lambda cat: (cat.data_source, cat.name))
 
   def _get_cdp_categories(self) -> list[CategoryDescription]:
-    descriptor = cast("ChromiumBasedWebDriver",
-                      self.browser).perfetto_categories()
+    browser = self.browser
+    assert isinstance(browser, ChromiumBasedWebDriver)
+    descriptor = browser.perfetto_categories()
     return [
         CategoryDescription(
             data_source="track_event",

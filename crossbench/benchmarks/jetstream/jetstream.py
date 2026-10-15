@@ -10,7 +10,7 @@ import json
 import logging
 import statistics
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, ClassVar, Sequence, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Sequence
 
 from typing_extensions import override
 
@@ -48,7 +48,9 @@ class JetStreamProbe(
 
   @property
   def jetstream(self) -> JetStreamBenchmark:
-    return cast(JetStreamBenchmark, self.benchmark)
+    benchmark = self.benchmark
+    assert isinstance(benchmark, JetStreamBenchmark)
+    return benchmark
 
   @abc.abstractmethod
   @override

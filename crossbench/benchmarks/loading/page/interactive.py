@@ -7,7 +7,7 @@ from __future__ import annotations
 import contextlib
 import datetime as dt
 import logging
-from typing import TYPE_CHECKING, Iterable, Iterator, cast
+from typing import TYPE_CHECKING, Iterable, Iterator
 
 from typing_extensions import override
 
@@ -106,7 +106,8 @@ class InteractivePage(Page):
     for block in self.blocks:
       for action in block:
         if action.TYPE == ActionType.GET:
-          return cast(GetAction, action).url
+          assert isinstance(action, GetAction)
+          return action.url
     raise RuntimeError("No GET action with an URL found.")
 
   def create_failure_artifacts(self,

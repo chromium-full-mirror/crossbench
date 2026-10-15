@@ -8,7 +8,7 @@ import abc
 import argparse
 import datetime as dt
 import enum
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Mapping, Sequence, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Final, Mapping, Sequence
 
 from typing_extensions import Self, override
 
@@ -40,7 +40,9 @@ class Speedometer3Probe(SpeedometerProbe, metaclass=abc.ABCMeta):
 
   @property
   def speedometer(self) -> Speedometer3Benchmark:
-    return cast(Speedometer3Benchmark, self.benchmark)
+    benchmark = self.benchmark
+    assert isinstance(benchmark, Speedometer3Benchmark)
+    return benchmark
 
   @override
   def is_valid_metric_key(self, metric_key: str) -> bool:

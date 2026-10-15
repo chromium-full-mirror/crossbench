@@ -9,7 +9,7 @@ import datetime as dt
 import functools
 import inspect
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Generic, Iterable, \
-    Mapping, Self, Sequence, TypeVar, cast
+    Mapping, Self, Sequence, TypeVar
 
 from typing_extensions import override
 
@@ -19,6 +19,7 @@ from crossbench.benchmarks.base import StoryFilter, SubStoryBenchmark
 from crossbench.benchmarks.web_power.probe import WebPowerProbe
 from crossbench.benchmarks.web_power.wpr_helpers import WprBannerDismisser
 from crossbench.cli.config.network import NetworkConfig, NetworkType
+from crossbench.cli.parser import CBArgumentParser
 from crossbench.helper.path_finder import WprGoFinder
 from crossbench.network.replay.wpr import WprReplayNetwork
 from crossbench.parse import DurationParser, NumberParser, ObjectParser, \
@@ -34,7 +35,6 @@ if TYPE_CHECKING:
   from crossbench import path as pth
   from crossbench.action_runner.config import ActionRunnerConfig
   from crossbench.browsers.attributes import BrowserAttributes
-  from crossbench.cli.parser import CBArgumentParser
   from crossbench.flags.base import Flags
   from crossbench.plt.base import Platform
   from crossbench.plt.types import ListCmdArgs
@@ -490,8 +490,9 @@ class WebPowerBenchmarkBase(SubStoryBenchmark):
   @override
   def add_cli_arguments(cls, parser: CBArgumentParser) -> CBArgumentParser:
     parser = super().add_cli_arguments(parser)
-    parser = cast("CBArgumentParser",
-                  cls.STORY_FILTER_CLS.add_cli_arguments(parser))
+    filter_parser = cls.STORY_FILTER_CLS.add_cli_arguments(parser)
+    assert isinstance(filter_parser, CBArgumentParser)
+    parser = filter_parser
     parser.add_argument(
         "--benchmark-version", action="version", version=f"{VERSION_STRING}")
     parser.add_argument(

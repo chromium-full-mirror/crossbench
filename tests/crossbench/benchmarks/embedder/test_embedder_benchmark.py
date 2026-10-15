@@ -10,6 +10,7 @@ from unittest import mock
 from crossbench.benchmarks.embedder.config.cujs import CUJsConfig
 from crossbench.benchmarks.embedder.embedder_benchmark import \
     EmbedderBenchmark, EmbedderStory
+from crossbench.browsers.webview.embedder import WebviewEmbedder
 from crossbench.cli.parser import CBArgumentParser
 from tests import test_helper
 from tests.crossbench.base import CrossbenchFakeFsTestCase
@@ -143,6 +144,7 @@ class EmbedderBenchmarkTestCase(CrossbenchFakeFsTestCase):
     benchmark = EmbedderBenchmark(stories=[self.story])
     run = mock.MagicMock()
     run.benchmark = benchmark
+    run.browser = mock.MagicMock(spec=WebviewEmbedder)
     run.browser.android_package = "com.google.android.googlequicksearchbox"
 
     self.story.setup(run)
@@ -167,6 +169,7 @@ class EmbedderBenchmarkTestCase(CrossbenchFakeFsTestCase):
     )
     run = mock.MagicMock()
     run.benchmark = benchmark
+    run.browser = mock.MagicMock(spec=WebviewEmbedder)
     run.browser.android_package = "com.google.android.googlequicksearchbox"
 
     self.story.setup(run)
@@ -201,6 +204,7 @@ class EmbedderBenchmarkTestCase(CrossbenchFakeFsTestCase):
     )
     run = mock.MagicMock()
     run.benchmark = benchmark
+    run.browser = mock.MagicMock(spec=WebviewEmbedder)
     run.browser.android_package = "com.google.android.googlequicksearchbox"
 
     self.story.setup(run)

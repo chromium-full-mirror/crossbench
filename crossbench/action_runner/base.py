@@ -9,8 +9,7 @@ import datetime as dt
 import logging
 import sys
 import time
-from typing import TYPE_CHECKING, Callable, Final, Iterable, Iterator, \
-    Sequence, cast
+from typing import TYPE_CHECKING, Callable, Final, Iterable, Iterator, Sequence
 
 from crossbench import exception
 from crossbench.action_runner.action_runner_listener import \
@@ -694,7 +693,8 @@ class ActionRunner:
       action: i_action.TextInputAction,
       do_type_function: Callable[[Actions, str], object],
   ) -> None:
-    action_text = cast(str, action.text)
+    action_text = action.text
+    assert isinstance(action_text, str)
     character_delay_s = (action.duration / len(action_text)).total_seconds()
     start_time = time.time()
     action_expected_end_time = start_time + action.duration.total_seconds()

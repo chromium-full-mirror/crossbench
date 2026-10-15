@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Self, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Final, Self
 
 from typing_extensions import override
 
@@ -78,7 +78,9 @@ class BlinkAIProbe(BenchmarkProbeMixin, JsonResultProbe):
 
   @override
   def create_context(self, run: Run) -> BlinkAIProbeContext:
-    return cast(BlinkAIProbeContext, super().create_context(run))
+    context = super().create_context(run)
+    assert isinstance(context, BlinkAIProbeContext)
+    return context
 
   @override
   def get_context_cls(self) -> type[BlinkAIProbeContext]:

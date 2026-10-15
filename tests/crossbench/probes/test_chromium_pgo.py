@@ -9,6 +9,7 @@ from typing import Iterator
 from unittest import mock
 
 from crossbench.browsers.chromium.devtools import DevToolsCommandResult
+from crossbench.browsers.chromium.webdriver import ChromiumWebDriverAndroid
 from crossbench.probes.chromium_pgo import ChromiumPgoProbe, \
     ChromiumPgoProbeContextAndroid
 from crossbench.runner.run import Run
@@ -31,6 +32,7 @@ class ChromiumPgoProbeContextAndroidTestCase(GenericProbeTestCase):
 
   def create_context(self) -> ChromiumPgoProbeContextAndroid:
     mock_run = mock.MagicMock(spec=Run)
+    mock_run.browser = mock.MagicMock(spec=ChromiumWebDriverAndroid)
     mock_run.browser.android_package = "com.android.chrome"
     probe = ChromiumPgoProbe.config_parser().parse({})
     return ChromiumPgoProbeContextAndroid(probe, mock_run)

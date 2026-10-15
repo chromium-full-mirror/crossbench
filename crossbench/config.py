@@ -69,8 +69,8 @@ class ConfigArgParser:
     self.is_list: Final[bool] = is_list
     type_is_class: bool = inspect.isclass(type)
     self.type_is_class: Final[bool] = type_is_class
-    self.is_enum: Final[bool] = type_is_class and issubclass(
-        type, enum.Enum)  # type: ignore[arg-type]
+    self.enum_type: Final[builtins.type[enum.Enum]
+                          | None] = self._validate_enum_type(type)
     self.config_object_type: Final[builtins.type[ConfigObject]
                                    | None] = self._validate_config_object_type(
                                        type)
@@ -121,6 +121,12 @@ class ConfigArgParser:
                        f"of the aliases='{self.aliases}'")
     ObjectParser.unique_sequence(self.aliases, "aliases", ValueError)
 
+  def _validate_enum_type(self, type_obj: object) -> type[enum.Enum] | None:
+    if self.type_is_class and isinstance(type_obj, type) and issubclass(
+        type_obj, enum.Enum):
+      return type_obj
+    return None
+
   def _validate_config_object_type(
       self, type_obj: object) -> type[ConfigObject] | None:
     if self.type_is_class and isinstance(type_obj, type) and issubclass(
@@ -130,8 +136,8 @@ class ConfigArgParser:
 
   def _validate_choices(self,
                         choices: Iterable[object] | None) -> frozenset | None:
-    if self.is_enum:
-      return self._validate_enum_choices(choices)
+    if enum_type := self.enum_type:
+      return self._validate_enum_choices(enum_type, choices)
     if choices is None:
       return None
     choices_list = list(choices)
@@ -142,10 +148,8 @@ class ConfigArgParser:
     return frozen_choices
 
   def _validate_enum_choices(
-      self, choices: Iterable[object] | None) -> frozenset | None:
-    assert self.is_enum, "Expected enum"
-    assert self.type, "Expected type"
-    enum_type: type[enum.Enum] = cast(type[enum.Enum], self.type)
+      self, enum_type: type[enum.Enum],
+      choices: Iterable[object] | None) -> frozenset | None:
     if choices is None:
       return frozenset(enum for enum in enum_type)
     frozen_choices = frozenset(choices)
@@ -165,8 +169,8 @@ class ConfigArgParser:
     if self.required:
       raise ValueError("Required argument should have an empty default value, "
                        f"but got default={default!r}")
-    if self.is_enum:
-      return self._validate_enum_default(default)
+    if enum_type := self.enum_type:
+      return self._validate_enum_default(enum_type, default)
     maybe_class: ArgParserType | None = self.type
     if self.is_list:
       self._validate_list_default(default, maybe_class)
@@ -193,8 +197,8 @@ class ConfigArgParser:
               f"Expected default list item of type={self.type}, "
               f"but got type={type(default_item).__name__}: {default_item}")
 
-  def _validate_enum_default(self, default: object) -> object:
-    enum_type: type[enum.Enum] = cast(type[enum.Enum], self.type)
+  def _validate_enum_default(self, enum_type: type[enum.Enum],
+                             default: object) -> object:
     if self.is_list:
       default_list = default
     else:
@@ -218,7 +222,7 @@ class ConfigArgParser:
     if not self.type:
       raise ValueError(f"Argument '{self.name}' without a type "
                        "cannot have argument dependencies.")
-    if self.is_enum:
+    if self.enum_type:
       raise ValueError(f"Enum '{self.name}' cannot have argument dependencies")
 
   def _is_iterable_non_str(self, value: object) -> TypeGuard[Iterable[object]]:
@@ -274,8 +278,8 @@ class ConfigArgParser:
     if config_type := self.config_object_type:
       items.extend(config_type.help_text_items())
 
-    if self.is_enum:
-      items.extend(self._enum_help_text())
+    if enum_type := self.enum_type:
+      items.extend(self._enum_help_text(enum_type))
     elif self.choices:
       items.append(self._choices_help_text(self.choices))
 
@@ -286,10 +290,10 @@ class ConfigArgParser:
   def _choices_help_text(self, choices: Iterable) -> tuple[str, str]:
     return ("choices", ", ".join(map(str, choices)))
 
-  def _enum_help_text(self) -> list[tuple[str, str]]:
-    if self.type and hasattr(self.type, "help_text_items"):
-      # See str_enum_with_help.StrEnumWithHelp
-      return [("choices", ""), *self.type.help_text_items()]
+  def _enum_help_text(self,
+                      enum_type: type[enum.Enum]) -> list[tuple[str, str]]:
+    if issubclass(enum_type, StrEnumWithHelp):
+      return [("choices", ""), *enum_type.help_text_items()]  # type: ignore
     assert self.choices, "Expected choices"
     return [self._choices_help_text(choice.value for choice in self.choices)]
 
@@ -371,9 +375,9 @@ class ConfigArgParser:
 
   def parse_data(self, data: object, depending_kwargs: dict[str,
                                                             object]) -> object:
-    if self.is_enum:
+    if enum_type := self.enum_type:
       self._validate_type_without_depending_kwargs(depending_kwargs)
-      return self.parse_enum_data(data)
+      return self.parse_enum_data(enum_type, data)
     if self.choices and data not in self.choices:
       raise ValueError(f"{self.cls_name}.{self.name}: "
                        f"Invalid choice '{data}', choices are {self.choices}")
@@ -412,16 +416,12 @@ class ConfigArgParser:
     config_object: ConfigObject = config_object_type.parse(data)
     return config_object.to_argument_value()
 
-  def parse_enum_data(self, data: object) -> enum.Enum:
-    assert self.is_enum, "Expected enum"
+  def parse_enum_data(self, enum_type: type[enum.Enum],
+                      data: object) -> enum.Enum:
     assert self.choices, "Expected choices"
-    instance_type = self.type
-    assert instance_type, "Expected instance type"
-    assert isinstance(instance_type, type), "type for enum has to be a Class."
-    if issubclass(instance_type, ConfigEnum):
-      return instance_type.parse(data)  # type: ignore
-    assert issubclass(instance_type, enum.Enum)
-    return ObjectParser.enum(self.name, instance_type, data, self.choices)
+    if issubclass(enum_type, ConfigEnum):
+      return enum_type.parse(data)  # type: ignore
+    return ObjectParser.enum(self.name, enum_type, data, self.choices)
 
 
 class ConfigEnum(StrEnumWithHelp):

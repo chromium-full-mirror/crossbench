@@ -4,18 +4,18 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, Final
 
 from typing_extensions import override
 
+from crossbench.plt.ios import IOSPlatform
+from crossbench.plt.macos import MacOSPlatform
 from crossbench.probes.probe_context import ProbeContext
 from crossbench.probes.profiling.enum import TargetMode
 from crossbench.probes.xcode_instruments.recorder import XctraceRecorder
 
 if TYPE_CHECKING:
   from crossbench import path as pth
-  from crossbench.plt.ios import IOSPlatform
-  from crossbench.plt.macos import MacOSPlatform
   from crossbench.probes.results import ProbeResult
   from crossbench.probes.xcode_instruments.xcode_instruments import \
       XcodeInstrumentsProbe
@@ -37,7 +37,9 @@ class XcodeInstrumentsContext(ProbeContext["XcodeInstrumentsProbe"]):
   @property
   def _host(self) -> MacOSPlatform:
     # xctrace always runs on the host Mac, even for iOS device recordings.
-    return cast("MacOSPlatform", self.host_platform)
+    host_platform = self.host_platform
+    assert isinstance(host_platform, MacOSPlatform)
+    return host_platform
 
   def get_attach_pid(self) -> int | None:
     match self._target:
@@ -73,7 +75,9 @@ class XcodeInstrumentsContext(ProbeContext["XcodeInstrumentsProbe"]):
     super().start_story_run()
     device_udid: str | None = None
     if self.browser_platform.is_ios:
-      device_udid = cast("IOSPlatform", self.browser_platform).udid
+      browser_platform = self.browser_platform
+      assert isinstance(browser_platform, IOSPlatform)
+      device_udid = browser_platform.udid
     attach_pid = self.get_attach_pid()
     self._recorder = XctraceRecorder(
         self._host,

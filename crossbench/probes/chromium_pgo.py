@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import functools
 import logging
-from typing import TYPE_CHECKING, ClassVar, Final, cast
+from typing import TYPE_CHECKING, ClassVar, Final
 
 from typing_extensions import override
 
@@ -108,7 +108,8 @@ class ChromiumPgoProbeContextAndroid(ChromiumPgoProbeContext):
 
   @functools.cached_property
   def remote_pgo_dir(self) -> pth.AnyPath:
-    android_browser = cast(ChromiumWebDriverAndroid, self.run.browser)
+    android_browser = self.run.browser
+    assert isinstance(android_browser, ChromiumWebDriverAndroid)
     return (self.probe.remote_pgo_root_path / android_browser.android_package /
             self.probe.remote_pgo_cache_suffix)
 

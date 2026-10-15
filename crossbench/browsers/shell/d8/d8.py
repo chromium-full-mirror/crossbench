@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import urllib.request
-from typing import TYPE_CHECKING, Any, Sequence, cast
+from typing import TYPE_CHECKING, Any, Sequence
 
 from typing_extensions import override
 
@@ -59,7 +59,9 @@ class D8(ShellBrowser):
 
   @property
   def network(self) -> LocalFileNetwork:
-    return cast(LocalFileNetwork, super().network)
+    network = super().network
+    assert isinstance(network, LocalFileNetwork)
+    return network
 
   @property
   def d8_path(self) -> pth.LocalPath:
@@ -99,7 +101,8 @@ class D8(ShellBrowser):
   @property
   @override
   def js_flags(self) -> JSFlags:
-    return cast(ChromeFlags, self._flags).js_flags
+    assert isinstance(self._flags, ChromeFlags)
+    return self._flags.js_flags
 
   def start(self, session: BrowserSessionRunGroup) -> None:
     super().start(session)

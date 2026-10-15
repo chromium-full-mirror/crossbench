@@ -4,10 +4,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar, Iterable, Self, cast
+from typing import TYPE_CHECKING, ClassVar, Iterable, Self
 
 from typing_extensions import override
 
+from crossbench.plt.android_adb import AndroidAdbPlatform
 from crossbench.probes.probe import Probe, ProbeConfigParser, ProbeContext, \
     ProbeIncompatibleBrowser
 from crossbench.probes.probe_context import BaseProbeContext, \
@@ -17,7 +18,6 @@ if TYPE_CHECKING:
   from crossbench import path as pth
   from crossbench.browsers.browser import Browser
   from crossbench.env.runner_env import RunnerEnv
-  from crossbench.plt.android_adb import AndroidAdbPlatform
   from crossbench.probes.results import ProbeResult
   from crossbench.runner.groups.session import BrowserSessionRunGroup
 
@@ -81,9 +81,9 @@ class AndroidLogcatProbeContextMixin(BaseProbeContext[LogcatAndroidProbe]):
   @property
   def browser_platform(self) -> AndroidAdbPlatform:
     browser_platform = super().browser_platform  # type: ignore
-    assert browser_platform.is_android, (
+    assert isinstance(browser_platform, AndroidAdbPlatform), (
         f"Expected android platform, but got {browser_platform}")
-    return cast("AndroidAdbPlatform", browser_platform)
+    return browser_platform
 
   def _capture_logcat_file(self, dest_file: pth.LocalPath) -> None:
     assert self._logcat_start_time, "Missing logcat start time"

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, Final
 
 from typing_extensions import override
 
@@ -31,8 +31,8 @@ class SshPortManager(PortManager):
     self._reverse_forward_popens: dict[int, subprocess.Popen] = {}
 
   def _build_ssh_cmd(self, *args: CmdArg, shell: bool = False) -> ListCmdArgs:
-    return cast(SshPlatformMixin, self.platform).build_ssh_cmd(
-        *args, shell=shell)
+    assert isinstance(self.platform, SshPlatformMixin)
+    return self.platform.build_ssh_cmd(*args, shell=shell)
 
   @property
   def host_platform(self) -> Platform:

@@ -4,12 +4,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar, Final, cast
+from typing import TYPE_CHECKING, ClassVar, Final
 
 from typing_extensions import override
 
 from crossbench.browsers.webview.embedder import WebviewEmbedder
 from crossbench.parse import ObjectParser
+from crossbench.plt.android_adb import AndroidAdbPlatform
 from crossbench.probes.js import parse_javascript
 from crossbench.probes.json import JsonResultProbe, JsonResultProbeContext
 from crossbench.probes.metric import MetricsMerger
@@ -18,7 +19,6 @@ from crossbench.probes.probe import ProbeConfigParser, ProbeIncompatibleBrowser
 if TYPE_CHECKING:
   from crossbench.browsers.browser import Browser
   from crossbench.env.runner_env import RunnerEnv
-  from crossbench.plt.android_adb import AndroidAdbPlatform
   from crossbench.probes.results import ProbeResult
   from crossbench.runner.actions import Actions
   from crossbench.runner.groups.browsers import BrowsersRunGroup
@@ -87,9 +87,9 @@ class WebviewEmbedderProbeContext(JsonResultProbeContext[WebviewEmbedderProbe]):
   @override
   def browser_platform(self) -> AndroidAdbPlatform:
     browser_platform = super().browser_platform
-    assert browser_platform.is_android, (
+    assert isinstance(browser_platform, AndroidAdbPlatform), (
         f"Expected android platform, but got {browser_platform}")
-    return cast("AndroidAdbPlatform", browser_platform)
+    return browser_platform
 
   @override
   def stop_story_run(self) -> None:

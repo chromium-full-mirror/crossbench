@@ -5,8 +5,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Iterable, Mapping, Sequence, \
-    cast
+from typing import TYPE_CHECKING, Any, ClassVar, Iterable, Mapping, Sequence
 
 from typing_extensions import override
 
@@ -70,8 +69,8 @@ class DevToolsFrontendLoadTimeProbe(ChromeMetricsInternalsProbe,
       self, merger: MetricsMerger,
       repetitions_groups: Iterable[RepetitionsRunGroup]) -> None:
     for repetition_group in repetitions_groups:
-      story: DevToolsFrontendStory = cast(DevToolsFrontendStory,
-                                          repetition_group.story)
+      story = repetition_group.story
+      assert isinstance(story, DevToolsFrontendStory)
       for prefix_path in story.reporting_prefixes():
         merger.merge_json_file(
             repetition_group.results[self].json,

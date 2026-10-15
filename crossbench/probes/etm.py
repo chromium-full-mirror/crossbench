@@ -8,7 +8,7 @@ import io
 import logging
 import subprocess
 from functools import cached_property
-from typing import TYPE_CHECKING, Iterable, Self, cast
+from typing import TYPE_CHECKING, Iterable, Self
 
 from typing_extensions import override
 
@@ -164,8 +164,8 @@ class EtmProbe(ChromiumProbe):
   @override
   def attach(self, browser: Browser) -> None:
     super().attach(browser)
-    chromium = cast(ChromiumBased, browser)
-    chromium.flags.enable_benchmarking_api()
+    assert isinstance(browser, ChromiumBased)
+    browser.flags.enable_benchmarking_api()
 
   @override
   def get_context_cls(self) -> type[EtmProbeContext]:

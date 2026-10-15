@@ -8,7 +8,7 @@ import functools
 import logging
 import shlex
 from typing import TYPE_CHECKING, ClassVar, Final, Iterable, Self, Sequence, \
-    TypeAlias, cast
+    TypeAlias
 
 from typing_extensions import override
 
@@ -398,8 +398,8 @@ class ProfilingProbe(Probe):
     else:
       raise ProbeIncompatibleBrowser(self, browser)
     if browser.attributes().is_chromium_based:
-      chromium = cast(ChromiumBased, browser)
-      self._validate_chromium_based(chromium)
+      assert isinstance(browser, ChromiumBased)
+      self._validate_chromium_based(browser)
     if self.run_pprof(browser):
       self._validate_pprof(env, browser)
     if not browser_platform.is_linux:
@@ -459,7 +459,8 @@ class ProfilingProbe(Probe):
     self._validate_linux_perf_paranoid(browser)
 
   def _validate_linux_perf_paranoid(self, browser: Browser) -> None:
-    linux_platform = cast(plt.LinuxPlatform, browser.platform)
+    linux_platform = browser.platform
+    assert isinstance(linux_platform, plt.LinuxPlatform)
     if (paranoid := linux_platform.perf_event_paranoid()) is None:
       return
     if paranoid > MAX_PERF_EVENT_PARANOID:
@@ -518,8 +519,8 @@ class ProfilingProbe(Probe):
       assert browser.attributes().is_chromium_based, (
           f"Expected Chromium-based browser, found {type(browser)}.")
     if browser.attributes().is_chromium_based:
-      chromium = cast(ChromiumBased, browser)
-      self._attach_chromium(chromium)
+      assert isinstance(browser, ChromiumBased)
+      self._attach_chromium(browser)
 
   def _attach_chromium(self, browser: ChromiumBased) -> None:
     if not self._spare_renderer_process:

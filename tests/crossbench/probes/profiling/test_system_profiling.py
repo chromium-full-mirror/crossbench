@@ -13,6 +13,7 @@ from typing_extensions import override
 from crossbench import path as pth
 from crossbench.benchmarks.loading.page.live import LivePage
 from crossbench.browsers.chromium.version import ChromiumVersion
+from crossbench.browsers.chromium_based.chromium_based import ChromiumBased
 from crossbench.browsers.settings import Settings
 from crossbench.plt.android_adb import Adb
 from crossbench.plt.bin import Binaries
@@ -639,7 +640,7 @@ class LinuxProfilingContextTestCase(GenericProbeTestCase):
     self.probe = ProfilingProbe()
     self.run = mock.Mock()
     self.run.is_remote = False
-    self.run.browser = mock.Mock()
+    self.run.browser = mock.Mock(spec=ChromiumBased)
     self.run.browser.platform = self.platform
     self.run.browser.version = ChromiumVersion((120, 0, 0, 0))
     self.run.browser.path = pathlib.Path("/tmp/chrome/chrome")

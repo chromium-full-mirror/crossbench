@@ -303,11 +303,14 @@ class PyodideAndroidAdbPlatform(android_adb.AndroidAdbPlatform):
 
   @property
   def webadb(self) -> Any:
-    return cast(PyodideAdb, self.adb).webadb
+    assert isinstance(self.adb, PyodideAdb)
+    return self.adb.webadb
 
   @override
   def get_gcs_blob(self, gcs_url: str) -> PyodideGcsBlob:
-    return cast(PyodideGcsBlob, self.host_platform.get_gcs_blob(gcs_url))
+    blob = self.host_platform.get_gcs_blob(gcs_url)
+    assert isinstance(blob, PyodideGcsBlob)
+    return blob
 
   def _check_interrupted(self) -> None:
     if self.webadb and self.webadb.isInterrupted():

@@ -7,7 +7,7 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import logging
-from typing import TYPE_CHECKING, ClassVar, Iterator, Self, Sequence, cast
+from typing import TYPE_CHECKING, ClassVar, Iterator, Self, Sequence
 
 from typing_extensions import override
 
@@ -165,6 +165,7 @@ class PageConfig(ConfigObject):
   def first_url(self) -> str:
     for action in self.actions():
       if action.TYPE == ActionType.GET:
-        return cast(GetAction, action).url
+        assert isinstance(action, GetAction)
+        return action.url
     logging.debug("PageConfig: No GET action with an URL found.")
     return ""

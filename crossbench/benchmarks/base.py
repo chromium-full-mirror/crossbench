@@ -10,7 +10,7 @@ import datetime as dt
 import logging
 import re
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Generic, Iterable, \
-    Mapping, NotRequired, Sequence, TypeAlias, TypedDict, TypeVar, cast
+    Mapping, NotRequired, Sequence, TypeAlias, TypedDict, TypeVar
 
 from ordered_set import OrderedSet
 from typing_extensions import Self, override
@@ -874,10 +874,10 @@ class PressBenchmark(SubStoryBenchmark):
     self.custom_url = custom_url
     if custom_url:
       for story in stories:
-        press_story = cast(PressBenchmarkStory, story)
-        assert press_story.url == custom_url, (
-            f"Expected custom url on {press_story} to be {custom_url} "
-            f"but got {press_story.url}")
+        assert isinstance(story, PressBenchmarkStory)
+        assert story.url == custom_url, (
+            f"Expected custom url on {story} to be {custom_url} "
+            f"but got {story.url}")
 
   @override
   def setup(self, runner: Runner) -> None:
@@ -889,7 +889,8 @@ class PressBenchmark(SubStoryBenchmark):
       if runner.has_any_live_network():
         self._validate_custom_url(runner, self.custom_url)
       return
-    first_story = cast(PressBenchmarkStory, self.stories[0])
+    first_story = self.stories[0]
+    assert isinstance(first_story, PressBenchmarkStory)
     url = first_story.url
     if not runner.has_all_live_network() and not url:
       # For non-live networks we create a matching URL

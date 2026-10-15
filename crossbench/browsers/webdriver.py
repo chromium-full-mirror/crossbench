@@ -12,13 +12,13 @@ import subprocess
 import time
 import traceback
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Final, Iterator, NoReturn, Sequence, \
-    cast
+from typing import TYPE_CHECKING, Any, Final, Iterator, NoReturn, Sequence
 
 import selenium.common.exceptions
 import urllib3
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.remote_connection import RemoteConnection
 from typing_extensions import override
 
 from crossbench import exception
@@ -28,18 +28,17 @@ from crossbench.browsers.browser import Browser
 from crossbench.browsers.version import BrowserVersion, UnknownBrowserVersion
 from crossbench.helper import wait
 from crossbench.probes.internal.browser.driver_log import BrowserDriverLogProbe
-from crossbench.types import JsonDict
 
 if TYPE_CHECKING:
   import datetime as dt
 
   from selenium.webdriver.common.timeouts import Timeouts
-  from selenium.webdriver.remote.remote_connection import RemoteConnection
 
   from crossbench import path as pth
   from crossbench.browsers.settings import Settings
   from crossbench.env.runner_env import RunnerEnv
   from crossbench.runner.groups.session import BrowserSessionRunGroup
+  from crossbench.types import JsonDict
 
 
 class DriverException(RuntimeError):
@@ -65,12 +64,14 @@ class WebDriverBrowser(Browser, metaclass=abc.ABCMeta):
   _http_timeout_cache: float | None = None
 
   def _get_http_timeout(self) -> int:
-    executor = cast("RemoteConnection", self._private_driver.command_executor)
+    executor = self._private_driver.command_executor
+    assert isinstance(executor, RemoteConnection)
     return executor.client_config.timeout
 
   def _set_http_timeout(self, timeout: float) -> None:
     logging.debug("Setting http request timeout to %s", timeout)
-    executor = cast("RemoteConnection", self._private_driver.command_executor)
+    executor = self._private_driver.command_executor
+    assert isinstance(executor, RemoteConnection)
     executor.client_config.timeout = timeout
 
   @contextmanager
@@ -265,7 +266,8 @@ class WebDriverBrowser(Browser, metaclass=abc.ABCMeta):
   @override
   def details_json(self) -> JsonDict:
     details: JsonDict = super().details_json()
-    log = cast(JsonDict, details["log"])
+    log = details["log"]
+    assert isinstance(log, dict)
     if self.driver_log_file:
       log["driver"] = os.fspath(self.driver_log_file)
     return details

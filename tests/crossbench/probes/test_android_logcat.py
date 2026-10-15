@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from unittest import mock
 
+from crossbench.plt.android_adb import AndroidAdbPlatform
 from crossbench.probes.android_logcat import AndroidLogcatProbeContext, \
     LogcatAndroidProbe
 from crossbench.probes.probe import ProbeIncompatibleBrowser
@@ -32,7 +33,8 @@ class LogcatAndroidProbeTestCase(BaseProbeTestCase):
   def test_probe_lifecycle_and_teardown(self):
     probe = LogcatAndroidProbe(("Tag:V",))
     run = self.mock_run()
-    platform = run.browser_session.browser.platform
+    platform = mock.MagicMock(spec=AndroidAdbPlatform)
+    run.browser_session.browser.platform = platform
     platform.is_android = True
     platform.sh_stdout.return_value = "2026-05-20 12:00:00\n"
 

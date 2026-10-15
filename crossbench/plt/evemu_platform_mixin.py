@@ -10,8 +10,7 @@ import datetime as dt
 import logging
 import subprocess
 import time
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Final, Iterable, \
-    cast
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Final, Iterable
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -20,14 +19,14 @@ from crossbench.action_runner.action.enums import ButtonClick
 from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
     MouseButtonEvent, MouseMoveEvent, TouchEvent, WaitEvent
 from crossbench.action_runner.virtual_device.all import DEFAULT_VIRTUAL_DEVICES
+from crossbench.action_runner.virtual_device.pointing import \
+    PointingVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.virtual_device_type import \
     VirtualDeviceType
 from crossbench.plt.base import Platform
 
 if TYPE_CHECKING:
   from crossbench.action_runner.config import VirtualDeviceConfig
-  from crossbench.action_runner.virtual_device.pointing import \
-      PointingVirtualDeviceConfig
 
 # Simplified mapping for common W3C to Linux EV_KEY codes
 # See linux/input-event-codes.h
@@ -254,13 +253,12 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
       if device_config.device_type == VirtualDeviceType.KEYBOARD:
         self._init_virtual_keyboard(device_config.name)
       elif device_config.device_type == VirtualDeviceType.TOUCHSCREEN:
-        self._init_pointing_virtual_device(
-            cast("PointingVirtualDeviceConfig", device_config),
-            _EVEMU_TOUCHSCREEN_HEADER)
+        assert isinstance(device_config, PointingVirtualDeviceConfig)
+        self._init_pointing_virtual_device(device_config,
+                                           _EVEMU_TOUCHSCREEN_HEADER)
       elif device_config.device_type == VirtualDeviceType.MOUSE:
-        self._init_pointing_virtual_device(
-            cast("PointingVirtualDeviceConfig", device_config),
-            _EVEMU_MOUSE_HEADER)
+        assert isinstance(device_config, PointingVirtualDeviceConfig)
+        self._init_pointing_virtual_device(device_config, _EVEMU_MOUSE_HEADER)
       else:
         raise ValueError(
             f"Unsupported virtual device type: {device_config.device_type}")

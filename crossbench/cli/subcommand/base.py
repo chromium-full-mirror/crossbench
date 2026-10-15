@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, ClassVar, Sequence, cast
+from typing import TYPE_CHECKING, ClassVar, Sequence
 
 from crossbench.cli.parser import CBArgumentParser, CBNamespace
 
@@ -40,7 +40,8 @@ class CrossbenchSubcommand(abc.ABC):
   @property
   def parser(self) -> CBArgumentParser:
     assert self._parser is not None, "Parser not registered"
-    return cast(CBArgumentParser, self._parser)
+    assert isinstance(self._parser, CBArgumentParser)
+    return self._parser
 
   @abc.abstractmethod
   def register_subcommand(self,

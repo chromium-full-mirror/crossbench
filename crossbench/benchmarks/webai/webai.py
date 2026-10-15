@@ -8,7 +8,7 @@ import abc
 import datetime as dt
 import json
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Sequence, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Sequence
 
 from typing_extensions import override
 
@@ -39,7 +39,9 @@ class WebAIProbe(BenchmarkProbeMixin, JsonResultProbe, metaclass=abc.ABCMeta):
 
   @override
   def create_context(self, run: Run) -> WebAIProbeContext:
-    return cast(WebAIProbeContext, super().create_context(run))
+    context = super().create_context(run)
+    assert isinstance(context, WebAIProbeContext)
+    return context
 
   @override
   def get_context_cls(self) -> type[WebAIProbeContext]:

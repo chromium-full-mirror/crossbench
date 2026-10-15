@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import enum
 import textwrap
-from typing import NamedTuple, Self, cast
+from typing import NamedTuple, Self
 
 import tabulate
 
@@ -38,4 +38,5 @@ class StrEnumWithHelp(StrEnumWithHelpData, enum.Enum):
     return text
 
   def __str__(self) -> str:
-    return cast(str, self.value)
+    assert isinstance(self.value, str)
+    return self.value

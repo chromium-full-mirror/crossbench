@@ -37,7 +37,9 @@ class ActionTypeConfigParser(ConfigParser[ActionType]):
         "action", aliases=("type",), type=ActionType.parse, required=True)
 
   def new_instance_from_kwargs(self, kwargs: dict[str, object]) -> ActionType:
-    return cast(ActionType, kwargs["action"])
+    action = kwargs["action"]
+    assert isinstance(action, ActionType)
+    return action
 
 
 _ACTION_TYPE_CONFIG_PARSER: Final = ActionTypeConfigParser()

@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import Final, cast
+from typing import Final
 
 from typing_extensions import override
 
@@ -23,8 +23,8 @@ class ChromeOsPerfettoProbeContext(PerfettoProbeContext):
   @override
   def browser_platform(self) -> ChromeOsSshPlatform:
     browser_platform = super().browser_platform
-    isinstance(browser_platform, ChromeOsSshPlatform)
-    return cast(ChromeOsSshPlatform, browser_platform)
+    assert isinstance(browser_platform, ChromeOsSshPlatform)
+    return browser_platform
 
   @override
   def get_browser_config_path(self) -> pth.AnyPath:

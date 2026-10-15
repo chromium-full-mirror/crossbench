@@ -9,7 +9,7 @@ import json
 import logging
 import shlex
 import subprocess
-from typing import TYPE_CHECKING, Any, Sequence, cast
+from typing import TYPE_CHECKING, Any, Sequence
 
 import websocket
 from typing_extensions import override
@@ -19,6 +19,7 @@ from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.browsers.chromium.version import ChromiumVersion
 from crossbench.browsers.chromium_based.chromium_based import ChromiumBased
 from crossbench.flags.chrome import ChromeFlags
+from crossbench.plt.android_adb import AndroidAdbPlatform
 from crossbench.plt.base import SubprocessError
 
 if TYPE_CHECKING:
@@ -27,7 +28,6 @@ if TYPE_CHECKING:
   from crossbench import path as pth
   from crossbench.browsers.settings import Settings
   from crossbench.flags.base import FlagsT
-  from crossbench.plt.android_adb import AndroidAdbPlatform
   from crossbench.runner.groups.session import BrowserSessionRunGroup
   from crossbench.types import JsonDict
 
@@ -92,7 +92,8 @@ class CdpAndroidBrowser(ChromiumBased):
   @property
   @override
   def platform(self) -> AndroidAdbPlatform:
-    return cast("AndroidAdbPlatform", self._platform)
+    assert isinstance(self._platform, AndroidAdbPlatform)
+    return self._platform
 
   @property
   def android_package(self) -> str:

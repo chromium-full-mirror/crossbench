@@ -5,18 +5,18 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, Final
 
 from typing_extensions import override
 
 import crossbench.path as pth
 from crossbench.cli.ui import ui
+from crossbench.plt.macos import MacOSPlatform
 from crossbench.probes.profiling.context.base import PosixProfilingContext
 from crossbench.probes.profiling.enum import TargetMode
 from crossbench.probes.xcode_instruments.recorder import XctraceRecorder
 
 if TYPE_CHECKING:
-  from crossbench.plt.macos import MacOSPlatform
   from crossbench.probes.profiling.system_profiling import ProfilingProbe
   from crossbench.probes.results import ProbeResult
   from crossbench.runner.run import Run
@@ -47,8 +47,10 @@ class MacOSProfilingContext(PosixProfilingContext):
     return super().get_default_result_path().parent / "profile.trace"
 
   def _start_xctrace(self, pid: int | None = None) -> None:
+    browser_platform = self.browser_platform
+    assert isinstance(browser_platform, MacOSPlatform)
     self._recorder = XctraceRecorder(
-        cast("MacOSPlatform", self.browser_platform),
+        browser_platform,
         _MAC_TRACE_TEMPLATE_PATH,
         self.result_path,
         attach_pid=pid,

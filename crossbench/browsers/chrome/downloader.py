@@ -11,7 +11,7 @@ import shutil
 import tempfile
 import zipfile
 from typing import TYPE_CHECKING, ClassVar, Final, Iterable, Iterator, \
-    NamedTuple, cast
+    NamedTuple
 
 from typing_extensions import override
 
@@ -416,7 +416,8 @@ class ChromeDownloaderAndroid(ChromeDownloader):
 
   @property
   def adb(self) -> Adb:
-    return cast(AndroidAdbPlatform, self._browser_platform).adb
+    assert isinstance(self._browser_platform, AndroidAdbPlatform)
+    return self._browser_platform.adb
 
   @override
   def _pre_check(self, requested_version: BrowserVersion | None = None) -> None:
