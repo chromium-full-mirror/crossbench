@@ -1,6 +1,8 @@
 ---
 name: implementation-workflow
-description: Step-by-step workflow for implementing, typing, formatting, testing, and validating Python code in Crossbench.
+description: >-
+  Step-by-step workflow for implementing, typing, formatting, testing, and
+  validating Python code in Crossbench.
 ---
 
 # Crossbench Python Implementation Workflow
