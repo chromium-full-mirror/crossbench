@@ -122,21 +122,22 @@ def CheckChange(input_api: Any, output_api: Any, on_commit: bool) -> Any:
             kwargs={},
             python3=True,
         ))
-    tests.append(
-        input_api.Command(
-            name="pyrefly",
-            cmd=[
-                input_api.python3_executable,
-                "-m",
-                "pyrefly",
-                "check",
-                "-c",
-                str(root_path / "pyproject.toml"),
-            ] + mypy_files_to_check,
-            message=output_api.PresubmitError,
-            kwargs={},
-            python3=True,
-        ))
+    if platform.system() != "Linux" or platform.machine() == "x86_64":
+      tests.append(
+          input_api.Command(
+              name="pyrefly",
+              cmd=[
+                  input_api.python3_executable,
+                  "-m",
+                  "pyrefly",
+                  "check",
+                  "-c",
+                  str(root_path / "pyproject.toml"),
+              ] + mypy_files_to_check,
+              message=output_api.PresubmitError,
+              kwargs={},
+              python3=True,
+          ))
 
   # ---------------------------------------------------------------------------
   # isort:
