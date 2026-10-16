@@ -8,7 +8,7 @@ from typing import Any
 
 from typing_extensions import override
 
-from crossbench.action_runner.base import ActionRunner
+from crossbench.action_runner.action_runner import ActionRunner
 from crossbench.probes.probe import Probe
 from crossbench.probes.results import BrowserProbeResult, \
     DuplicateProbeResult, EmptyProbeResult, LocalProbeResult, \

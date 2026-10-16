@@ -16,7 +16,7 @@ from crossbench.action_runner.action.enums import WindowTarget
 from crossbench.bond.bond import AddBotsConfig
 
 if TYPE_CHECKING:
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.config import ConfigParser
 
 

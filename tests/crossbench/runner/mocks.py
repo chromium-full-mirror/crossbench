@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 from typing_extensions import override
 
 from crossbench import path as pth
-from crossbench.action_runner.base import ActionRunner
+from crossbench.action_runner.action_runner import ActionRunner
 from crossbench.cli.config.secrets import Secrets
 from crossbench.env.runner_env import RunnerEnv
 from crossbench.exception import Annotator

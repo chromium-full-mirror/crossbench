@@ -10,14 +10,14 @@ from unittest import mock
 import pandas as pd
 from typing_extensions import override
 
-from crossbench.action_runner.base import ActionRunner
+from crossbench.action_runner.action_runner import ActionRunner
 from crossbench.benchmarks.loading.tab_controller import TabController
-from crossbench.cli.parser import CBArgumentParser
 from crossbench.benchmarks.loadline import LoadLine1PhoneBenchmark, \
     LoadLine1PhoneDebugBenchmark, LoadLine1PhoneFastBenchmark, \
     LoadLine1TabletBenchmark, LoadLine1TabletDebugBenchmark, \
     LoadLine1TabletFastBenchmark, loadline_1
 from crossbench.benchmarks.loadline.loadline import LoadLineProbe
+from crossbench.cli.parser import CBArgumentParser
 from crossbench.probes.trace_processor.constants import QUERIES_DIR
 from tests import test_helper
 from tests.crossbench.base import BaseCliTestCase, BaseCrossbenchTestCase, \

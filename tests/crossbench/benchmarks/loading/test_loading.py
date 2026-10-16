@@ -16,7 +16,7 @@ from unittest import mock
 from typing_extensions import override
 
 from crossbench.action_runner.action.action_type import ActionType
-from crossbench.action_runner.base import ActionRunner
+from crossbench.action_runner.action_runner import ActionRunner
 from crossbench.benchmarks.loading.config.blocks import ActionBlock, \
     ActionBlockListConfig
 from crossbench.benchmarks.loading.config.login.google import GOOGLE_LOGIN_URL

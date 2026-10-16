@@ -11,7 +11,7 @@ from crossbench.action_runner.action.enums import ReadyState
 from crossbench.action_runner.action.get import GetAction
 from crossbench.action_runner.action.meet_create import MeetCreateAction
 from crossbench.action_runner.action.meet_script import MeetScriptAction
-from crossbench.action_runner.base import ActionRunner
+from crossbench.action_runner.action_runner import ActionRunner
 from crossbench.action_runner.bond_action_runner import BondActionRunner
 from crossbench.cli.config.secrets import ServiceAccount
 from tests import test_helper

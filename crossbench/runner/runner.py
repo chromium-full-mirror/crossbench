@@ -44,7 +44,7 @@ from crossbench.uploader import results_uploader
 
 if TYPE_CHECKING:
 
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.benchmarks.base import Benchmark
   from crossbench.browsers.browser import Browser
   from crossbench.plt.types import PlatformKey

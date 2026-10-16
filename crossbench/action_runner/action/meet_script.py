@@ -15,7 +15,7 @@ from crossbench.action_runner.action.bond import BondAction
 from crossbench.parse import ObjectParser
 
 if TYPE_CHECKING:
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.config import ConfigParser
 
 

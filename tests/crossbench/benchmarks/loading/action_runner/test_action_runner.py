@@ -19,7 +19,7 @@ from crossbench.action_runner.action.probe import ProbeAction
 from crossbench.action_runner.action.scroll import ScrollAction
 from crossbench.action_runner.action.swipe import SwipeAction
 from crossbench.action_runner.action.text_input import TextInputAction
-from crossbench.action_runner.base import SCRIPTS_DIR, ActionRunner, \
+from crossbench.action_runner.action_runner import SCRIPTS_DIR, ActionRunner, \
     WindowPositions
 from crossbench.action_runner.display_rectangle import DisplayRectangle
 from crossbench.action_runner.element_not_found_error import \

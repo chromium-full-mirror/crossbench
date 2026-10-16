@@ -16,7 +16,7 @@ from crossbench.benchmarks.loading.tab_controller import TabController
 from crossbench.stories.story import Story
 
 if TYPE_CHECKING:
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.cli.config.secrets import Secrets
   from crossbench.runner.run import Run
 

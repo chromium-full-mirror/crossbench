@@ -22,7 +22,7 @@ from crossbench.config import ConfigError, ConfigObject, ConfigParser
 from crossbench.parse import NumberParser, ObjectParser
 
 if TYPE_CHECKING:
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.benchmarks.loading.page.interactive import InteractivePage
   from crossbench.runner.run import Run
   from crossbench.types import JsonDict

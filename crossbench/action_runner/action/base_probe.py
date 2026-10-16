@@ -16,7 +16,7 @@ from crossbench.action_runner.action.action_type import ActionType
 from crossbench.probes.all import PROBE_LOOKUP
 
 if TYPE_CHECKING:
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.probes.probe import Probe
   from crossbench.types import JsonDict
 

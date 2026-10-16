@@ -26,7 +26,7 @@ from crossbench.probes.probe_context import ProbeContext
 if TYPE_CHECKING:
   import argparse
 
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.benchmarks.loading.page.base import Page
   from crossbench.browsers.attributes import BrowserAttributes
   from crossbench.cli.parser import CBArgumentParser

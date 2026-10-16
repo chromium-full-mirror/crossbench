@@ -21,7 +21,7 @@ from crossbench.parse import DurationParser, NumberParser
 if TYPE_CHECKING:
   import urllib.parse as urlparse
 
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.types import JsonDict
 
 

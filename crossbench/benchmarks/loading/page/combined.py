@@ -16,7 +16,7 @@ from crossbench.benchmarks.loading.tab_controller import TabController
 from crossbench.cli.config.secrets import Secrets, SecretsMergeError
 
 if TYPE_CHECKING:
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.runner.run import Run
   from crossbench.types import JsonDict
 

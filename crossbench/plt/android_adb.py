@@ -24,7 +24,7 @@ from snippet_uiautomator import uiautomator
 from typing_extensions import override
 
 from crossbench import path as pth
-from crossbench.action_runner.base import ActionRunner
+from crossbench.action_runner.action_runner import ActionRunner
 from crossbench.action_runner.display_rectangle import DisplayRectangle
 from crossbench.action_runner.element_not_found_error import \
     ElementNotFoundError

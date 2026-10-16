@@ -26,7 +26,7 @@ from crossbench.stories.press_benchmark import PressBenchmarkStory
 from crossbench.stories.story import Story
 
 if TYPE_CHECKING:
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.benchmarks.benchmark_probe import BenchmarkProbeMixin
   from crossbench.browsers.attributes import BrowserAttributes
   from crossbench.cli.parser import CBArgumentParser

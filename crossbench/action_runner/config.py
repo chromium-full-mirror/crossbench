@@ -8,7 +8,7 @@ import dataclasses
 import logging
 from typing import TYPE_CHECKING, Self
 
-from crossbench.action_runner.base import ActionRunner
+from crossbench.action_runner.action_runner import ActionRunner
 from crossbench.action_runner.virtual_device.all import \
     DEFAULT_VIRTUAL_DEVICES, VIRTUAL_DEVICES_TUPLE
 from crossbench.action_runner.virtual_device.virtual_device_config import \

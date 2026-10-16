@@ -13,7 +13,7 @@ from crossbench.action_runner.action.action import Action
 from crossbench.action_runner.action.action_type import ActionType
 
 if TYPE_CHECKING:
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
 
 
 @dataclasses.dataclass(frozen=True, eq=False)

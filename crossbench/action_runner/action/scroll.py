@@ -17,7 +17,7 @@ from crossbench.benchmarks.loading.input_source import InputSource
 from crossbench.parse import DurationParser, NumberParser, ObjectParser
 
 if TYPE_CHECKING:
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.config import ConfigParser
   from crossbench.types import JsonDict
 

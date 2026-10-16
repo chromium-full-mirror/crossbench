@@ -34,7 +34,7 @@ from crossbench.str_enum_with_help import StrEnumWithHelp
 if TYPE_CHECKING:
   from selenium.webdriver.common.options import ArgOptions
 
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.benchmarks.base import Benchmark
   from crossbench.browsers.browser import Browser
   from crossbench.cli.config.secrets import Secrets

@@ -15,7 +15,7 @@ from crossbench.action_runner.action.enums import ReadyState
 from crossbench.benchmarks.loading.config.login.base import PresetLoginBlock
 
 if TYPE_CHECKING:
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.benchmarks.loading.page.interactive import InteractivePage
   from crossbench.cli.config.secrets import UsernamePassword
   from crossbench.runner.actions import Actions

@@ -22,7 +22,7 @@ from crossbench.runner.probe_context_lookup_error import \
     ProbeContextLookupError
 
 if TYPE_CHECKING:
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.benchmarks.loading.config.blocks import ActionBlock
   from crossbench.benchmarks.loading.config.login.custom import LoginBlock
   from crossbench.browsers.browser import Browser

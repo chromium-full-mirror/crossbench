@@ -15,7 +15,7 @@ from crossbench.action_runner.action.action_type import ActionType
 from crossbench.parse import NumberParser, ObjectParser
 
 if TYPE_CHECKING:
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.config import ConfigParser
   from crossbench.types import JsonDict
 

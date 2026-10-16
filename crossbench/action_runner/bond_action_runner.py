@@ -15,7 +15,7 @@ from crossbench.parse import ObjectParser
 if TYPE_CHECKING:
   from crossbench.action_runner.action import all as i_action
   from crossbench.action_runner.action.bond import BondAction
-  from crossbench.action_runner.base import ActionRunner
+  from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.browsers.browser import Browser
   from crossbench.runner.run import Run
 
