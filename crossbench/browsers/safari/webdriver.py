@@ -7,6 +7,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import os
+import subprocess
 from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 from selenium import webdriver
@@ -36,6 +37,11 @@ class SafariDriverKwargs(TypedDict):
 class SafariWebDriver(WebDriverBrowser, Safari):
 
   MAX_STARTUP_TIMEOUT: ClassVar[dt.timedelta] = dt.timedelta(seconds=10)
+  # Delay between launching safaridriver and sending the first session
+  # request. safaridriver answers HTTP requests before it has finished
+  # enumerating attached devices, so a session requested too early might not
+  # see all of them.
+  DRIVER_WARMUP_DELAY: ClassVar[dt.timedelta] = dt.timedelta(seconds=0)
 
   def __init__(self,
                label: str,
@@ -43,6 +49,7 @@ class SafariWebDriver(WebDriverBrowser, Safari):
                settings: Settings | None = None) -> None:
     super().__init__(label, path, settings)
     assert self.platform.is_apple, f"Unsupported platform: {self.platform}"
+    self._service: SafariService | None = None
 
   @classmethod
   @override
@@ -74,12 +81,17 @@ class SafariWebDriver(WebDriverBrowser, Safari):
     options: SafariOptions = self._get_driver_options(session)
     session.setup_selenium_options(options)
 
-    service = SafariService(executable_path=os.fspath(driver_path))
+    service = self._create_service(self.host_platform.local_path(driver_path))
     driver_kwargs: SafariDriverKwargs = {"service": service, "options": options}
 
-    with ui.spinner(), exception.annotate("Starting safaridriver with retries"):
-      driver = self._start_driver_with_retries(driver_path, driver_kwargs)
-      self.host_platform.sleep(0.5)
+    try:
+      with ui.spinner(), exception.annotate(
+          "Starting safaridriver with retries"):
+        driver = self._start_driver_with_retries(driver_path, driver_kwargs)
+        self.host_platform.sleep(0.5)
+    except BaseException:
+      self._stop_service()
+      raise
 
     assert driver.session_id, "Could not start webdriver"
     logs: pth.AnyPath = (
@@ -93,6 +105,43 @@ class SafariWebDriver(WebDriverBrowser, Safari):
           f"Invalid log file {first_log_file}")
     return driver
 
+  def _create_service(self, driver_path: pth.LocalPath) -> SafariService:
+    """Creates the safaridriver service without starting it.
+
+    With reuse_service=True selenium leaves starting and stopping safaridriver
+    to us, see _ensure_service_running(). This lets us insert
+    DRIVER_WARMUP_DELAY between launching safaridriver and the first session
+    request, which selenium would otherwise send immediately.
+    """
+    assert not self._service, "safaridriver service is already running"
+    service = SafariService(
+        executable_path=os.fspath(driver_path), reuse_service=True)
+    self._service = service
+    return service
+
+  def _ensure_service_running(self, service: SafariService) -> None:
+    """(Re)starts safaridriver if needed and waits for device discovery.
+
+    Note that selenium stops the service after a failed session request
+    regardless of reuse_service, so this is needed before every attempt.
+    """
+    if service.is_connectable():
+      return
+    service.start()
+    if delay := self.DRIVER_WARMUP_DELAY:
+      logging.debug("SafariWebDriver: waiting %s for device discovery", delay)
+      self.host_platform.sleep(delay)
+
+  def _stop_service(self) -> None:
+    if not self._service:
+      return
+    try:
+      self._service.stop()
+    except (OSError, subprocess.SubprocessError) as e:
+      logging.debug("Could not stop safaridriver service: %s", e)
+    finally:
+      self._service = None
+
   # TODO(cbruni): implement iOS platform
   def _start_driver_with_retries(
       self, driver_path: pth.AnyPath,
@@ -104,6 +153,9 @@ class SafariWebDriver(WebDriverBrowser, Safari):
     for _ in WaitRange(
         min=2, timeout=self.MAX_STARTUP_TIMEOUT).wait_with_backoff():
       try:
+        # Selenium stops the service after a failed session request, so we
+        # have to (re)start it before every attempt.
+        self._ensure_service_running(driver_kwargs["service"])
         return webdriver.Safari(**driver_kwargs)
       except Exception as e:  # noqa: BLE001
         retries += 1
@@ -177,12 +229,18 @@ class SafariWebDriver(WebDriverBrowser, Safari):
     try:
       super().force_quit()
     finally:
+      # Selenium does not stop a reused service, so we have to do it here.
+      self._stop_service()
       # Certain safaridriver versions keep on lingering around when they fail.
       self.host_platform.killall("safaridriver")
 
 
 class SafariWebdriverIOS(SafariWebDriver):
   MAX_STARTUP_TIMEOUT: ClassVar[dt.timedelta] = dt.timedelta(seconds=15)
+  # USB-attached devices are discovered noticeably later than Wi-Fi
+  # (CoreDevice) ones. Without this delay safaridriver only considers the
+  # Wi-Fi devices for the first session request and fails for USB devices.
+  DRIVER_WARMUP_DELAY: ClassVar[dt.timedelta] = dt.timedelta(seconds=1)
 
   @override
   def _get_driver_options(self,
