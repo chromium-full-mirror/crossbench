@@ -294,7 +294,7 @@ class WebPowerBenchmarkBaseTestCase(BaseWebPowerBenchmarkTestCase):
     run = self.mock_run()
     with mock.patch.object(self.platform,
                            "setup_virtual_devices") as mock_setup_devices:
-      benchmark.new_action_runner(self.platform, run)
+      benchmark.new_action_runner(run)
       mock_setup_devices.assert_called_once_with(())
 
   def test_custom_action_runner_config(self) -> None:

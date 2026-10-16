@@ -4,17 +4,13 @@
 
 from __future__ import annotations
 
-import argparse
+import logging
 import unittest
 from typing import Any
 from unittest import mock
 
-from crossbench import plt
-from crossbench.action_runner.base import ActionRunner
 from crossbench.action_runner.config import DEFAULT_VIRTUAL_DEVICES, \
-    ActionRunnerConfig, ActionRunnerType
-from crossbench.action_runner.unified_input_action_runner import \
-    UnifiedInputActionRunner
+    ActionRunnerConfig
 from crossbench.action_runner.virtual_device.keyboard import \
     KeyboardVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.mouse import \
@@ -31,84 +27,11 @@ class ActionRunnerConfigTest(unittest.TestCase):
   def setUp(self) -> None:
     self.mock_run = mock.MagicMock(spec=Run)
 
-  def test_parse_invalid(self) -> None:
-    for invalid in ["bas", "adnroid", "chroms"]:
-      with self.subTest(pattern=invalid):
-        with self.assertRaises((argparse.ArgumentTypeError, ValueError)):
-          ActionRunnerConfig.parse(invalid)
-
-  def test_parse_basic(self) -> None:
-    action_runner = ActionRunnerConfig.parse("basic")
-    self.assertIsInstance(action_runner, ActionRunnerConfig)
-    self.assertEqual(action_runner.type, ActionRunnerType.BASIC)
-    self.assertIsInstance(
-        action_runner.instantiate(plt.PLATFORM, self.mock_run), ActionRunner)
-
-  def test_parse_auto(self) -> None:
-    action_runner = ActionRunnerConfig.parse("auto")
-    self.assertIsInstance(action_runner, ActionRunnerConfig)
-    self.assertEqual(action_runner.type, ActionRunnerType.AUTO)
-    self.assertIsInstance(
-        action_runner.instantiate(plt.PLATFORM, self.mock_run), ActionRunner)
-
-  def test_parse_auto_android(self) -> None:
-    action_runner_config = ActionRunnerConfig.parse("auto")
-    mock_platform = mock.MagicMock()
-    mock_platform.is_android = True
-    action_runner = action_runner_config.instantiate(mock_platform,
-                                                     self.mock_run)
-    self.assertIsInstance(action_runner, UnifiedInputActionRunner)
-    self.assertEqual(action_runner_config.virtual_devices, ())
-
-  def test_parse_auto_chromeos(self) -> None:
-    action_runner_config = ActionRunnerConfig.parse("auto")
-    mock_platform = mock.MagicMock()
-    mock_platform.is_android = False
-    mock_platform.is_chromeos = True
-    action_runner = action_runner_config.instantiate(mock_platform,
-                                                     self.mock_run)
-    self.assertIsInstance(action_runner, UnifiedInputActionRunner)
-    self.assertEqual(action_runner_config.virtual_devices, ())
-
-  def test_parse_auto_linux(self) -> None:
-    action_runner_config = ActionRunnerConfig.parse("auto")
-    mock_platform = mock.MagicMock()
-    mock_platform.is_android = False
-    mock_platform.is_chromeos = False
-    mock_platform.is_linux = True
-    action_runner = action_runner_config.instantiate(mock_platform,
-                                                     self.mock_run)
-    self.assertIsInstance(action_runner, UnifiedInputActionRunner)
-    self.assertEqual(action_runner_config.virtual_devices, ())
-
-  def test_parse_android(self) -> None:
-    action_runner_config = ActionRunnerConfig.parse("android")
-    self.assertIsInstance(action_runner_config, ActionRunnerConfig)
-    self.assertEqual(action_runner_config.type, ActionRunnerType.UNIFIED)
-    self.assertIs(action_runner_config.type, ActionRunnerType.ANDROID)
-    action_runner = action_runner_config.instantiate(plt.PLATFORM,
-                                                     self.mock_run)
-    self.assertIsInstance(action_runner, UnifiedInputActionRunner)
-    self.assertEqual(action_runner_config.virtual_devices, ())
-
-  def test_parse_unified(self) -> None:
-    action_runner_config = ActionRunnerConfig.parse("unified")
-    self.assertIsInstance(action_runner_config, ActionRunnerConfig)
-    self.assertEqual(action_runner_config.type, ActionRunnerType.UNIFIED)
-    self.assertIs(action_runner_config.type, ActionRunnerType.ANDROID)
-    self.assertIs(action_runner_config.type, ActionRunnerType.CHROMEOS)
-    action_runner = action_runner_config.instantiate(plt.PLATFORM,
-                                                     self.mock_run)
-    self.assertIsInstance(action_runner, UnifiedInputActionRunner)
-
-  def test_parse_chromeos(self) -> None:
-    action_runner_config = ActionRunnerConfig.parse("chromeos")
-    self.assertIsInstance(action_runner_config, ActionRunnerConfig)
-    self.assertIs(action_runner_config.type, ActionRunnerType.CHROMEOS)
-    action_runner = action_runner_config.instantiate(plt.PLATFORM,
-                                                     self.mock_run)
-    self.assertIsInstance(action_runner, UnifiedInputActionRunner)
-    self.assertEqual(action_runner_config.virtual_devices, ())
+  def test_parse_str_deprecated_noop(self) -> None:
+    with self.assertLogs(level=logging.WARNING) as cm:
+      action_runner_config = ActionRunnerConfig.parse("android")
+    self.assertTrue(any("deprecated" in msg for msg in cm.output))
+    self.assertEqual(action_runner_config, ActionRunnerConfig())
 
   def test_default_virtual_devices(self) -> None:
     action_runner_config = ActionRunnerConfig()
@@ -133,8 +56,6 @@ class ActionRunnerConfigTest(unittest.TestCase):
 
   def test_parse_virtual_devices(self) -> None:
     config_dict: dict[str, Any] = {
-        "type":
-            "android",
         "virtual_devices": [
             {
                 "type": "keyboard",
@@ -155,7 +76,6 @@ class ActionRunnerConfigTest(unittest.TestCase):
         ],
     }
     action_runner_config = ActionRunnerConfig.parse_dict(config_dict)
-    self.assertEqual(action_runner_config.type, ActionRunnerType.ANDROID)
     self.assertEqual(len(action_runner_config.virtual_devices), 3)
     self.assertEqual(
         action_runner_config.virtual_devices[0],
@@ -173,7 +93,7 @@ class ActionRunnerConfigTest(unittest.TestCase):
   def test_instantiate_default_no_virtual_devices(self) -> None:
     setup_devices = self.mock_run.browser_platform.setup_virtual_devices
     config = ActionRunnerConfig()
-    config.instantiate(plt.PLATFORM, self.mock_run)
+    config.instantiate(self.mock_run)
     setup_devices.assert_called_once_with(())
 
   def test_instantiate_explicit_virtual_devices(self) -> None:
@@ -181,7 +101,7 @@ class ActionRunnerConfigTest(unittest.TestCase):
     ts1 = TouchscreenVirtualDeviceConfig(name="ts1")
     mouse1 = MouseVirtualDeviceConfig(name="mouse1")
     config = ActionRunnerConfig(virtual_devices=(ts1, mouse1))
-    config.instantiate(plt.PLATFORM, self.mock_run)
+    config.instantiate(self.mock_run)
     setup_devices.assert_called_once_with((ts1, mouse1))
 
 

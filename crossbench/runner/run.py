@@ -115,7 +115,7 @@ class Run(ResultOrigin):
     self._env = RunEnv(self, self._browser.settings.env_config,
                        env_validation_mode)
     self._story = story
-    self._action_runner = runner.new_action_runner(self._browser.platform, self)
+    self._action_runner = runner.new_action_runner(self)
     self._repetition = NumberParser.positive_zero_int(repetition, "repetition")
     self._is_warmup = is_warmup
     assert temperature, "Missing cache-temperature value."

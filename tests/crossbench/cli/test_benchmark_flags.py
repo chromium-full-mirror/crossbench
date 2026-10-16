@@ -15,7 +15,6 @@ from typing_extensions import override
 from crossbench import __version__
 from crossbench import path as pth
 from crossbench import plt
-from crossbench.action_runner.config import ActionRunnerType
 from crossbench.benchmarks.loading.loading_benchmark import LoadingBenchmark
 from crossbench.browsers.splash_screen import SplashScreen, URLSplashScreen
 from crossbench.browsers.viewport import Viewport
@@ -46,18 +45,6 @@ class BenchmarkFlagsParserTestCase(BaseCliTestCase):
 
   def parse_args(self, *args: str) -> argparse.Namespace:
     return self.create_parser().parse_args(args)
-
-  def test_action_runner_config_flag(self) -> None:
-    args = self.parse_args("--action-runner=basic")
-    self.assertEqual(args.action_runner_config.type, ActionRunnerType.BASIC)
-    benchmark = LoadingBenchmark.from_cli_args(args)
-    self.assertEqual(benchmark.action_runner_config.type,
-                     ActionRunnerType.BASIC)
-
-  def test_action_runner_config_alias(self) -> None:
-    args_1 = self.parse_args("--action-runner=basic")
-    args_2 = self.parse_args("--action-runner-config=basic")
-    self.assertEqual(args_1, args_2)
 
   def test_cool_down_default(self) -> None:
     args = self.parse_args()

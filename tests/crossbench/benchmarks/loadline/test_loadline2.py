@@ -133,7 +133,7 @@ class BaseLoadLine2BenchmarkTestCase(
   def test_kwargs_from_cli(self) -> None:
     args = self.parse_args(
         "--deterministic",
-        "--action-runner-config=basic",
+        "--action-runner-config={}",
         "--stories=google_search_result",
     )
     kwargs = self.benchmark_cls.kwargs_from_cli(args)

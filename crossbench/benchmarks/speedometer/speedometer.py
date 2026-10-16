@@ -278,7 +278,7 @@ class SpeedometerStory(PressBenchmarkStory, metaclass=abc.ABCMeta):
   def _try_click_start_button_android(self, run: Run, actions: Actions) -> bool:
     # Enlarge the button first, as the coordinate logic doesn't work perfectly
     # at the moment (e.g. the gesture nav taskbar inset confuses the logic in
-    # the AndroidInputActionRunner).
+    # the ActionRunner).
     actions.js(f"""
         let startButton = document.querySelector("{self.BUTTON_SELECTOR}");
         startButton.style.position = "absolute";

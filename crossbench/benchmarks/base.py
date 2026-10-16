@@ -32,7 +32,6 @@ if TYPE_CHECKING:
   from crossbench.cli.parser import CBArgumentParser
   from crossbench.cli.types import Subparsers
   from crossbench.device_config import DeviceConfig
-  from crossbench.plt.base import Platform
   from crossbench.runner.groups.session import BrowserSessionRunGroup
   from crossbench.runner.run import Run
   from crossbench.runner.runner import Runner
@@ -200,11 +199,9 @@ class Benchmark(abc.ABC):
     return list(stories)
 
   def new_action_runner(self,
-                        platform: Platform,
                         run: Run,
                         step_by_step_mode: bool = False) -> ActionRunner:
-    return self._action_runner_config.instantiate(platform, run,
-                                                  step_by_step_mode)
+    return self._action_runner_config.instantiate(run, step_by_step_mode)
 
   def setup(self, runner: Runner) -> None:
     del runner

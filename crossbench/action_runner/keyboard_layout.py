@@ -87,12 +87,12 @@ def _build_reverse_us_keyboard_layout() -> immutabledict[tuple[str, bool], str]:
 
 
 # Maps (W3C KeyboardEvent.code, has_shift) pairs back to their original
-# character. UnifiedInputActionRunner translates text strings into low-level
-# KeyEvent sequences (using W3C key codes and ShiftLeft modifier events) before
-# passing them to Platform.inject_input_events(). On older Android devices
-# (SDK < 37) where uinput EVEMU injection is unsupported, AndroidAdbPlatform
-# falls back to `adb shell input keyboard text <str>` and needs this reverse
-# mapping to reconstruct the text string from the KeyEvent stream.
+# character. ActionRunner translates text strings into low-level KeyEvent
+# sequences (using W3C key codes and ShiftLeft modifier events) before passing
+# them to Platform.inject_input_events(). On older Android devices (SDK < 37)
+# where uinput EVEMU injection is unsupported, AndroidAdbPlatform falls back to
+# `adb shell input keyboard text <str>` and needs this reverse mapping to
+# reconstruct the text string from the KeyEvent stream.
 REVERSE_US_KEYBOARD_LAYOUT: Final[immutabledict[tuple[str, bool], str]] = (
     _build_reverse_us_keyboard_layout())
 

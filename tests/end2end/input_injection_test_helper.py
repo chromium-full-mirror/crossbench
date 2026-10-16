@@ -76,7 +76,6 @@ class BaseInputInjectionTest:
           f"--page-config={page_config_file}",
           f"--out-dir={test_env.results_dir}",
           "--env-validation=skip",
-          "--action-runner=unified",
           "--throw",
           *list(test_env.cq_flags),
       ]

@@ -1,16 +1,15 @@
 # `get_window_positions.js`
 
 This script queries viewport, screen, window, and target DOM element geometry in
-a single synchronous WebDriver `executeScript` round-trip so that
-`UnifiedInputActionRunner` can translate CSS viewport coordinates into physical
-device screen coordinates.
+a single synchronous WebDriver `executeScript` round-trip so that `ActionRunner`
+can translate CSS viewport coordinates into physical device screen coordinates.
 
 ## Execution & Arguments
 
-When locating a DOM element, `UnifiedInputActionRunner._get_viewport_info()`
-prepends the selector lookup snippet produced by
-`ActionRunner.get_selector_script()` (which resolves `arguments[0]` and binds
-the matched node to `element`) before evaluating `get_window_positions.js`.
+When locating a DOM element, `ActionRunner._get_viewport_info()` prepends the
+selector lookup snippet produced by `ActionRunner.get_selector_script()` (which
+resolves `arguments[0]` and binds the matched node to `element`) before
+evaluating `get_window_positions.js`.
 
 The script receives two WebDriver arguments:
 

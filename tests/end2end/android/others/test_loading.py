@@ -34,7 +34,6 @@ def _run_loading_test(browser_config: str,
         f"--page-config={page_config_file.name}",
         f"--out-dir={test_env.results_dir}",
         "--env-validation=skip",
-        "--action-runner=unified",
         *list(test_env.cq_flags),
     ]
     if probe_config_file:

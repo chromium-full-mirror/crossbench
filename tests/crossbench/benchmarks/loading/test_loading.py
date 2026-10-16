@@ -17,7 +17,6 @@ from typing_extensions import override
 
 from crossbench.action_runner.action.action_type import ActionType
 from crossbench.action_runner.base import ActionRunner
-from crossbench.action_runner.config import ActionRunnerType
 from crossbench.benchmarks.loading.config.blocks import ActionBlock, \
     ActionBlockListConfig
 from crossbench.benchmarks.loading.config.login.google import GOOGLE_LOGIN_URL
@@ -140,19 +139,12 @@ class LoadingBenchmarkCliTestCaseMixin:
     with self.assertRaisesRegex(argparse.ArgumentTypeError, "config"):
       self.benchmark_cls.from_cli_args(args)
 
-  def test_cli_flag_aliases(self):
-    args_action_runner = self.parse_args("--action-runner=chromeos")
-    args_action_runner_alias = self.parse_args(
-        "--action-runner-config=chromeos")
-    self.assertEqual(args_action_runner, args_action_runner_alias)
-
   def test_kwargs_from_cli(self):
-    args = self.parse_args("--action-runner=android")
+    args = self.parse_args()
     kwargs = self.benchmark_cls.kwargs_from_cli(args)
     self.assertIn("stories", kwargs)
     self.assertIn("action_runner_config", kwargs)
-    self.assertEqual(kwargs["action_runner_config"].type,
-                     ActionRunnerType.ANDROID)
+    self.assertIsNone(kwargs["action_runner_config"])
 
 
 class TestPageLoadBenchmark(LoadingBenchmarkCliTestCaseMixin, SubStoryTestCase):
@@ -676,9 +668,8 @@ class TestPageLoadBenchmark(LoadingBenchmarkCliTestCaseMixin, SubStoryTestCase):
     args_about_blank_alias = self.parse_args("--about-blank=500ms")
     self.assertEqual(args_about_blank, args_about_blank_alias)
 
-    args_action_runner = self.parse_args("--action-runner=chromeos")
-    args_action_runner_alias = self.parse_args(
-        "--action-runner-config=chromeos")
+    args_action_runner = self.parse_args("--action-runner={}")
+    args_action_runner_alias = self.parse_args("--action-runner-config={}")
     self.assertEqual(args_action_runner, args_action_runner_alias)
 
 

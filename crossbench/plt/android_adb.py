@@ -24,6 +24,7 @@ from snippet_uiautomator import uiautomator
 from typing_extensions import override
 
 from crossbench import path as pth
+from crossbench.action_runner.base import ActionRunner
 from crossbench.action_runner.display_rectangle import DisplayRectangle
 from crossbench.action_runner.element_not_found_error import \
     ElementNotFoundError
@@ -31,8 +32,6 @@ from crossbench.action_runner.input_events import InputEvent, KeyEvent, \
     MouseButtonEvent, MouseMoveEvent, TouchEvent, WaitEvent
 from crossbench.action_runner.keyboard_layout import \
     REVERSE_US_KEYBOARD_LAYOUT, W3C_TO_ANDROID_KEYCODE
-from crossbench.action_runner.unified_input_action_runner import \
-    UnifiedInputActionRunner
 from crossbench.benchmarks.loading.point import Point
 from crossbench.browsers.chromium.devtools import DevToolsRemoteClient
 from crossbench.flags.base import Flags, FlagsData
@@ -916,7 +915,7 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
     end: Point = touch_events[-1].position
     touch_down_count: int = sum(1 for e in touch_events if e.is_down)
     if touch_down_count == 1 and start == end:
-      if duration > UnifiedInputActionRunner.DEFAULT_CLICK_DURATION:
+      if duration > ActionRunner.DEFAULT_CLICK_DURATION:
         raise NotImplementedError(
             self._uinput_unsupported_msg(
                 "Non-zero click duration (long-press) is not supported."))

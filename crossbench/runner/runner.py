@@ -577,9 +577,8 @@ class Runner:
   def has_browser_group(self) -> bool:
     return self._browser_group is not None
 
-  def new_action_runner(self, platform: plt.Platform, run: Run) -> ActionRunner:
-    return self._benchmark.new_action_runner(platform, run,
-                                             self._step_by_step_mode)
+  def new_action_runner(self, run: Run) -> ActionRunner:
+    return self._benchmark.new_action_runner(run, self._step_by_step_mode)
 
   def wait_range(self,
                  min_interval: AnyTimeUnit,
