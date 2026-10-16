@@ -17,6 +17,8 @@ from crossbench import path as pth
 from crossbench import plt
 from crossbench.benchmarks.base import Benchmark
 from crossbench.benchmarks.loading.loading_benchmark import LoadingBenchmark
+from crossbench.benchmarks.speedometer.speedometer_3_1 import \
+    Speedometer31Benchmark, Speedometer31Story
 from crossbench.browsers import viewport
 from crossbench.browsers.splash_screen import SplashScreen, URLSplashScreen
 from crossbench.cli.cli import CrossBenchCLI
@@ -105,6 +107,61 @@ class FastCliTestCasePartB(BaseCliTestCase):
     with self.assertRaises(argparse.ArgumentTypeError):
       self.run_cli("loading", "--browser=chrome", "--browser=chrome",
                    "--urls=http://test.com", "--env-validation=skip", "--throw")
+
+  def _run_speedometer_cli(self, *args: str) -> Runner:
+    with self._patch_get_browser_cls(
+        mock_browser.MockChromeStable), mock.patch.object(
+            BenchmarkSubcommand, "_run_benchmark") as run_benchmark:
+      self.run_cli("sp3.1", "--browser=chrome", "--env-validation=skip", *args)
+    run_benchmark.assert_called_once()
+    runner = run_benchmark.call_args[0][1]
+    self.assertIsInstance(runner, Runner)
+    return runner
+
+  def _create_speedometer_checkout(self) -> pth.LocalPath:
+    assert Speedometer31Benchmark.LOCAL_DIR
+    local_dir = pth.LocalPath(pth.ROOT_DIR) / Speedometer31Benchmark.LOCAL_DIR
+    self.fs.create_file(local_dir / "index.html")
+    return local_dir
+
+  def test_speedometer_default_local_file_server(self):
+    self._create_speedometer_checkout()
+    runner = self._run_speedometer_cli()
+    benchmark = runner.benchmark
+    self.assertIsInstance(benchmark, Speedometer31Benchmark)
+    self.assertIsNone(benchmark.custom_url)
+    self.assertTrue(runner.browsers[0].network.is_local_file_server)
+
+  def test_speedometer_default_no_checkout(self):
+    with self._patch_get_browser_cls(mock_browser.MockChromeStable):
+      with self.assertRaisesRegex(argparse.ArgumentTypeError,
+                                  "local-serve dir"):
+        self.run_cli("sp3.1", "--browser=chrome", "--env-validation=skip",
+                     "--throw")
+      _, _, stderr = self.run_cli_output(
+          "sp3.1",
+          "--browser=chrome",
+          "--env-validation=skip",
+          raises=SysExitTestException)
+    self.assertIn("local-serve dir", stderr)
+
+  def test_speedometer_live_url_explicit(self):
+    self._create_speedometer_checkout()
+    runner = self._run_speedometer_cli("--live")
+    benchmark = runner.benchmark
+    self.assertIsInstance(benchmark, Speedometer31Benchmark)
+    self.assertEqual(benchmark.custom_url, Speedometer31Story.URL)
+    self.assertTrue(runner.browsers[0].network.is_live)
+
+  def test_speedometer_explicit_network_wins(self):
+    self._create_speedometer_checkout()
+    other_dir = pth.LocalPath("/other/benchmark")
+    self.fs.create_file(other_dir / "index.html")
+    runner = self._run_speedometer_cli(f"--local-file-server={other_dir}")
+    self.assertIsNone(runner.benchmark.custom_url)
+    network = runner.browsers[0].network
+    assert isinstance(network, LocalFileNetwork)
+    self.assertEqual(network.path, other_dir)
 
   def test_browser_identifiers_multiple(self):
     mock_browsers: list[type[mock_browser.MockBrowser]] = [

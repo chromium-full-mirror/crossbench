@@ -284,6 +284,17 @@ Crossbench supports various network settings directly, see `./cb.py help network
 | `--network=path/to/archive.wprgo` | Use 'wpr' replay network with the given request archive. |
 | `--network='{type:"wpr", path:"./archive.wprgo", speed:"3G-regular"}'`| Use 'wpr' network with 3G traffic shaping. |
 
+#### Local Press Benchmarks
+Press benchmarks whose sources are checked out via `DEPS` (`LOCAL_DIR` on the
+benchmark class, currently only `speedometer_3.1` in
+`third_party/speedometer/v3.1`) are served by default from that checkout via a
+local file server; on remote platforms the server port is reverse-forwarded to
+the device (e.g. via `adb reverse`). This matches the setup on the Chromium perf
+bots. Use `--live`, `--official` or `--url=...` to run against a hosted URL
+instead. Running without the checkout (e.g. `checkout_press_benchmarks = False`
+in your `.gclient` `custom_vars`, or a pip install) is an error unless one of
+these flags is passed.
+
 ## 📊 Results and Output Directory Structure
 
 By default, Crossbench stores all results in a timestamped folder under `results/`. A symlink `results/latest` is also created for convenience.

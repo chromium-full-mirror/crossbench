@@ -189,9 +189,11 @@ class PressBaseBenchmarkTestCase(SubStoryTestCase, metaclass=abc.ABCMeta):
 
   def test_cli_flag_live(self):
     args = self.parse_args("--live")
-    self.assertIsNone(args.custom_benchmark_url)
+    # --live explicitly pins the live URL (as opposed to the default None),
+    # so it overrides the benchmark's default local file server on Android.
+    self.assertEqual(args.custom_benchmark_url, self.story_cls.URL)
     benchmark_instance = self.benchmark_cls.from_cli_args(args)
-    self.assertIsNone(benchmark_instance.custom_url)
+    self.assertEqual(benchmark_instance.custom_url, self.story_cls.URL)
     for story in benchmark_instance.stories:
       self.assertEqual(story.url, self.story_cls.URL)
 

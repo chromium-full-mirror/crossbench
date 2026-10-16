@@ -12,7 +12,9 @@ from typing import TYPE_CHECKING, Final, Iterator, MutableSet
 from ordered_set import OrderedSet
 
 import crossbench.benchmarks.all as all_benchmarks
-from crossbench.benchmarks.base import Benchmark, SubStoryBenchmark
+from crossbench import path as pth
+from crossbench.benchmarks.base import Benchmark, PressBenchmark, \
+    SubStoryBenchmark
 from crossbench.benchmarks.loading.loading_benchmark import LoadingBenchmark
 from crossbench.benchmarks.memory.memory_benchmark import MemoryBenchmark
 from crossbench.benchmarks.web_power.base import WebPowerBenchmarkBase
@@ -86,6 +88,18 @@ class AllBenchmarksTestCase(unittest.TestCase):
         continue
       self.assertNotIn(benchmark_cls.DEFAULT_STORY_CLS, seen_story_classes)
       seen_story_classes.add(benchmark_cls.DEFAULT_STORY_CLS)
+
+  def test_press_benchmark_local_dirs(self):
+    for benchmark_cls in ALL:
+      if not issubclass(benchmark_cls, PressBenchmark):
+        continue
+      if not benchmark_cls.LOCAL_DIR:
+        continue
+      with self.subTest(benchmark_cls=benchmark_cls.__name__):
+        self.assertFalse(benchmark_cls.LOCAL_DIR.is_absolute())
+        index_html = pth.ROOT_DIR / benchmark_cls.LOCAL_DIR / "index.html"
+        self.assertTrue(index_html.is_file(),
+                        f"Missing {index_html}, run `gclient sync`.")
 
 
 if __name__ == "__main__":

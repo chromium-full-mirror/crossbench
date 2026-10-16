@@ -718,6 +718,8 @@ class BenchmarkSubcommand(CrossbenchSubcommand):
 
   def _process_network_config_args(self, args: CBNamespace) -> None:
     args.network_config = NetworkConfig.parse_args(args)
+    if args.network_config.is_default():
+      args.network_config = self._benchmark_cls.default_network_config(args)
 
   def _process_probe_config_args(self, args: CBNamespace) -> None:
     args.probe_config = ProbeListConfig.parse_args(args)

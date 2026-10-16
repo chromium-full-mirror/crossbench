@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from typing_extensions import override
 
+from crossbench import path as pth
 from crossbench.benchmarks.speedometer.speedometer_3 import \
     Speedometer3Benchmark, Speedometer3Probe, Speedometer3ProbeContext, \
     Speedometer3Story
@@ -49,6 +50,7 @@ class Speedometer31Benchmark(Speedometer3Benchmark):
   NAME: ClassVar[str] = "speedometer_3.1"
   DEFAULT_STORY_CLS: ClassVar = Speedometer31Story  # type: ignore
   PROBES: ClassVar[ProbeClsTupleT] = (Speedometer31Probe,)
+  LOCAL_DIR = pth.LocalPath("third_party/speedometer/v3.1")
 
   @classmethod
   @override
