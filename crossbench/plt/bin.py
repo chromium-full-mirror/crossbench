@@ -475,6 +475,7 @@ class Binaries:
   PYTHON3: ClassVar = Binary("python3", default="python3", win="python3.exe")
   RPM2CPIO: ClassVar = LinuxBinary("rpm2cpio")
   SIMPLEPERF: ClassVar = AndroidBinary("simpleperf")
+  WMIC: ClassVar = Binary("wmic", win="wmic.exe")
   XCTRACE: ClassVar = MacOsBinary("xctrace")
   CHROMEDRIVER: ClassVar = Binary(
       "chromedriver",

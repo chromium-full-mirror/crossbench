@@ -246,26 +246,36 @@ class WinMockPlatformTestCase(BaseLocalMockPlatformTestMixin,
     self.assertEqual(vram, {"gpu_0": 1024.0, "gpu_1": 2048.0})
 
   def test_gpu_vram_used_wmic(self):
-    self.expect_sh(
-        "wmic",
-        "path",
-        "Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory",
-        "get",
-        "DedicatedUsage,SharedUsage",
-        result="DedicatedUsage  SharedUsage\n1073741824      536870912\n",
-    )
-    vram = self.platform.gpu_vram_used()
+    wmic = self.path("C:/Windows/System32/wbem/wmic.exe")
+    self.fs.create_file(wmic)
+    with self.platform.override_binary("wmic.exe", wmic):
+      self.expect_sh(
+          wmic,
+          "path",
+          "Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory",
+          "get",
+          "DedicatedUsage,SharedUsage",
+          result="DedicatedUsage  SharedUsage\n1073741824      536870912\n",
+      )
+      vram = self.platform.gpu_vram_used()
     self.assertEqual(vram, {"gpu_wmic": 1536.0})
 
   def test_gpu_vram_used_none(self):
-    self.expect_sh(
-        "wmic",
-        "path",
-        "Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory",
-        "get",
-        "DedicatedUsage,SharedUsage",
-        result="DedicatedUsage  SharedUsage\n0               0\n",
-    )
+    wmic = self.path("C:/Windows/System32/wbem/wmic.exe")
+    self.fs.create_file(wmic)
+    with self.platform.override_binary("wmic.exe", wmic):
+      self.expect_sh(
+          wmic,
+          "path",
+          "Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory",
+          "get",
+          "DedicatedUsage,SharedUsage",
+          result="DedicatedUsage  SharedUsage\n0               0\n",
+      )
+      vram = self.platform.gpu_vram_used()
+    self.assertEqual(vram, {})
+
+  def test_gpu_vram_used_no_wmic(self):
     vram = self.platform.gpu_vram_used()
     self.assertEqual(vram, {})
 

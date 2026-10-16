@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 from crossbench import path as pth
 from crossbench.helper.size import Size
 from crossbench.plt.base import Platform
+from crossbench.plt.bin import Binaries
 from crossbench.plt.signals import WinSignals
 from crossbench.plt.version import PlatformVersion
 
@@ -229,9 +230,12 @@ class WinPlatform(Platform):
       if vram_dict:
         return vram_dict
 
-    # 2. Try WMIC / Performance Counters (DedicatedUsage + SharedUsage)
+    # 2. Try WMIC / Performance Counters (DedicatedUsage + SharedUsage).
+    # wmic.exe is no longer installed by default on newer Windows 11 builds.
+    if not (wmic := Binaries.WMIC.search(self)):
+      return super().gpu_vram_used()
     out = self.sh_stdout(
-        "wmic",
+        wmic,
         "path",
         "Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory",
         "get",
