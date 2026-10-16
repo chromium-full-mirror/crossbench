@@ -201,15 +201,16 @@ class LinuxPlatform(EvemuPlatformMixin, PosixPlatform):
   def _cpu_freq_from_proc(self) -> CPUFreqInfo | None:
     if not self.is_file(PROC_CPUINFO_PATH):
       return None
-    freqs: list[float] = []
+    total_freq: float = 0.0
+    count: int = 0
     for line in self.cat(PROC_CPUINFO_PATH).splitlines():
       if line.lower().startswith("cpu mhz"):
         _, freq_str = line.split(":", maxsplit=1)
-        freqs.append(NumberParser.positive_zero_float(freq_str.strip()))
-    if not freqs:
+        total_freq += NumberParser.positive_zero_float(freq_str.strip())
+        count += 1
+    if not count:
       return None
-    current = sum(freqs) / len(freqs)
-    return CPUFreqInfo(min=0.0, max=0.0, current=current)
+    return CPUFreqInfo(min=0.0, max=0.0, current=total_freq / count)
 
   @property
   @override
