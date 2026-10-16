@@ -26,6 +26,7 @@ import tempfile
 import urllib.error
 import urllib.request
 import weakref
+import webbrowser
 from typing import TYPE_CHECKING, Callable, Final, Generator, Iterable, \
     Iterator, Mapping, Sequence, cast
 
@@ -1262,6 +1263,19 @@ class Platform(abc.ABC):
   def check_system_monitoring(self, disable: bool = False) -> bool:
     del disable
     return True
+
+  def open_url(self, url: str) -> bool:
+    """Opens a URL in a browser on this platform.
+
+    Args:
+      url: The http or https URL to open.
+
+    Returns:
+      True if the browser was launched successfully, False otherwise.
+    """
+    self.assert_is_local()
+    url = ObjectParser.url_str(url, schemes=("http", "https"))
+    return webbrowser.open(url)
 
   def download_to(self, url: str, path: pth.AnyPath) -> pth.AnyPath:
     self.assert_is_local()

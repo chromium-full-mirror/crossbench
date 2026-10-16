@@ -7,25 +7,28 @@ from __future__ import annotations
 import argparse
 import contextlib
 import dataclasses
+import datetime as dt
 import enum
-from typing import TYPE_CHECKING, Final, Sequence, TypeVar
+from typing import TYPE_CHECKING, Callable, Final, Sequence, TypeVar
 
 from immutabledict import immutabledict
 
 from crossbench.cli.ui import ui
-from crossbench.helper import txt_helper
+from crossbench.helper import txt_helper, wait
 from crossbench.parse import NumberParser, ObjectParser
 from crossbench.pinpoint.api import JOB_SHORTEN_URL_TEMPLATE, \
     LESZEK_PERF_DEV_JOB_URL_TEMPLATE, LESZEK_PERF_JOB_SHORT_URL_TEMPLATE, \
     PINPOINT_JOB_URL_TEMPLATE
 from crossbench.pinpoint.format_time import format_datetime
+from crossbench.pinpoint.job_config import fetch_job_config
 
 if TYPE_CHECKING:
-  import datetime as dt
-
   from typing_extensions import Self
 
   from crossbench.types import JsonDict
+
+
+MIN_POLL_INTERVAL: Final[dt.timedelta] = dt.timedelta(seconds=1)
 
 
 class JobStatus(enum.StrEnum):
@@ -69,6 +72,10 @@ class JobStatus(enum.StrEnum):
   @property
   def is_completed(self) -> bool:
     return self is JobStatus.COMPLETED
+
+  @property
+  def is_success(self) -> bool:
+    return self.is_completed
 
 
 _STATUS_EMOJI_LOOKUP: Final[immutabledict[str, str]] = immutabledict({
@@ -285,6 +292,20 @@ class PinpointJobInfo:
     return None
 
   @classmethod
+  def from_id(cls, job_id: str, full: bool = False) -> Self:
+    """Fetches and returns PinpointJobInfo for the given job ID.
+
+    Args:
+      job_id: The Pinpoint job ID.
+      full: Whether to request full attempt data from the server.
+
+    Returns:
+      PinpointJobInfo parsed from the fetched job configuration.
+    """
+    data = fetch_job_config(job_id, full=full)
+    return cls.from_json(data)
+
+  @classmethod
   def from_json(cls, data: JsonDict) -> Self:
     arguments = cls._parse_arguments(data)
     status = JobStatus.parse(data.get("status"))
@@ -367,6 +388,12 @@ class PinpointJobInfo:
     return False
 
   @property
+  def is_success(self) -> bool:
+    if status := self.status:
+      return status.is_success
+    return False
+
+  @property
   def status_display(self) -> str:
     if self.status:
       if emoji := self.status.status_emoji:
@@ -407,11 +434,14 @@ class PinpointJobInfo:
       return ui.link(self.results_url)
     return ""
 
-  def to_status_entries(self) -> tuple[tuple[str, str], ...]:
+  def to_status_entries(self, link: bool = True) -> tuple[tuple[str, str], ...]:
+    url = self.short_url_link if link else self.short_url
+    results_url = (
+        self.formatted_results_url if link else (self.results_url or ""))
     entries: list[tuple[str, str | None]] = [
         ("Job ID", self.job_id),
         ("Status", self.status_display),
-        ("URL", self.short_url_link),
+        ("URL", url),
         ("Type", self.job_type or None),
         ("Benchmark", self.benchmark),
         ("Bot", self.bot),
@@ -423,10 +453,53 @@ class PinpointJobInfo:
         ("Completed", self.formatted_completed or None),
         ("Progress", self.progress),
         ("Differences", self.differences_str or None),
-        ("Results URL", self.formatted_results_url or None),
+        ("Results URL", results_url or None),
         ("Cancel Reason", self.cancel_reason),
     ]
     return tuple((k, v) for k, v in entries if v is not None)
 
   def to_dict(self) -> JsonDict:
     return dataclasses.asdict(self)
+
+  def wait(
+      self,
+      timeout: dt.timedelta = dt.timedelta.max,
+      poll_interval: dt.timedelta = dt.timedelta(seconds=30),
+      progress: Callable[[Self, dt.timedelta], None] | None = None,
+  ) -> Self:
+    """Waits for the Pinpoint job to finish.
+
+    Args:
+      timeout: Maximum duration to wait before timing out (defaults to no
+        timeout).
+      poll_interval: Polling interval between status checks (default: 30s).
+      progress: Optional callback invoked with (job_info, elapsed) on each poll.
+
+    Returns:
+      PinpointJobInfo with terminal status.
+
+    Raises:
+      ValueError: If the job has no job_id.
+      TimeoutError: If the job does not finish within the specified timeout.
+    """
+    if not self.job_id:
+      raise ValueError("Cannot wait for job without job_id.")
+    job_id = self.job_id
+    start_time = dt.datetime.now()
+    poll_seconds = max(MIN_POLL_INTERVAL, poll_interval).total_seconds()
+    job_info: Self = self
+
+    while not job_info.is_terminal:
+      elapsed = dt.datetime.now() - start_time
+      if elapsed >= timeout:
+        raise TimeoutError(f"Pinpoint job {job_id} did not finish within "
+                           f"{ui.format_duration(timeout)} "
+                           f"(current status: {job_info.status_display}).")
+
+      if progress:
+        progress(job_info, elapsed)
+      remaining = (timeout - elapsed).total_seconds()
+      wait.sleep(min(poll_seconds, max(0.0, remaining)))
+      job_info = type(self).from_id(job_id, full=True)
+
+    return job_info

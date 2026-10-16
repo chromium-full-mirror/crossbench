@@ -6,20 +6,32 @@ from __future__ import annotations
 
 import abc
 import argparse
+import contextlib
+import datetime as dt
+import json
+import logging
+import sys
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Final, final
+from typing import TYPE_CHECKING, Final, Iterator, final
 
+import yaml
+from tabulate import tabulate
 from typing_extensions import override
 
+from crossbench import plt
 from crossbench.cli.parser import CBArgumentParser
 from crossbench.cli.subcommand.base import CrossbenchSubcommand
-from crossbench.parse import NumberParser, ObjectParser, PathParser
+from crossbench.cli.ui import ui
+from crossbench.parse import DurationParser, NumberParser, ObjectParser, \
+    PathParser
+from crossbench.pinpoint.api import PINPOINT_JOB_URL_TEMPLATE
 from crossbench.pinpoint.benchmarks import pinpoint_benchmark_name
 from crossbench.pinpoint.cancel_job import cancel_jobs
 from crossbench.pinpoint.config import PinpointBisectJobConfig, \
     PinpointTryJobConfig
 from crossbench.pinpoint.job_config import print_job_config
-from crossbench.pinpoint.job_info import UrlSource
+from crossbench.pinpoint.job_info import MIN_POLL_INTERVAL, PinpointJobInfo, \
+    UrlSource
 from crossbench.pinpoint.job_parser import parse_job_id, parse_job_ids
 from crossbench.pinpoint.job_results import download_results
 from crossbench.pinpoint.list_benchmarks import fetch_benchmarks
@@ -27,7 +39,7 @@ from crossbench.pinpoint.list_bots import fetch_bots
 from crossbench.pinpoint.list_builds import list_builds
 from crossbench.pinpoint.list_jobs import EXTRA_COLUMNS, list_jobs
 from crossbench.pinpoint.list_stories import fetch_stories
-from crossbench.pinpoint.output_format import OutputFormat
+from crossbench.pinpoint.output_format import OutputFormat, format_delimited
 from crossbench.pinpoint.start_job import bisect_job, start_job
 from crossbench.pinpoint.user import UserEnum, list_user
 from crossbench.pinpoint.user_metrics import collect_metrics, init_metrics
@@ -42,6 +54,22 @@ _JOB_ID_HELP: Final[str] = (
 if TYPE_CHECKING:
   from crossbench.cli.cli import BenchmarkClass, CrossBenchCLI
   from crossbench.cli.types import Subparsers
+  from crossbench.helper.spinner import Spinner
+
+
+@contextlib.contextmanager
+def collect_metrics_context(action: str) -> Iterator[None]:
+  init_metrics()
+  executor = ThreadPoolExecutor(max_workers=1)
+  executor.submit(collect_metrics, action)
+  interrupted = False
+  try:
+    yield
+  except KeyboardInterrupt:
+    interrupted = True
+    sys.exit(2)
+  finally:
+    executor.shutdown(wait=not interrupted, cancel_futures=interrupted)
 
 
 class PinpointBaseSubcommand(abc.ABC):
@@ -70,14 +98,8 @@ class PinpointBaseSubcommand(abc.ABC):
 
   @final
   def run(self, args: argparse.Namespace) -> None:
-    init_metrics()
-    with ThreadPoolExecutor() as executor:
-      [
-          f.result() for f in [
-              executor.submit(self.subcommand_run, args),
-              executor.submit(collect_metrics, args.action),
-          ]
-      ]
+    with collect_metrics_context(args.action):
+      self.subcommand_run(args)
 
   @abc.abstractmethod
   def subcommand_run(self, args: argparse.Namespace) -> None:
@@ -215,6 +237,143 @@ class PinpointConfigSubcommand(PinpointJobSubcommand):
   @override
   def job_subcommand_run(self, job_id: str, args: argparse.Namespace) -> None:
     print_job_config(job_id=job_id, raw=args.raw, full=args.full)
+
+
+class PinpointStatusSubcommand(PinpointJobSubcommand):
+  """Displays the status of a specific Pinpoint job."""
+
+  @override
+  def create_parser(self) -> argparse.ArgumentParser:
+    status_parser = self._parent.subparsers.add_parser(
+        "status",
+        aliases=("st",),
+        help="Displays the status of a specific Pinpoint job.")
+    status_parser.add_argument(
+        "--format",
+        "-f",
+        type=OutputFormat,
+        choices=OutputFormat.all(),
+        default=OutputFormat.TABLE,
+        help="The output format for the job status. (default: table)")
+    return status_parser
+
+  @override
+  def job_subcommand_run(self, job_id: str, args: argparse.Namespace) -> None:
+    job_info = PinpointJobInfo.from_id(job_id, full=True)
+    print(self.format_job_status(job_info, output_format=args.format))
+
+  @classmethod
+  def format_job_status(
+      cls,
+      job_info: PinpointJobInfo,
+      output_format: OutputFormat = OutputFormat.TABLE,
+  ) -> str:
+    match output_format:
+      case OutputFormat.JSON:
+        return json.dumps(job_info.raw_data, indent=2)
+      case OutputFormat.YAML:
+        return yaml.dump(job_info.raw_data)
+      case OutputFormat.CSV | OutputFormat.TSV:
+        entries = job_info.to_status_entries(link=False)
+        return format_delimited(
+            ["Property", "Value"],
+            entries,
+            delimiter=output_format.delimiter,
+        )
+      case OutputFormat.TABLE:
+        entries = job_info.to_status_entries(link=True)
+        return tabulate([(k, ":", v) for k, v in entries], tablefmt="plain")
+      case _:
+        raise ValueError(f"Unsupported output format: {output_format}")
+
+
+class PinpointWaitSubcommand(PinpointJobSubcommand):
+  """Waits for a Pinpoint job to finish."""
+
+  def __init__(self, parent: PinpointSubcommand) -> None:
+    super().__init__(parent)
+    self._spinner: Spinner | None = None
+
+  @override
+  def create_parser(self) -> argparse.ArgumentParser:
+    wait_parser = self._parent.subparsers.add_parser(
+        "wait", aliases=("watch",), help="Waits for a Pinpoint job to finish.")
+    wait_parser.add_argument(
+        "--timeout",
+        type=DurationParser.positive_duration,
+        default=dt.timedelta.max,
+        help="Maximum duration to wait for the job (e.g. '30m', '2h').")
+    wait_parser.add_argument(
+        "--poll-interval",
+        type=DurationParser.duration_range(min=MIN_POLL_INTERVAL),
+        default=dt.timedelta(seconds=30),
+        help="Polling interval for checking job status (default: 30s).")
+    wait_parser.add_argument(
+        "--fail",
+        action="store_true",
+        default=False,
+        help=("Exit with a non-zero exit code if the job did not complete "
+              "successfully."))
+    return wait_parser
+
+  @override
+  def job_subcommand_run(self, job_id: str, args: argparse.Namespace) -> None:
+    try:
+      with ui.spinner(title=f"Waiting for job {job_id}...") as spinner:
+        self._spinner = spinner
+        try:
+          job_info = PinpointJobInfo.from_id(
+              job_id, full=True).wait(
+                  timeout=args.timeout,
+                  poll_interval=args.poll_interval,
+                  progress=self.on_progress,
+              )
+        finally:
+          self._spinner = None
+    except KeyboardInterrupt:
+      sys.stderr.write(f"\nAborted waiting for job {job_id}.\n")
+      raise
+    print(PinpointStatusSubcommand.format_job_status(job_info))
+    if not job_info.is_success:
+      logging.error("Pinpoint job %s did not succeed: %s", job_id,
+                    job_info.status_display)
+      if args.fail:
+        sys.exit(1)
+
+  def on_progress(self,
+                  info: PinpointJobInfo,
+                  elapsed: dt.timedelta,
+                  spinner: Spinner | None = None) -> None:
+    target_spinner = spinner or self._spinner
+    if not target_spinner:
+      return
+    progress_str = f" [{info.progress}]" if info.progress else ""
+    target_spinner.write(f" ({info.status_display}{progress_str}, "
+                         f"{ui.format_duration(elapsed)})")
+
+
+class PinpointShowSubcommand(PinpointJobSubcommand):
+  """Opens a Pinpoint job in the default web browser."""
+
+  @override
+  def create_parser(self) -> argparse.ArgumentParser:
+    return self._parent.subparsers.add_parser(
+        "show",
+        aliases=("open",),
+        help="Opens the Pinpoint job in the default web browser.")
+
+  @override
+  def job_subcommand_run(self, job_id: str, args: argparse.Namespace) -> None:
+    del args
+    url = PINPOINT_JOB_URL_TEMPLATE.format(job_id=job_id)
+    platform = plt.PLATFORM.host_platform
+    if platform.is_headless:
+      logging.warning(
+          "Cannot open browser in headless environment. Job URL: %s", url)
+      return
+    logging.info("Opening %s", url)
+    if not platform.open_url(url):
+      logging.warning("Failed to open browser for %s", url)
 
 
 class PinpointBaseStartSubcommand(PinpointBaseSubcommand):
@@ -747,7 +906,9 @@ class PinpointResultsSubcommand(PinpointJobSubcommand):
   @override
   def create_parser(self) -> argparse.ArgumentParser:
     results_parser = self._parent.subparsers.add_parser(
-        "results", help="Downloads results of the given Pinpoint job.")
+        "results",
+        aliases=("download", "fetch"),
+        help="Downloads results of the given Pinpoint job.")
     results_parser.add_argument(
         "--output-directory",
         "--out-dir",
@@ -821,6 +982,9 @@ class PinpointSubcommand(CrossbenchSubcommand):
         help="Pinpoint actions")
     self._list_subcommand = PinpointListSubcommand(self)
     self._config_subcommand = PinpointConfigSubcommand(self)
+    self._status_subcommand = PinpointStatusSubcommand(self)
+    self._wait_subcommand = PinpointWaitSubcommand(self)
+    self._show_subcommand = PinpointShowSubcommand(self)
     self._start_subcommand = PinpointStartSubcommand(self)
     self._bisect_subcommand = PinpointBisectSubcommand(self)
     self._cancel_subcommand = PinpointCancelSubcommand(self)

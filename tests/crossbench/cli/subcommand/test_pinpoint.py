@@ -5,19 +5,80 @@
 from __future__ import annotations
 
 import argparse
+import copy
+import datetime as dt
 import io
+import json
 import unittest
+from typing import TYPE_CHECKING, Any, Final
 from unittest import mock
+
+import yaml
 
 from crossbench import path as pth
 from crossbench.cli.cli import CrossBenchCLI
-from crossbench.cli.subcommand.pinpoint import PinpointHelpFormatter
+from crossbench.cli.subcommand.pinpoint import PinpointHelpFormatter, \
+    PinpointStatusSubcommand, PinpointWaitSubcommand, \
+    collect_metrics_context
 from crossbench.pinpoint.config import BisectEndVariantConfig, \
     BisectStartVariantConfig, PinpointBisectJobConfig, PinpointTryJobConfig, \
     VariantConfig
-from crossbench.pinpoint.job_info import UrlSource
+from crossbench.pinpoint.job_info import PinpointJobInfo, UrlSource
+from crossbench.pinpoint.output_format import OutputFormat
 from crossbench.pinpoint.user import UserEnum
 from tests import test_helper
+
+if TYPE_CHECKING:
+  from crossbench.types import JsonDict
+
+_TEST_STATUS_JOB_DATA: Final[JsonDict] = {
+    "job_id":
+        "123abc",
+    "status":
+        "Running",
+    "comparison_mode":
+        "try",
+    "user":
+        "tester@example.com",
+    "created":
+        "2024-01-01T12:00:00Z",
+    "arguments": {
+        "benchmark": "speedometer3",
+        "configuration": "linux-perf",
+        "story": "Speedometer3",
+        "bug_id": "9999",
+        "initial_attempt_count": "10",
+    },
+    "state": [
+        {
+            "attempts": [
+                {
+                    "executions": [{}, {
+                        "completed": True,
+                    }],
+                },
+                {
+                    "executions": [{}, {
+                        "completed": True,
+                    }],
+                },
+            ],
+        },
+        {
+            "attempts": [{
+                "executions": [{}, {
+                    "completed": True,
+                }],
+            }],
+        },
+    ],
+}
+
+
+def _test_status_job_data(**kwargs: Any) -> JsonDict:
+  data = copy.deepcopy(_TEST_STATUS_JOB_DATA)
+  data.update(kwargs)
+  return data
 
 
 class PinpointSubcommandTest(unittest.TestCase):
@@ -37,6 +98,18 @@ class PinpointSubcommandTest(unittest.TestCase):
     self.cli.run(["pinpoint", "list", "-n", "100"])
     self.mock_init_metrics.assert_called_once_with()
     self.mock_collect_metrics.assert_called_once_with("list")
+
+  def test_collect_metrics_context(self):
+    with collect_metrics_context("custom_action"):
+      pass
+    self.mock_init_metrics.assert_called_once_with()
+    self.mock_collect_metrics.assert_called_once_with("custom_action")
+
+  def test_collect_metrics_context_keyboard_interrupt(self):
+    with self.assertRaises(SystemExit) as cm:
+      with collect_metrics_context("custom_action"):
+        raise KeyboardInterrupt
+    self.assertEqual(cm.exception.code, 2)
 
   @mock.patch("crossbench.cli.subcommand.pinpoint.list_jobs")
   def test_pinpoint_list(self, mock_list_job):
@@ -626,6 +699,296 @@ class PinpointSubcommandTest(unittest.TestCase):
         ["pinpoint", "results", "123abc", "--out-dir", "test_dir", "--force"])
     mock_download_results.assert_called_once_with(
         job_id="123abc", out_dir=pth.LocalPath("test_dir"), force=True)
+
+  @mock.patch("crossbench.cli.subcommand.pinpoint.download_results")
+  def test_pinpoint_download_results_aliases(self, mock_download_results):
+    self.cli.run(["pinpoint", "download", "123abc"])
+    mock_download_results.assert_called_once_with(
+        job_id="123abc", out_dir=None, force=False)
+    mock_download_results.reset_mock()
+    self.cli.run(["pinpoint", "fetch", "123abc"])
+    mock_download_results.assert_called_once_with(
+        job_id="123abc", out_dir=None, force=False)
+
+  def test_status_job_data_deep_clone(self):
+    data1 = _test_status_job_data()
+    data2 = _test_status_job_data()
+    self.assertIsNot(data1, data2)
+    self.assertIsNot(data1["arguments"], data2["arguments"])
+    self.assertIsNot(data1["state"], data2["state"])
+    data1["status"] = "Mutated"
+    data1["arguments"]["benchmark"] = "Mutated"
+    self.assertEqual(data2["status"], "Running")
+    self.assertEqual(data2["arguments"]["benchmark"], "speedometer3")
+    self.assertEqual(_TEST_STATUS_JOB_DATA["status"], "Running")
+    self.assertEqual(_TEST_STATUS_JOB_DATA["arguments"]["benchmark"],
+                     "speedometer3")
+
+  @mock.patch("crossbench.pinpoint.job_info.fetch_job_config")
+  def test_pinpoint_status(self, mock_fetch):
+    mock_fetch.return_value = _test_status_job_data()
+    self.cli.run(["pinpoint", "status", "123abc"])
+    mock_fetch.assert_called_once_with("123abc", full=True)
+    self.mock_print.assert_called_once()
+    output = self.mock_print.call_args[0][0]
+    self.assertIn("123abc", output)
+    self.assertIn("🏃 running", output)
+    self.assertIn("speedometer3", output)
+
+    mock_fetch.reset_mock()
+    self.mock_print.reset_mock()
+    self.cli.run(["pinpoint", "st", "--job", "123abc", "--format", "json"])
+    mock_fetch.assert_called_once_with("123abc", full=True)
+    parsed = json.loads(self.mock_print.call_args[0][0])
+    self.assertEqual(parsed["job_id"], "123abc")
+
+  def test_format_job_status_formats(self):
+    job_info = PinpointJobInfo.from_json(_test_status_job_data())
+    formatted_table = PinpointStatusSubcommand.format_job_status(job_info)
+    self.assertIn("123abc", formatted_table)
+    self.assertIn("🏃 running", formatted_table)
+    self.assertIn("speedometer3", formatted_table)
+    self.assertIn("linux-perf", formatted_table)
+    self.assertIn("Speedometer3", formatted_table)
+    self.assertIn("9999", formatted_table)
+    self.assertIn("tester@example.com", formatted_table)
+
+    formatted_yaml = PinpointStatusSubcommand.format_job_status(
+        job_info, OutputFormat.YAML)
+    self.assertEqual(yaml.safe_load(formatted_yaml)["job_id"], "123abc")
+
+    formatted_csv = PinpointStatusSubcommand.format_job_status(
+        job_info, OutputFormat.CSV)
+    self.assertIn("Property,Value", formatted_csv)
+    self.assertIn("Job ID,123abc", formatted_csv)
+    self.assertNotIn("\x1b]8;;", formatted_csv)
+
+    formatted_tsv = PinpointStatusSubcommand.format_job_status(
+        job_info, OutputFormat.TSV)
+    self.assertIn("Property\tValue", formatted_tsv)
+    self.assertIn("Job ID\t123abc", formatted_tsv)
+    self.assertNotIn("\x1b]8;;", formatted_tsv)
+
+  def test_format_job_status_bisect(self):
+    bisect_info = PinpointJobInfo.from_json({
+        "job_id": "98765",
+        "status": "Completed",
+        "comparison_mode": "performance",
+        "difference_count": 1,
+        "arguments": {
+            "benchmark": "speedometer3",
+            "configuration": "win-11-perf",
+            "initial_attempt_count": "10",
+        },
+        "state": [
+            {
+                "attempts": [{
+                    "executions": [{}, {
+                        "completed": True,
+                    }],
+                }],
+            },
+            {
+                "attempts": [{
+                    "executions": [{}, {
+                        "completed": True,
+                    }],
+                }],
+            },
+        ],
+        "results_url": "https://storage.cloud.google.com/results.html",
+    })
+    formatted = PinpointStatusSubcommand.format_job_status(bisect_info)
+    self.assertIn("bisect", formatted)
+    self.assertIn("✅ completed", formatted)
+    self.assertIn("Differences", formatted)
+    self.assertIn("Results URL", formatted)
+    self.assertIn("2 commits, 2 attempts", formatted)
+
+  @mock.patch("crossbench.pinpoint.job_info.PinpointJobInfo.from_id")
+  def test_pinpoint_wait(self, mock_from_id):
+    mock_job = mock.MagicMock()
+    mock_job.wait.return_value = PinpointJobInfo.from_json(
+        _test_status_job_data())
+    mock_from_id.return_value = mock_job
+    self.cli.run([
+        "pinpoint",
+        "wait",
+        "123abc",
+        "--timeout",
+        "30m",
+        "--poll-interval",
+        "5s",
+    ])
+    mock_from_id.assert_called_once_with("123abc", full=True)
+    mock_job.wait.assert_called_once_with(
+        timeout=dt.timedelta(minutes=30),
+        poll_interval=dt.timedelta(seconds=5),
+        progress=mock.ANY)
+    self.assertEqual(self.mock_print.call_count, 2)
+    self.assertIn("123abc", self.mock_print.call_args[0][0])
+
+  @mock.patch("crossbench.pinpoint.job_info.PinpointJobInfo.from_id")
+  def test_pinpoint_wait_default(self, mock_from_id):
+    mock_job = mock.MagicMock()
+    mock_job.wait.return_value = PinpointJobInfo.from_json(
+        _test_status_job_data())
+    mock_from_id.return_value = mock_job
+    self.cli.run([
+        "pinpoint",
+        "wait",
+        "123abc",
+    ])
+    mock_from_id.assert_called_once_with("123abc", full=True)
+    mock_job.wait.assert_called_once_with(
+        timeout=dt.timedelta.max,
+        poll_interval=dt.timedelta(seconds=30),
+        progress=mock.ANY)
+    self.assertEqual(self.mock_print.call_count, 2)
+
+    mock_from_id.reset_mock()
+    mock_job.wait.reset_mock()
+    self.mock_print.reset_mock()
+    self.cli.run([
+        "pinpoint",
+        "watch",
+        "123abc",
+    ])
+    mock_from_id.assert_called_once_with("123abc", full=True)
+    mock_job.wait.assert_called_once_with(
+        timeout=dt.timedelta.max,
+        poll_interval=dt.timedelta(seconds=30),
+        progress=mock.ANY)
+    self.assertEqual(self.mock_print.call_count, 2)
+
+  @mock.patch("crossbench.pinpoint.job_info.PinpointJobInfo.from_id")
+  def test_pinpoint_wait_keyboard_interrupt(self, mock_from_id):
+    mock_job = mock.MagicMock()
+    mock_job.wait.side_effect = KeyboardInterrupt()
+    mock_from_id.return_value = mock_job
+    with mock.patch("sys.stderr", new_callable=io.StringIO) as mock_stderr:
+      with self.assertRaises(SystemExit) as cm:
+        self.cli.run(["pinpoint", "wait", "123abc"])
+      self.assertEqual(cm.exception.code, 2)
+      self.assertIn("Aborted waiting for job 123abc", mock_stderr.getvalue())
+
+  def test_pinpoint_wait_invalid_timeout(self):
+    with self.assertRaises(SystemExit):
+      self.cli.run(["pinpoint", "wait", "123abc", "--timeout", "0s"])
+
+  def test_pinpoint_wait_invalid_poll_interval(self):
+    with self.assertRaises(SystemExit):
+      self.cli.run(["pinpoint", "wait", "123abc", "--poll-interval", "0s"])
+
+  def test_pinpoint_wait_on_progress(self):
+    subcommand = PinpointWaitSubcommand(mock.MagicMock())
+    job_info = PinpointJobInfo.from_json(_test_status_job_data())
+    mock_spinner = mock.MagicMock()
+
+    subcommand.on_progress(
+        job_info, dt.timedelta(seconds=15), spinner=mock_spinner)
+    mock_spinner.write.assert_called_once()
+    self.assertIn("15.0s", mock_spinner.write.call_args[0][0])
+    self.assertIn(job_info.status_display, mock_spinner.write.call_args[0][0])
+
+    subcommand._spinner = mock_spinner
+    subcommand.on_progress(job_info, dt.timedelta(seconds=20))
+    self.assertEqual(mock_spinner.write.call_count, 2)
+    self.assertIn("20.0s", mock_spinner.write.call_args[0][0])
+
+    subcommand._spinner = None
+    subcommand.on_progress(job_info, dt.timedelta(seconds=20))
+    self.assertEqual(mock_spinner.write.call_count, 2)
+
+  @mock.patch("logging.error")
+  @mock.patch("crossbench.pinpoint.job_info.PinpointJobInfo.from_id")
+  def test_pinpoint_wait_failed_logging_no_fail_flag(self, mock_from_id,
+                                                     mock_logging_error):
+    mock_job = mock.MagicMock()
+    failed_data = _test_status_job_data(status="Failed")
+    mock_job.wait.return_value = PinpointJobInfo.from_json(failed_data)
+    mock_from_id.return_value = mock_job
+    self.cli.run(["pinpoint", "wait", "123abc"])
+    mock_logging_error.assert_called_once()
+    self.assertIn("123abc", mock_logging_error.call_args[0][1])
+    self.assertIn("failed", mock_logging_error.call_args[0][2].lower())
+
+  @mock.patch("logging.error")
+  @mock.patch("crossbench.pinpoint.job_info.PinpointJobInfo.from_id")
+  def test_pinpoint_wait_failed_with_fail_flag(self, mock_from_id,
+                                               mock_logging_error):
+    mock_job = mock.MagicMock()
+    failed_data = _test_status_job_data(status="Failed")
+    mock_job.wait.return_value = PinpointJobInfo.from_json(failed_data)
+    mock_from_id.return_value = mock_job
+    with self.assertRaises(SystemExit) as cm:
+      self.cli.run(["pinpoint", "wait", "123abc", "--fail"])
+    self.assertEqual(cm.exception.code, 1)
+    mock_logging_error.assert_called_once()
+    self.assertIn("123abc", mock_logging_error.call_args[0][1])
+    self.assertIn("failed", mock_logging_error.call_args[0][2].lower())
+
+  @mock.patch("logging.error")
+  @mock.patch("crossbench.pinpoint.job_info.PinpointJobInfo.from_id")
+  def test_pinpoint_wait_cancelled_with_fail_flag(self, mock_from_id,
+                                                  mock_logging_error):
+    mock_job = mock.MagicMock()
+    cancelled_data = _test_status_job_data(status="Cancelled")
+    mock_job.wait.return_value = PinpointJobInfo.from_json(cancelled_data)
+    mock_from_id.return_value = mock_job
+    with self.assertRaises(SystemExit) as cm:
+      self.cli.run(["pinpoint", "wait", "123abc", "--fail"])
+    self.assertEqual(cm.exception.code, 1)
+    mock_logging_error.assert_called_once()
+    self.assertIn("123abc", mock_logging_error.call_args[0][1])
+    self.assertIn("cancelled", mock_logging_error.call_args[0][2].lower())
+
+  @mock.patch("logging.error")
+  @mock.patch("crossbench.pinpoint.job_info.PinpointJobInfo.from_id")
+  def test_pinpoint_wait_success_with_fail_flag(self, mock_from_id,
+                                                mock_logging_error):
+    mock_job = mock.MagicMock()
+    completed_data = _test_status_job_data(status="Completed")
+    mock_job.wait.return_value = PinpointJobInfo.from_json(completed_data)
+    mock_from_id.return_value = mock_job
+    self.cli.run(["pinpoint", "wait", "123abc", "--fail"])
+    mock_logging_error.assert_not_called()
+
+  @mock.patch("crossbench.plt.Platform.open_url")
+  @mock.patch(
+      "crossbench.plt.Platform.is_headless",
+      new_callable=mock.PropertyMock,
+      return_value=False)
+  def test_pinpoint_show(self, _mock_is_headless, mock_open_url):
+    self.cli.run(["pinpoint", "show", "123abc"])
+    mock_open_url.assert_called_once_with(
+        "https://pinpoint-dot-chromeperf.appspot.com/job/123abc")
+    mock_open_url.reset_mock()
+    self.cli.run(["pinpoint", "open", "123abc"])
+    mock_open_url.assert_called_once_with(
+        "https://pinpoint-dot-chromeperf.appspot.com/job/123abc")
+
+    mock_open_url.reset_mock()
+    mock_open_url.return_value = False
+    with mock.patch("logging.warning") as mock_warning:
+      self.cli.run(["pinpoint", "show", "123abc"])
+      mock_warning.assert_called_once_with(
+          "Failed to open browser for %s",
+          "https://pinpoint-dot-chromeperf.appspot.com/job/123abc")
+
+  @mock.patch("logging.warning")
+  @mock.patch("crossbench.plt.Platform.open_url")
+  @mock.patch(
+      "crossbench.plt.Platform.is_headless",
+      new_callable=mock.PropertyMock,
+      return_value=True)
+  def test_pinpoint_show_headless(self, _mock_is_headless, mock_open_url,
+                                  mock_warning):
+    self.cli.run(["pinpoint", "show", "123abc"])
+    mock_open_url.assert_not_called()
+    mock_warning.assert_called_once_with(
+        "Cannot open browser in headless environment. Job URL: %s",
+        "https://pinpoint-dot-chromeperf.appspot.com/job/123abc")
 
   def test_help_formatter(self):
     parser = argparse.ArgumentParser(

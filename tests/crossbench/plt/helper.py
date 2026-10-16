@@ -148,6 +148,26 @@ class BaseMockPlatformTestCase(CrossbenchFakeFsTestCase, metaclass=abc.ABCMeta):
           returncode=1)
     self.assertFalse(self.platform.is_remote_desktop)
 
+  def test_open_url(self):
+    if not self.platform.is_local:
+      with self.assertRaises(RuntimeError):
+        self.platform.open_url("https://example.com")
+      return
+    with mock.patch("webbrowser.open") as mock_open:
+      mock_open.return_value = True
+      self.assertTrue(self.platform.open_url("https://example.com"))
+      mock_open.assert_called_once_with("https://example.com")
+
+  def test_open_url_invalid(self):
+    if not self.platform.is_local:
+      with self.assertRaises(RuntimeError):
+        self.platform.open_url("ftp://example.com")
+      return
+    with self.assertRaises(argparse.ArgumentTypeError):
+      self.platform.open_url("ftp://example.com")
+    with self.assertRaises(argparse.ArgumentTypeError):
+      self.platform.open_url("not-a-url")
+
   def _gcs_download_dest(self) -> pth.LocalPath:
     # GCS downloads always land on the host, even for remote platforms.
     return self.host_platform.local_path("/cache/wpr/archive.wprgo")

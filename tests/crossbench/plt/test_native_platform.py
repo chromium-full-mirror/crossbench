@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import datetime as dt
 import gc
@@ -51,6 +52,26 @@ class BaseNativePlatformTestCase(unittest.TestCase):
     self.platform.sleep(0.01)
     self.platform.sleep(dt.timedelta())
     self.platform.sleep(dt.timedelta(seconds=0.1))
+
+  def test_open_url(self):
+    if not self.platform.is_local:
+      with self.assertRaises(RuntimeError):
+        self.platform.open_url("https://example.com")
+      return
+    with mock.patch("webbrowser.open") as mock_open:
+      mock_open.return_value = True
+      self.assertTrue(self.platform.open_url("https://example.com"))
+      mock_open.assert_called_once_with("https://example.com")
+
+  def test_open_url_invalid(self):
+    if not self.platform.is_local:
+      with self.assertRaises(RuntimeError):
+        self.platform.open_url("ftp://example.com")
+      return
+    with self.assertRaises(argparse.ArgumentTypeError):
+      self.platform.open_url("ftp://example.com")
+    with self.assertRaises(argparse.ArgumentTypeError):
+      self.platform.open_url("not-a-url")
 
   def test_cpu_details(self):
     details = self.platform.cpu_details()
