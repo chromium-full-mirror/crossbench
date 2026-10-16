@@ -70,6 +70,17 @@ class ActionRunnerConfigTest(unittest.TestCase):
     self.assertIsInstance(action_runner, UnifiedInputActionRunner)
     self.assertEqual(action_runner_config.virtual_devices, ())
 
+  def test_parse_auto_linux(self) -> None:
+    action_runner_config = ActionRunnerConfig.parse("auto")
+    mock_platform = mock.MagicMock()
+    mock_platform.is_android = False
+    mock_platform.is_chromeos = False
+    mock_platform.is_linux = True
+    action_runner = action_runner_config.instantiate(mock_platform,
+                                                     self.mock_run)
+    self.assertIsInstance(action_runner, UnifiedInputActionRunner)
+    self.assertEqual(action_runner_config.virtual_devices, ())
+
   def test_parse_android(self) -> None:
     action_runner_config = ActionRunnerConfig.parse("android")
     self.assertIsInstance(action_runner_config, ActionRunnerConfig)

@@ -88,7 +88,7 @@ class ActionRunnerConfig(ConfigObject):
                           platform: Platform,
                           run: Run,
                           step_by_step_mode: bool = False) -> ActionRunner:
-    if platform.is_android or platform.is_chromeos:
+    if platform.is_android or platform.is_chromeos or platform.is_linux:
       return UnifiedInputActionRunner(run, self.virtual_devices,
                                       step_by_step_mode)
     return ActionRunner(run, self.virtual_devices, step_by_step_mode)
