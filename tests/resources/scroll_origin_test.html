@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<!--
+  Copyright 2026 The Chromium Authors
+  Use of this source code is governed by a BSD-style license that can be
+  found in the LICENSE file.
+
+  Diagnostic page for verifying scroll benchmark symmetry, swipe counts,
+  per-swipe distances/durations, and whether upward scrolling overshoots
+  past the starting origin.
+
+  On load, the page jumps to a mid-page origin (scrollY = 5000px) so that
+  upward scroll overshoot is not clamped at scrollY = 0, renders a color-coded
+  ruler (red above the origin, blue below), and records per-swipe metrics both
+  in a fixed on-screen HUD and via performance.mark() entries.
+
+  Example usage with web-power-scroll (works offline in Airplane Mode via a
+  base64 data URI):
+    ./cb.py web-power-scroll \
+      --url="data:text/html;base64,$(base64 < tests/resources/scroll_origin_test.html | tr -d '\n')" \
+      -b=adb:chrome --fast
+
+  To also dump per-swipe performance.mark() telemetry to performance.entries.json:
+    ./cb.py web-power-scroll \
+      --url="data:text/html;base64,$(base64 < tests/resources/scroll_origin_test.html | tr -d '\n')" \
+      -b=adb:chrome --fast --no-probe=perfetto --probe=performance.entries
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scroll Symmetry & Origin Diagnostic</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    height: 20000px;
+    font-family: monospace;
+    background: linear-gradient(
+      to bottom,
+      #4a0000 0px,
+      #7a0000 4998px,
+      #ffcc00 4998px,
+      #ffcc00 5002px,
+      #0b2545 5002px,
+      #001220 20000px
+    );
+    color: #fff;
+  }
+  .tick {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1px dashed rgba(255,255,255,0.35);
+    padding: 2px 12px;
+    font-size: 13px;
+  }
+  .tick.origin {
+    border-top: 4px solid #ffcc00;
+    background: rgba(255, 204, 0, 0.25);
+    color: #ffcc00;
+    font-size: 18px;
+    font-weight: bold;
+    padding: 6px 12px;
+  }
+  .tick.past {
+    color: #ff9999;
+    border-top-color: rgba(255, 100, 100, 0.6);
+  }
+  #hud {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.88);
+    border: 2px solid #888;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 13px;
+    line-height: 1.35;
+    pointer-events: none;
+  }
+  #status {
+    font-size: 15px;
+    font-weight: bold;
+    padding: 6px;
+    margin-bottom: 6px;
+    border-radius: 4px;
+    text-align: center;
+    background: #222;
+  }
+  .overshot { background: #b00020 !important; color: #fff; }
+  .undershot { background: #c65100 !important; color: #fff; }
+  .exact { background: #1b5e20 !important; color: #fff; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 11px; }
+  th, td { border-bottom: 1px solid #444; padding: 2px 4px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="status">READY AT ORIGIN (ΔY = 0 px)</div>
+  <div>
+    <b>ΔY from Origin:</b> <span id="cur-dy">0</span> px |
+    <b>Min ΔY:</b> <span id="min-dy">0</span> px |
+    <b>Max ΔY:</b> <span id="max-dy">0</span> px
+  </div>
+  <div>
+    <b>Swipes (Down / Up):</b> <span id="swipe-counts">0 / 0</span> |
+    <b>Viewport H:</b> <span id="vp-h">-</span> px
+  </div>
+  <table>
+    <thead>
+      <tr><th>Swipe</th><th>Dir</th><th>Scroll ms</th><th>VpH</th><th>ΔScrollY</th><th>End ΔY</th></tr>
+    </thead>
+    <tbody id="log"></tbody>
+  </table>
+</div>
+<div id="ruler"></div>
+<script>
+  const ORIGIN_Y = 5000;
+  const ruler = document.getElementById('ruler');
+  for (let y = 500; y <= 15000; y += 100) {
+    const dy = y - ORIGIN_Y;
+    const div = document.createElement('div');
+    div.className = 'tick' + (dy === 0 ? ' origin' : (dy < 0 ? ' past' : ''));
+    div.style.top = y + 'px';
+    div.textContent = dy === 0
+      ? '🎯 ORIGIN (ΔY = 0 px, scrollY = 5000 px)'
+      : (dy < 0 ? `⚠️ ${dy} px (PAST ORIGIN)` : `+${dy} px`);
+    ruler.appendChild(div);
+  }
+
+  let armed = false;
+  let minDy = 0;
+  let maxDy = 0;
+  const swipes = [];
+  let currentSwipe = null;
+  let idleTimer = null;
+
+  function jumpToOrigin() {
+    window.scrollTo(0, ORIGIN_Y);
+    setTimeout(() => {
+      window.scrollTo(0, ORIGIN_Y);
+      minDy = 0;
+      maxDy = 0;
+      armed = true;
+      updateHud();
+    }, 150);
+  }
+  window.addEventListener('load', jumpToOrigin);
+  if (document.readyState === 'complete') jumpToOrigin();
+
+  function finalizeSwipe(s) {
+    if (!s || s.marked) return;
+    s.marked = true;
+    const ds = Math.round(s.endScrollY - s.startScrollY);
+    const endDy = Math.round(s.endScrollY - ORIGIN_Y);
+    const dur = Math.round(s.lastTime - s.startTime);
+    const dir = ds > 2 ? 'DOWN' : (ds < -2 ? 'UP' : 'NONE');
+    performance.mark(
+      `diag_swipe_${s.index}_${dir}_dur_${dur}ms_vpH_${s.vpH}_dScroll_${ds}_endDy_${endDy}_minDy_${minDy}_maxDy_${maxDy}`
+    );
+  }
+
+  function renderTable() {
+    let downCount = 0;
+    let upCount = 0;
+    for (const s of swipes) {
+      const ds = s.endScrollY - s.startScrollY;
+      if (ds > 2) downCount++;
+      else if (ds < -2) upCount++;
+    }
+    document.getElementById('swipe-counts').textContent = `${downCount} / ${upCount}`;
+
+    const log = document.getElementById('log');
+    log.innerHTML = '';
+    for (const s of swipes.slice(-10)) {
+      const ds = Math.round(s.endScrollY - s.startScrollY);
+      const endDy = Math.round(s.endScrollY - ORIGIN_Y);
+      const dur = Math.round(s.lastTime - s.startTime);
+      const dir = ds > 2 ? 'DOWN' : (ds < -2 ? 'UP' : '-');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>#${s.index}</td><td>${dir}</td><td>${dur}ms</td>` +
+                     `<td>${s.vpH}</td><td>${ds > 0 ? '+' : ''}${ds}px</td>` +
+                     `<td>${endDy > 0 ? '+' : ''}${endDy}px</td>`;
+      log.appendChild(tr);
+    }
+    return { downCount, upCount };
+  }
+
+  function updateHud() {
+    const dy = Math.round(window.scrollY - ORIGIN_Y);
+    if (armed) {
+      if (dy < minDy) minDy = dy;
+      if (dy > maxDy) maxDy = dy;
+      if (currentSwipe) {
+        currentSwipe.endScrollY = window.scrollY;
+        currentSwipe.lastTime = performance.now();
+        clearTimeout(idleTimer);
+        const swipeRef = currentSwipe;
+        idleTimer = setTimeout(() => finalizeSwipe(swipeRef), 250);
+      }
+    }
+    document.getElementById('cur-dy').textContent = dy > 0 ? `+${dy}` : dy;
+    document.getElementById('min-dy').textContent = minDy > 0 ? `+${minDy}` : minDy;
+    document.getElementById('max-dy').textContent = maxDy > 0 ? `+${maxDy}` : maxDy;
+    document.getElementById('vp-h').textContent = window.visualViewport
+      ? Math.round(window.visualViewport.height)
+      : window.innerHeight;
+
+    const { upCount } = renderTable();
+    const status = document.getElementById('status');
+    if (minDy < -5) {
+      status.className = 'overshot';
+      status.textContent = `⚠️ PAST ORIGIN! Min ΔY = ${minDy} px (Now: ${dy > 0 ? '+' : ''}${dy} px)`;
+    } else if (upCount > 0 && Math.abs(dy) > 10) {
+      status.className = dy < 0 ? 'overshot' : 'undershot';
+      status.textContent = `ASYMMETRIC: ΔY = ${dy > 0 ? '+' : ''}${dy} px`;
+    } else if (upCount > 0) {
+      status.className = 'exact';
+      status.textContent = `AT ORIGIN (ΔY = ${dy > 0 ? '+' : ''}${dy} px)`;
+    }
+  }
+
+  window.addEventListener('scroll', updateHud, { passive: true });
+  window.addEventListener('touchstart', () => {
+    if (!armed) return;
+    clearTimeout(idleTimer);
+    if (currentSwipe) finalizeSwipe(currentSwipe);
+    currentSwipe = {
+      index: swipes.length + 1,
+      startTime: performance.now(),
+      lastTime: performance.now(),
+      startScrollY: window.scrollY,
+      endScrollY: window.scrollY,
+      vpH: window.visualViewport ? Math.round(window.visualViewport.height) : window.innerHeight,
+      marked: false,
+    };
+    swipes.push(currentSwipe);
+    updateHud();
+  }, { passive: true });
+</script>
+</body>
+</html>
