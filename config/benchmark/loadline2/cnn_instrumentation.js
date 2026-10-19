@@ -69,6 +69,11 @@ if (window.location.href ===
   // Make sure the cookie banner doesn't pop up
   document.cookie = 'OptanonAlertBoxClosed=' + new Date().toISOString()
   button_observer.observe(document, {childList: true, subtree: true});
-  menu_observer.observe(document, {childList: true, subtree: true});
+  menu_observer.observe(document, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class'],
+  });
   headline_observer.observe(document, {childList: true, subtree: true});
 }
