@@ -7,10 +7,11 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Iterable, Sequence
 
+from ordered_set import OrderedSet
 from perfetto.batch_trace_processor.api import BatchTraceProcessorConfig
 from perfetto.trace_processor.api import TraceProcessorConfig
 
-from crossbench import path as pth
+from crossbench import plt
 from crossbench.probes.trace_processor.constants import MODULES_DIR
 
 if TYPE_CHECKING:
@@ -18,16 +19,12 @@ if TYPE_CHECKING:
   from perfetto.trace_processor.api import SqlPackage
   from perfetto.trace_uri_resolver.registry import ResolverRegistry
 
-
-def _to_posix_sql_package_path(path: pth.AnyPathLike) -> str:
-  if isinstance(path, pth.AnyPath):
-    return path.as_posix()
-  return pth.LocalPath(path).as_posix()
+  from crossbench import path as pth
 
 
 def CBTraceProcessorConfig(  # noqa: N802
     bin_path: pth.LocalPath | str | None = None,
-    module_paths: Iterable[pth.AnyPathLike] | None = None,
+    module_paths: Iterable[pth.LocalPath | str] | None = None,
     extra_flags: Sequence[str] | None = None,
     verbose: bool = False,
     enable_dev_features: bool = False,
@@ -36,11 +33,11 @@ def CBTraceProcessorConfig(  # noqa: N802
     ingest_ftrace_in_raw: bool = True,
 ) -> TraceProcessorConfig:
   """TraceProcessorConfig preconfigured with Crossbench SQL modules."""
-  packages: list[str | SqlPackage] = [MODULES_DIR.as_posix()]
+  # Perfetto's trace_processor requires forward-slash package paths on Windows.
+  packages: OrderedSet[str | SqlPackage] = OrderedSet(
+      (MODULES_DIR.as_posix(),))
   for path in module_paths or ():
-    posix_path = _to_posix_sql_package_path(path)
-    if posix_path not in packages:
-      packages.append(posix_path)
+    packages.add(plt.PLATFORM.path(path).as_posix())
 
   return TraceProcessorConfig(
       bin_path=os.fspath(bin_path) if bin_path else None,
@@ -50,14 +47,14 @@ def CBTraceProcessorConfig(  # noqa: N802
       load_timeout=load_timeout,
       ingest_ftrace_in_raw=ingest_ftrace_in_raw,
       extra_flags=list(extra_flags) if extra_flags else None,
-      add_sql_packages=packages,
+      add_sql_packages=list(packages),
   )
 
 
 def CBBatchTraceProcessorConfig(  # noqa: N802
     tp_config: TraceProcessorConfig | None = None,
     bin_path: pth.LocalPath | str | None = None,
-    module_paths: Iterable[pth.AnyPathLike] | None = None,
+    module_paths: Iterable[pth.LocalPath | str] | None = None,
     extra_flags: Sequence[str] | None = None,
     load_failure_handling: FailureHandling | None = None,
     execute_failure_handling: FailureHandling | None = None,

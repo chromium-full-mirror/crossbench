@@ -881,10 +881,11 @@ class TraceProcessorHelperTestCase(unittest.TestCase):
     self.assertIn(MODULES_DIR.as_posix(), config.add_sql_packages)
     self.assertIn(custom_dir.as_posix(), config.add_sql_packages)
 
-  def test_default_trace_processor_config_windows_modules(self):
-    win_dir = pth.AnyWindowsPath(r"C:\src\crossbench\config\queries")
-    config = CBTraceProcessorConfig(module_paths=[win_dir])
-    self.assertIn("C:/src/crossbench/config/queries", config.add_sql_packages)
+  def test_trace_processor_config_windows_module_paths(self):
+    with unittest.mock.patch.object(
+        plt.PLATFORM, "path", side_effect=pth.AnyWindowsPath):
+      config = CBTraceProcessorConfig(module_paths=[r"C:\custom\modules\ext"])
+    self.assertIn("C:/custom/modules/ext", config.add_sql_packages)
 
   def test_default_batch_trace_processor_config(self):
     btp_config = CBBatchTraceProcessorConfig()
