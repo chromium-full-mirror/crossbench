@@ -14,6 +14,7 @@ from crossbench.probes.trace_processor.constants import MODULES_DIR
 
 if TYPE_CHECKING:
   from perfetto.batch_trace_processor.api import FailureHandling
+  from perfetto.trace_processor.api import SqlPackage
   from perfetto.trace_uri_resolver.registry import ResolverRegistry
 
   from crossbench import path as pth
@@ -30,7 +31,7 @@ def CBTraceProcessorConfig(  # noqa: N802
     ingest_ftrace_in_raw: bool = True,
 ) -> TraceProcessorConfig:
   """TraceProcessorConfig preconfigured with Crossbench SQL modules."""
-  packages: list[str] = [os.fspath(MODULES_DIR)]
+  packages: list[str | SqlPackage] = [os.fspath(MODULES_DIR)]
   for path in module_paths or ():
     fspath = os.fspath(path)
     if fspath not in packages:

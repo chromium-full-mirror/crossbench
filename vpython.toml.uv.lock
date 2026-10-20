@@ -343,9 +343,8 @@ pathspec==1.0.4 ; python_full_version < '3.12' \
     --hash=sha256:eeaf9fc7cbc0a4492b666be276f38956baa67cd3faca745462db83d98f1cef87 \
     --hash=sha256:fb6ae2fd4e7c921a165808a552060e722767cfa526f99ca5156ed2ce45a5c723
     # via mypy
-perfetto==0.16.0 ; python_full_version < '3.12' \
-    --hash=sha256:2394a32261988f0fb954dd5484c8c2488da7a75636db136399133acf08f515e8 \
-    --hash=sha256:26c9e802763b06da9215d4437a56c2decb4e5e3156c8a7345454501d18a9664c
+perfetto==0.58.2 ; python_full_version < '3.12' \
+    --hash=sha256:c4ff0dde6d5aab56051c88f7af9ba34e5655523a2dc786992a83c2630fc07a03
 platformdirs==4.9.2 ; python_full_version < '3.12' \
     --hash=sha256:9170634f126f8efdae22fb58ae8a0eaa86f38365bc57897a6c4f781d1f5875bd \
     --hash=sha256:ef245e78eb7a2ba57599bdb39c4ff323cfae3de356a47207b58bb29e7f479f46
