@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Iterable, Sequence
 from perfetto.batch_trace_processor.api import BatchTraceProcessorConfig
 from perfetto.trace_processor.api import TraceProcessorConfig
 
+from crossbench import path as pth
 from crossbench.probes.trace_processor.constants import MODULES_DIR
 
 if TYPE_CHECKING:
@@ -17,12 +18,16 @@ if TYPE_CHECKING:
   from perfetto.trace_processor.api import SqlPackage
   from perfetto.trace_uri_resolver.registry import ResolverRegistry
 
-  from crossbench import path as pth
+
+def _to_posix_sql_package_path(path: pth.AnyPathLike) -> str:
+  if isinstance(path, pth.AnyPath):
+    return path.as_posix()
+  return pth.LocalPath(path).as_posix()
 
 
 def CBTraceProcessorConfig(  # noqa: N802
     bin_path: pth.LocalPath | str | None = None,
-    module_paths: Iterable[pth.LocalPath | str] | None = None,
+    module_paths: Iterable[pth.AnyPathLike] | None = None,
     extra_flags: Sequence[str] | None = None,
     verbose: bool = False,
     enable_dev_features: bool = False,
@@ -31,11 +36,11 @@ def CBTraceProcessorConfig(  # noqa: N802
     ingest_ftrace_in_raw: bool = True,
 ) -> TraceProcessorConfig:
   """TraceProcessorConfig preconfigured with Crossbench SQL modules."""
-  packages: list[str | SqlPackage] = [os.fspath(MODULES_DIR)]
+  packages: list[str | SqlPackage] = [MODULES_DIR.as_posix()]
   for path in module_paths or ():
-    fspath = os.fspath(path)
-    if fspath not in packages:
-      packages.append(fspath)
+    posix_path = _to_posix_sql_package_path(path)
+    if posix_path not in packages:
+      packages.append(posix_path)
 
   return TraceProcessorConfig(
       bin_path=os.fspath(bin_path) if bin_path else None,
@@ -52,7 +57,7 @@ def CBTraceProcessorConfig(  # noqa: N802
 def CBBatchTraceProcessorConfig(  # noqa: N802
     tp_config: TraceProcessorConfig | None = None,
     bin_path: pth.LocalPath | str | None = None,
-    module_paths: Iterable[pth.LocalPath | str] | None = None,
+    module_paths: Iterable[pth.AnyPathLike] | None = None,
     extra_flags: Sequence[str] | None = None,
     load_failure_handling: FailureHandling | None = None,
     execute_failure_handling: FailureHandling | None = None,

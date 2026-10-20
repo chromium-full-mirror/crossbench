@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import io
 import json
-import os
 import pathlib
 import unittest
 from argparse import ArgumentTypeError
@@ -866,7 +865,7 @@ class TraceProcessorHelperTestCase(unittest.TestCase):
 
   def test_default_trace_processor_config(self):
     config = CBTraceProcessorConfig()
-    self.assertIn(os.fspath(MODULES_DIR), config.add_sql_packages)
+    self.assertIn(MODULES_DIR.as_posix(), config.add_sql_packages)
     self.assertIsNone(config.bin_path)
 
   def test_default_trace_processor_config_custom_modules(self):
@@ -879,13 +878,18 @@ class TraceProcessorHelperTestCase(unittest.TestCase):
     self.assertEqual(config.bin_path, "/path/to/tp")
     self.assertTrue(config.verbose)
     self.assertTrue(config.enable_dev_features)
-    self.assertIn(os.fspath(MODULES_DIR), config.add_sql_packages)
-    self.assertIn(os.fspath(custom_dir), config.add_sql_packages)
+    self.assertIn(MODULES_DIR.as_posix(), config.add_sql_packages)
+    self.assertIn(custom_dir.as_posix(), config.add_sql_packages)
+
+  def test_default_trace_processor_config_windows_modules(self):
+    win_dir = pth.AnyWindowsPath(r"C:\src\crossbench\config\queries")
+    config = CBTraceProcessorConfig(module_paths=[win_dir])
+    self.assertIn("C:/src/crossbench/config/queries", config.add_sql_packages)
 
   def test_default_batch_trace_processor_config(self):
     btp_config = CBBatchTraceProcessorConfig()
     self.assertIsNotNone(btp_config.tp_config)
-    self.assertIn(os.fspath(MODULES_DIR), btp_config.tp_config.add_sql_packages)
+    self.assertIn(MODULES_DIR.as_posix(), btp_config.tp_config.add_sql_packages)
 
   def test_batch_trace_processor_config_with_tp_config(self):
     tp_config = TraceProcessorConfig()
