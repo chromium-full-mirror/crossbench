@@ -502,6 +502,37 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
       })
     self.assertIn("JS", str(cm.exception))
 
+  def test_parse_click_ui_selector_with_js(self):
+    with self.assertRaisesRegex(ValueError, "JS"):
+      ClickAction.parse_dict({
+          "action": "click",
+          "source": "JS",
+          "position": {
+              "res": "button_id",
+          },
+      })
+
+  def test_parse_click_coordinates_with_driver(self):
+    with self.assertRaisesRegex(ValueError, "DRIVER"):
+      ClickAction.parse_dict({
+          "action": "click",
+          "source": "DRIVER",
+          "position": {
+              "x": 0,
+              "y": 0,
+          },
+      })
+
+  def test_parse_click_ui_selector_with_driver(self):
+    with self.assertRaisesRegex(ValueError, "DRIVER"):
+      ClickAction.parse_dict({
+          "action": "click",
+          "source": "DRIVER",
+          "position": {
+              "res": "button_id",
+          },
+      })
+
   def test_parse_click_missing_position(self):
     with self.assertRaises(ValueError) as cm:
       ClickAction.parse_dict({"action": "click", "source": "TOUCH"})
@@ -671,6 +702,16 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
         "keyevent": "KEYCODE_BACK",
     }
     with self.assertRaisesRegex(ValueError, "Exactly one"):
+      TextInputAction.parse_dict(config_dict)
+
+  def test_parse_text_input_keyevent_with_js(self):
+    config_dict = {
+        "action": "text_input",
+        "source": "js",
+        "duration": "1s",
+        "keyevent": "KEYCODE_BACK",
+    }
+    with self.assertRaisesRegex(ValueError, "keyevent"):
       TextInputAction.parse_dict(config_dict)
 
   def test_parse_wait_for_condition(self):

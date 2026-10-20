@@ -76,6 +76,7 @@
       }
       {
         "action": "text_input"
+        "source": "keyboard"
         "keyevent": "Enter"
         "duration": "100ms"
       }

@@ -261,8 +261,6 @@ class ActionRunner:
       self.scroll_js(action)
     elif input_source is InputSource.TOUCH:
       self.scroll_touch(action)
-    elif input_source is InputSource.MOUSE:
-      self.scroll_mouse(action)
     else:
       raise RuntimeError(f"Unsupported input source: '{input_source}'")
 
@@ -281,7 +279,7 @@ class ActionRunner:
     input_source = action.input_source
     if input_source is InputSource.KEYBOARD:
       self.text_input_keyboard(action)
-    elif input_source is InputSource.JS and not action.keyevent:
+    elif input_source is InputSource.JS:
       self.text_input_js(action)
     else:
       raise RuntimeError(f"Unsupported input source: '{input_source}'")
@@ -576,16 +574,11 @@ class ActionRunner:
       raise ElementNotFoundError(action.selector)
     return None
 
-  def scroll_mouse(self, action: i_action.ScrollAction) -> None:
-    raise InputSourceNotImplementedError(self, action, action.input_source)
-
   def text_input_js(self, action: i_action.TextInputAction) -> None:
     with self.actions("TextInput", measure=False) as actions:
-      if text := action.text:
-        actions.js(
-            "document.activeElement.value = arguments[0]", arguments=[text])
-      else:
-        raise InputSourceNotImplementedError(self, action, action.input_source)
+      actions.js(
+          "document.activeElement.value = arguments[0]",
+          arguments=[action.text])
 
   def _text_to_weighted_events(self, text: str) -> list[KeyEvent | int]:
     events: list[KeyEvent | int] = []
@@ -613,49 +606,51 @@ class ActionRunner:
     return events
 
   def text_input_keyboard(self, action: i_action.TextInputAction) -> None:
-    events_with_weights: list[KeyEvent | int] = []
-    if action.text:
-      events_with_weights.extend(self._text_to_weighted_events(action.text))
-    elif action.keyevent:
-      events_with_weights.extend([
-          KeyEvent(key_code=action.keyevent, is_down=True),
-          self.KEY_HOLD_WEIGHT,
-          KeyEvent(key_code=action.keyevent, is_down=False),
-          self.KEY_GAP_WEIGHT,
-      ])
+    with self.actions("TextInput", measure=False):
+      events_with_weights: list[KeyEvent | int] = []
+      if text := action.text:
+        events_with_weights.extend(self._text_to_weighted_events(text))
+      elif keyevent := action.keyevent:
+        events_with_weights.extend([
+            KeyEvent(key_code=keyevent, is_down=True),
+            self.KEY_HOLD_WEIGHT,
+            KeyEvent(key_code=keyevent, is_down=False),
+            self.KEY_GAP_WEIGHT,
+        ])
 
-    if not events_with_weights:
-      return
+      if not events_with_weights:
+        return
 
-    assert action.source_device
+      source_device = action.source_device
+      assert isinstance(source_device, str)
 
-    if not action.duration:
-      input_events = [e for e in events_with_weights if isinstance(e, KeyEvent)]
-      self.browser_platform.inject_input_events(action.source_device,
-                                                input_events)
-      return
+      if not action.duration:
+        input_events = [
+            e for e in events_with_weights if isinstance(e, KeyEvent)
+        ]
+        self.browser_platform.inject_input_events(source_device, input_events)
+        return
 
-    total_weight = sum(w for w in events_with_weights if isinstance(w, int))
-    total_duration_us = int(action.duration.total_seconds() * 1_000_000)
-    cumulative_weight = 0
-    previous_cumulative_us = 0
+      total_weight = sum(w for w in events_with_weights if isinstance(w, int))
+      total_duration_us = int(action.duration.total_seconds() * 1_000_000)
+      cumulative_weight = 0
+      previous_cumulative_us = 0
 
-    timed_events: list[InputEvent] = []
-    for item in events_with_weights:
-      if isinstance(item, KeyEvent):
-        timed_events.append(item)
-      else:
-        cumulative_weight += item
-        target_cumulative_us = (total_duration_us *
-                                cumulative_weight) // total_weight
-        wait_us = target_cumulative_us - previous_cumulative_us
-        previous_cumulative_us = target_cumulative_us
-        if wait_us > 0:
-          timed_events.append(
-              WaitEvent(duration=dt.timedelta(microseconds=wait_us)))
+      timed_events: list[InputEvent] = []
+      for item in events_with_weights:
+        if isinstance(item, KeyEvent):
+          timed_events.append(item)
+        else:
+          cumulative_weight += item
+          target_cumulative_us = (total_duration_us *
+                                  cumulative_weight) // total_weight
+          wait_us = target_cumulative_us - previous_cumulative_us
+          previous_cumulative_us = target_cumulative_us
+          if wait_us > 0:
+            timed_events.append(
+                WaitEvent(duration=dt.timedelta(microseconds=wait_us)))
 
-    self.browser_platform.inject_input_events(action.source_device,
-                                              timed_events)
+      self.browser_platform.inject_input_events(source_device, timed_events)
 
   def swipe(self, action: i_action.SwipeAction) -> None:
     with self.actions("SwipeAction", measure=False):

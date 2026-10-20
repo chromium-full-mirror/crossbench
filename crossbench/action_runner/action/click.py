@@ -68,8 +68,10 @@ class ClickAction(InputSourceAction):
     if not self.position:
       raise ValueError(f"{self}.position is missing")
 
-    if self.input_source is InputSource.JS and self.position.coordinates:
-      raise ValueError("X,Y Coordinates cannot be used with JS click source.")
+    if (self.input_source in (InputSource.JS, InputSource.DRIVER) and
+        not self.position.selector):
+      raise ValueError(f"{self.input_source.name} click source requires a "
+                       "selector position.")
 
     if self.attempts != 1:
       if not self.position.selector:

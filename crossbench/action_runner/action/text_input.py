@@ -57,6 +57,11 @@ class TextInputAction(InputSourceAction):
     if bool(self.text) + bool(self.keyevent) != 1:
       raise ValueError(
           f"Exactly one of {self}.text or {self}.keyevent can be specified.")
+    if self.input_source is InputSource.JS:
+      if self.keyevent:
+        raise ValueError("keyevent cannot be used with JS text_input source.")
+      if not self.text:
+        raise ValueError("text must be provided with JS text_input source.")
 
   @override
   def validate_duration(self) -> None:
