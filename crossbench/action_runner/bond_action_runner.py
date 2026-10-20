@@ -21,14 +21,13 @@ if TYPE_CHECKING:
 
 class BondActionRunner:
 
-  def __init__(self, action_runner: ActionRunner, run: Run) -> None:
+  def __init__(self, action_runner: ActionRunner) -> None:
     self._action_runner: ActionRunner = action_runner
-    self._run: Run = run
     self._bond_client: BondClient | None = None
 
   @property
   def run(self) -> Run:
-    return self._run
+    return self._action_runner.run
 
   def bond_client(self) -> BondClient:
     if not self._bond_client:

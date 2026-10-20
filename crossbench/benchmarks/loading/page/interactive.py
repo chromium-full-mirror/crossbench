@@ -115,7 +115,7 @@ class InteractivePage(Page):
                                message: str = "failure") -> None:
     action_runner = run.action_runner
     try:
-      action_runner.failure_screenshot(run, message)
+      action_runner.failure_screenshot(message)
     except Exception as e:  # noqa: BLE001
       logging.error("Failed to take a failure screenshot: %s", e)
 
@@ -138,28 +138,27 @@ class InteractivePage(Page):
     action_runner = run.action_runner
     if self._run_login and (login_block := self.login_block):
       with self._performance_mark_scope(run, "login"):
-        action_runner.run_login(run, self, login_block)
+        action_runner.run_login(self, login_block)
     if self._run_setup and (setup_block := self.setup_block):
       with self._performance_mark_scope(run, "setup"):
-        action_runner.run_setup(run, self, setup_block)
+        action_runner.run_setup(self, setup_block)
 
   @override
   def teardown(self, run: Run) -> None:
     action_runner = run.action_runner
     if self._run_teardown and (teardown_block := self.teardown_block):
       with self._performance_mark_scope(run, "teardown"):
-        action_runner.run_teardown(run, self, teardown_block)
+        action_runner.run_teardown(self, teardown_block)
     action_runner.teardown()
 
   def run_once(self, run: Run) -> None:
     action_runner = run.action_runner
     multiple_tabs = self.tabs.multiple_tabs
-    action_runner.run_interactive_page(run, self, multiple_tabs)
+    action_runner.run_interactive_page(self, multiple_tabs)
 
   @override
-  def run_with(self, run: Run, action_runner: ActionRunner,
-               multiple_tabs: bool) -> None:
-    action_runner.run_interactive_page(run, self, multiple_tabs)
+  def run_with(self, action_runner: ActionRunner, multiple_tabs: bool) -> None:
+    action_runner.run_interactive_page(self, multiple_tabs)
 
   @override
   def details_json(self) -> JsonDict:

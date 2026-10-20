@@ -143,7 +143,6 @@ class ActionRunner:
                step_by_step_mode: bool = False) -> None:
     self._run = run
     self._listener = ActionRunnerListener()
-    # TODO: Don't share state across runs
     self._info_stack: exception.TInfoStack | None = None
     self._step_by_step_mode = step_by_step_mode
     self._failure_screenshot_annotations: list[ScreenshotAnnotation] = []
@@ -156,10 +155,6 @@ class ActionRunner:
   @property
   def run(self) -> Run:
     return self._run
-
-  @run.setter
-  def run(self, value: Run) -> None:
-    self._run = value
 
   @property
   def browser(self) -> Browser:
@@ -193,19 +188,18 @@ class ActionRunner:
   @property
   def bond(self) -> BondActionRunner:
     if not self._bond:
-      self._bond = BondActionRunner(self, self.run)
+      self._bond = BondActionRunner(self)
     return self._bond
 
   def teardown(self) -> None:
     if self._bond:
       self._bond.teardown()
 
-  def run_blocks(self, run: Run, page: InteractivePage,
-                 blocks: Iterable[ActionBlock]) -> None:
+  def run_blocks(self, blocks: Iterable[ActionBlock]) -> None:
     for block in blocks:
-      block.run_with(self, run, page)
+      block.run_with(self)
 
-  def run_block(self, run: Run, block: ActionBlock) -> None:
+  def run_block(self, block: ActionBlock) -> None:
     block_index = block.index
     # TODO: Instead maybe just pass context down.
     # Or pass unique path to every action __init__
@@ -214,18 +208,18 @@ class ActionRunner:
         for action_index, action in enumerate(block, start=1):
           with self._info_stack_annotate(f"action_{action_index}"):
             with exception.annotate(f"action {action_index}: {action!s}"):
-              self._run_action_step(run, action)
+              self._run_action_step(action)
 
-  def _run_action_step(self, run: Run, action: i_action.Action) -> None:
+  def _run_action_step(self, action: i_action.Action) -> None:
     if self._step_by_step_mode:
       logging.critical("[STEP-BY-STEP MODE] Next step: %s", action.to_json())
       ui.prompt("[STEP-BY-STEP MODE] Press Enter to continue")
     self._failure_screenshot_annotations = []
-    self.run_action(run, action)
+    self.run_action(action)
 
-  def run_action(self, run: Run, action: i_action.Action) -> None:
+  def run_action(self, action: i_action.Action) -> None:
     message: str = action.TYPE.name
-    with run.exceptions.annotate(message):
+    with self.run.exceptions.annotate(message):
       sys.stdout.write(f"   {message.ljust(30)}\r")
       action.run_with(self)
 
@@ -802,11 +796,10 @@ class ActionRunner:
 
   def screenshot_impl(
       self,
-      run: Run,
       suffix: str,
       annotations: Sequence[ScreenshotAnnotation] | None = None,
   ) -> None:
-    ctx = run.get_probe_context(ScreenshotProbe)
+    ctx = self.run.get_probe_context(ScreenshotProbe)
     if not ctx:
       logging.debug("No screenshot probe for screenshot on %s",
                     repr(self.info_stack))
@@ -818,72 +811,67 @@ class ActionRunner:
       self, annotation: ScreenshotAnnotation) -> None:
     self._failure_screenshot_annotations.append(annotation)
 
-  def failure_screenshot(self, run: Run, suffix: str) -> None:
-    self.screenshot_impl(run, suffix, self._failure_screenshot_annotations)
+  def failure_screenshot(self, suffix: str) -> None:
+    self.screenshot_impl(suffix, self._failure_screenshot_annotations)
 
-  def _maybe_navigate_to_about_blank(self, run: Run, page: Page) -> None:
+  def _maybe_navigate_to_about_blank(self, page: Page) -> None:
     if duration := page.about_blank_duration:
-      run.browser.show_url("about:blank")
-      run.runner.wait(duration)
+      self.browser.show_url("about:blank")
+      self.run.runner.wait(duration)
 
-  def run_page_multiple_tabs(self, run: Run, tabs: TabController,
+  def run_page_multiple_tabs(self, tabs: TabController,
                              pages: Iterable[Page]) -> None:
     # TODO: refactor possible logics to TabController.
-    browser = run.browser
     for _ in tabs:
       try:
         for i, page in enumerate(pages):
           # Create a new tab for the multiple_tab case.
           if i > 0:
-            browser.switch_to_new_tab()
-            self._listener.handle_new_tab(run)
-          page.run_with(run, self, False)
-          self._listener.handle_page_run(run)
-        browser.switch_to_new_tab()
-        self._listener.handle_new_tab(run)
+            self.browser.switch_to_new_tab()
+            self._listener.handle_new_tab(self.run)
+          page.run_with(self, False)
+          self._listener.handle_page_run(self.run)
+        self.browser.switch_to_new_tab()
+        self._listener.handle_new_tab(self.run)
       except Exception as e:
-        self._listener.handle_error(run, e)
+        self._listener.handle_error(self.run, e)
         raise
 
-  def run_combined_page(self, run: Run, page: CombinedPage,
-                        multiple_tabs: bool) -> None:
+  def run_combined_page(self, page: CombinedPage, multiple_tabs: bool) -> None:
     if multiple_tabs:
-      self.run_page_multiple_tabs(run, page.tabs, page.pages)
+      self.run_page_multiple_tabs(page.tabs, page.pages)
     else:
       for sub_page in page.pages:
-        sub_page.run_with(run, self, False)
+        sub_page.run_with(self, False)
 
-  def run_interactive_page_once(self, run: Run, page: InteractivePage) -> None:
+  def run_interactive_page_once(self, page: InteractivePage) -> None:
     try:
-      self.run_blocks(run, page, page.blocks)
-      self._maybe_navigate_to_about_blank(run, page)
+      self.run_blocks(page.blocks)
+      self._maybe_navigate_to_about_blank(page)
     except Exception:
       with self._info_stack_annotate("failure"):
-        page.create_failure_artifacts(run)
+        page.create_failure_artifacts(self.run)
       raise
 
-  def run_interactive_page(self, run: Run, page: InteractivePage,
+  def run_interactive_page(self, page: InteractivePage,
                            multiple_tabs: bool) -> None:
     if multiple_tabs:
-      self.run_page_multiple_tabs(run, page.tabs, [page])
+      self.run_page_multiple_tabs(page.tabs, [page])
     else:
-      self.run_interactive_page_once(run, page)
+      self.run_interactive_page_once(page)
 
-  def run_login(self, run: Run, page: InteractivePage,
-                login: ActionBlock) -> None:
-    with self._management_block_scope(run, page, "login"):
-      with run.browser.network.traffic_shaper.pause():
-        login.run_with(self, run, page)
+  def run_login(self, page: InteractivePage, login: ActionBlock) -> None:
+    with self._management_block_scope(page, "login"):
+      with self.browser.network.traffic_shaper.pause():
+        login.run_with(self)
 
-  def run_setup(self, run: Run, page: InteractivePage,
-                setup: ActionBlock) -> None:
-    with self._management_block_scope(run, page, "setup"):
-      setup.run_with(self, run, page)
+  def run_setup(self, page: InteractivePage, setup: ActionBlock) -> None:
+    with self._management_block_scope(page, "setup"):
+      setup.run_with(self)
 
-  def run_teardown(self, run: Run, page: InteractivePage,
-                   teardown: ActionBlock) -> None:
-    with self._management_block_scope(run, page, "teardown"):
-      teardown.run_with(self, run, page)
+  def run_teardown(self, page: InteractivePage, teardown: ActionBlock) -> None:
+    with self._management_block_scope(page, "teardown"):
+      teardown.run_with(self)
 
   @contextlib.contextmanager
   def playback_iteration(self, i: int) -> Iterator[None]:
@@ -905,7 +893,7 @@ class ActionRunner:
       self._info_stack = parent_info_stack
 
   @contextlib.contextmanager
-  def _management_block_scope(self, run: Run, page: InteractivePage,
+  def _management_block_scope(self, page: InteractivePage,
                               name: str) -> Iterator[None]:
     try:
       with exception.annotate(name):
@@ -913,7 +901,7 @@ class ActionRunner:
           yield
     except Exception:
       with self._info_stack_annotate("failure"):
-        page.create_failure_artifacts(run, "failure")
+        page.create_failure_artifacts(self.run, "failure")
       raise
 
   def switch_tab(self, action: i_action.SwitchTabAction) -> None:

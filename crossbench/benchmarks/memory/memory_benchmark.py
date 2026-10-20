@@ -398,14 +398,13 @@ class MemoryPage(LivePage):
       listener.reset_playback_state()
 
   @override
-  def run_with(self, run: Run, action_runner: ActionRunner,
-               multiple_tabs: bool) -> None:
+  def run_with(self, action_runner: ActionRunner, multiple_tabs: bool) -> None:
     if multiple_tabs:
       self._current_tab_index = 0
-      super().run_with(run, action_runner, multiple_tabs)
+      super().run_with(action_runner, multiple_tabs)
     else:
       if self._cached_blocksize is None:
-        total_memory_mb = run.browser.platform.total_memory_mb()
+        total_memory_mb = action_runner.browser_platform.total_memory_mb()
         self._cached_blocksize = max(
             1, int(total_memory_mb * (self.memory_percent / 100.0)))
       blocksize = self._cached_blocksize
@@ -423,7 +422,7 @@ class MemoryPage(LivePage):
               "TAB_INDEX": str(tab_index),
           })),)
       block = ActionBlock(actions=actions)
-      action_runner.run_block(run, block)
+      action_runner.run_block(block)
 
 
 class MemoryBenchmark(LoadingBenchmark):

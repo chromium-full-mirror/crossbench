@@ -63,8 +63,7 @@ class Page(Story, metaclass=abc.ABCMeta):
     del parent
 
   @abc.abstractmethod
-  def run_with(self, run: Run, action_runner: ActionRunner,
-               multiple_tabs: bool) -> None:
+  def run_with(self, action_runner: ActionRunner, multiple_tabs: bool) -> None:
     pass
 
   @abc.abstractmethod

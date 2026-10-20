@@ -54,11 +54,12 @@ class BondActionRunnerTestCase(BaseCrossbenchTestCase):
         NOW_EPOCH + create_meeting_duration +
         add_bots_duration,  # get timeout after add_bots
     ]
+    mock_run = self._make_mock_run()
     mock_action_runner = MagicMock(name="Mock ActionRunner")
+    mock_action_runner.run = mock_run
     mock_action_runner.get.side_effect = [None]
 
-    mock_run = self._make_mock_run()
-    bond_action_runner = BondActionRunner(mock_action_runner, mock_run)
+    bond_action_runner = BondActionRunner(mock_action_runner)
 
     mock_bond_client = mock_bond_client_cls.return_value
     mock_bond_client.create_meeting.side_effect = ["mock-conference-code"]
@@ -79,7 +80,7 @@ class BondActionRunnerTestCase(BaseCrossbenchTestCase):
   def test_get_current_conference_code(self):
     mock_run = self._make_mock_run()
     action_runner = ActionRunner(mock_run)
-    bond_action_runner = BondActionRunner(action_runner, mock_run)
+    bond_action_runner = BondActionRunner(action_runner)
     for browser in self.browsers:
       browser.set_current_url("https://meet.google.com/abc-def-ghi")
       code = bond_action_runner.get_current_conference_code(browser=browser)
@@ -88,7 +89,7 @@ class BondActionRunnerTestCase(BaseCrossbenchTestCase):
   def test_get_current_conference_code_invalid(self):
     mock_run = self._make_mock_run()
     action_runner = ActionRunner(mock_run)
-    bond_action_runner = BondActionRunner(action_runner, mock_run)
+    bond_action_runner = BondActionRunner(action_runner)
     for browser in self.browsers:
       browser.set_current_url("https://www.google.com")
       with self.assertRaisesRegex(RuntimeError,
@@ -159,8 +160,9 @@ class BondActionRunnerTestCase(BaseCrossbenchTestCase):
       "crossbench.action_runner.bond_action_runner.BondClient", autospec=True)
   def test_meet_script(self, mock_bond_client_cls):
     mock_run = self._make_mock_run()
-    bond_action_runner = BondActionRunner(
-        MagicMock(name="Mock ActionRunner"), mock_run)
+    mock_action_runner = MagicMock(name="Mock ActionRunner")
+    mock_action_runner.run = mock_run
+    bond_action_runner = BondActionRunner(mock_action_runner)
 
     mock_run.browser.current_url = "https://meet.google.com/abc-def-ghi"
 

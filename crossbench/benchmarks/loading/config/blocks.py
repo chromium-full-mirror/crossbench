@@ -23,8 +23,6 @@ from crossbench.parse import NumberParser, ObjectParser
 
 if TYPE_CHECKING:
   from crossbench.action_runner.action_runner import ActionRunner
-  from crossbench.benchmarks.loading.page.interactive import InteractivePage
-  from crossbench.runner.run import Run
   from crossbench.types import JsonDict
 
 assert ACTIONS_TUPLE, "import failed"
@@ -110,10 +108,8 @@ class ActionBlock(ConfigObject):
     #         f"action[{index}].index should be {index}, "
     #         f"but got {action.index}")
 
-  def run_with(self, runner: ActionRunner, run: Run,
-               page: InteractivePage) -> None:
-    del page
-    runner.run_block(run, self)
+  def run_with(self, runner: ActionRunner) -> None:
+    runner.run_block(self)
 
   def to_json(self) -> JsonDict:
     return {

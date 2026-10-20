@@ -88,12 +88,11 @@ class CombinedPage(Page):
   def run_once(self, run: Run) -> None:
     action_runner = run.action_runner
     multiple_tabs = self.tabs.multiple_tabs
-    action_runner.run_combined_page(run, self, multiple_tabs)
+    action_runner.run_combined_page(self, multiple_tabs)
 
   @override
-  def run_with(self, run: Run, action_runner: ActionRunner,
-               multiple_tabs: bool) -> None:
-    action_runner.run_combined_page(run, self, multiple_tabs)
+  def run_with(self, action_runner: ActionRunner, multiple_tabs: bool) -> None:
+    action_runner.run_combined_page(self, multiple_tabs)
 
   def __str__(self) -> str:
     combined_name = ",".join(page.name for page in self._pages)

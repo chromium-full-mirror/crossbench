@@ -76,7 +76,6 @@ class MockRun(ResultOrigin):
     self.index = index
     self.story = story
     self.action_runner: ActionRunner = action_runner or ActionRunner(self)
-    self.action_runner.run = self
 
     self.story_secrets = Secrets()
     self._out_dir = (

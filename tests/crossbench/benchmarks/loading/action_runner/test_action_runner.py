@@ -178,13 +178,13 @@ class DefaultActionRunnerTestCase(ActionRunnerTestCase):
 
     with self.assertRaisesRegex(MultiException,
                                 "Invoke not implemented for probe"):
-      self.action_runner.run_block(self.mock_run, action_block)
+      self.action_runner.run_block(action_block)
 
   def test_probe_action_screenshot(self):
     self.set_up_with_probe(ScreenshotProbe())
     action_block = ActionBlock(
         actions=(ProbeAction.create(probe="screenshot"),))
-    self.action_runner.run_block(self.mock_run, action_block)
+    self.action_runner.run_block(action_block)
     self.assertEqual(len(self.platform.screenshots), 1)
 
   def test_probe_action_wait_for_download_missing_pattern(self):
@@ -196,7 +196,7 @@ class DefaultActionRunnerTestCase(ActionRunnerTestCase):
     action_block = ActionBlock(actions=(ProbeAction.create(probe="downloads"),))
 
     with self.assertRaisesRegex(MultiException, "pattern"):
-      self.action_runner.run_block(self.mock_run, action_block)
+      self.action_runner.run_block(action_block)
 
   def test_probe_action_wait_for_download(self):
     downloads_dir = pathlib.Path("/Downloads")
@@ -211,13 +211,13 @@ class DefaultActionRunnerTestCase(ActionRunnerTestCase):
             probe="downloads", kwargs={"pattern": "a_download"}),))
 
     with self.assertRaisesRegex(MultiException, "Waited for"):
-      self.action_runner.run_block(self.mock_run, action_block)
+      self.action_runner.run_block(action_block)
 
   def test_probe_action_meminfo_no_kwargs(self):
     self.set_up_with_probe(MeminfoProbe())
     action_block = ActionBlock(actions=(ProbeAction.create(probe="meminfo"),))
 
-    self.action_runner.run_block(self.mock_run, action_block)
+    self.action_runner.run_block(action_block)
     self.assertEqual(self.browser.performance_marks[-1], "crossbench-meminfo")
 
   def test_probe_action_meminfo_all_kwargs(self):
@@ -233,14 +233,14 @@ class DefaultActionRunnerTestCase(ActionRunnerTestCase):
             },
         ),))
 
-    self.action_runner.run_block(self.mock_run, action_block)
+    self.action_runner.run_block(action_block)
     self.assertEqual(self.browser.performance_marks[-1], "crossbench-meminfo")
 
   def test_probe_action_dump_html(self):
     self.set_up_with_probe(DumpHtmlProbe())
     action_block = ActionBlock(actions=(ProbeAction.create(probe="dump_html"),))
     self.browser.set_default_js_return(True)
-    self.action_runner.run_block(self.mock_run, action_block)
+    self.action_runner.run_block(action_block)
     self.assertEqual(
         self.browser.invoked_js[-1].script,
         "return document.children[0].outerHTML",

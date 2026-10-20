@@ -194,26 +194,25 @@ class LoadLine2ProbeContext(ProbeContext[LoadLine2Probe]):
 class LoadLine2CombinedPage(CombinedPage):
 
   @override
-  def run_with(self, run: Run, action_runner: ActionRunner,
-               multiple_tabs: bool) -> None:
+  def run_with(self, action_runner: ActionRunner, multiple_tabs: bool) -> None:
     del multiple_tabs
     for page in self._pages:
       if not isinstance(page, InteractivePage):
-        page.run_with(run, action_runner, False)
+        page.run_with(action_runner, False)
         continue
       for block in page.blocks:
-        if block.label == "load" and run.browser_platform.is_android:
+        if block.label == "load" and action_runner.browser_platform.is_android:
           # Trigger a scheduling boost on devices that boost performance on
           # user input.
           action = ClickAction.create(
               source=InputSource.TOUCH,
               position=PositionConfig.from_coordinates(0, 0))
           action_runner.click_touch(action)
-        action_runner.run_blocks(run, page, (block,))
+        action_runner.run_blocks((block,))
 
   @override
   def run_once(self, run: Run) -> None:
-    self.run_with(run, run.action_runner, self.tabs.multiple_tabs)
+    self.run_with(run.action_runner, self.tabs.multiple_tabs)
 
 
 class LoadLine2Benchmark(LoadLineBenchmark):

@@ -16,10 +16,8 @@ from crossbench.benchmarks.loading.config.login.base import PresetLoginBlock
 
 if TYPE_CHECKING:
   from crossbench.action_runner.action_runner import ActionRunner
-  from crossbench.benchmarks.loading.page.interactive import InteractivePage
   from crossbench.cli.config.secrets import UsernamePassword
   from crossbench.runner.actions import Actions
-  from crossbench.runner.run import Run
 
 GOOGLE_LOGIN_URL: str = (
     "https://accounts.google.com/Logout?"
@@ -109,8 +107,8 @@ class GoogleLogin(PresetLoginBlock):
     return dt.timedelta(seconds=20)
 
   @override
-  def run_with(self, runner: ActionRunner, run: Run,
-               page: InteractivePage) -> None:
+  def run_with(self, runner: ActionRunner) -> None:
+    run = runner.run
     secret: UsernamePassword | None = run.secrets.google
     if not secret:
       raise RuntimeError("No google login provided")
