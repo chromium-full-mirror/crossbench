@@ -11,7 +11,7 @@ import logging
 import sys
 import time
 from typing import TYPE_CHECKING, Callable, Final, Iterable, Iterator, \
-    NamedTuple, Sequence
+    Sequence, TypedDict
 
 from crossbench import exception
 from crossbench import path as pth
@@ -65,23 +65,28 @@ SCRIPTS_DIR: Final[pth.LocalPath] = (
     pth.ROOT_DIR / "crossbench" / "action_runner" / "scripts")
 
 
-class WindowPositions(NamedTuple):
-  found_element: bool
-  pixel_ratio: float
-  outer_width: int
-  outer_height: int
-  inner_width: float
-  inner_height: float
+class ElementRectResult(TypedDict):
+  left: int
+  top: int
+  width: int
+  height: int
+
+
+class SelectElementResult(TypedDict):
+  count: int
+  scrollTop: float
+  device_pixel_ratio: float
+  window_outer_width: int
+  window_outer_height: int
+  window_inner_width: float
+  window_inner_height: float
   screen_width: int
   screen_height: int
-  avail_width: int
-  avail_height: int
-  screen_x: int
-  screen_y: int
-  element_left: int
-  element_top: int
-  element_width: int
-  element_height: int
+  screen_avail_width: int
+  screen_avail_height: int
+  window_offset_x: int
+  window_offset_y: int
+  element_rect: ElementRectResult | None
 
 
 class ActionNotImplementedError(NotImplementedError):
@@ -123,57 +128,6 @@ class ActionRunner:
   platform-level input event injection.
   """
 
-  XPATH_SELECT_ELEMENT: Final[str] = """
-      let elements = [];
-      let xpathResult = document.evaluate(arguments[0], document);
-      let currentElement = xpathResult.iterateNext();
-      let element = currentElement;
-      while (currentElement) {
-        elements.push(currentElement);
-        currentElement = xpathResult.iterateNext();
-      }
-  """
-
-  CSS_SELECT_ELEMENT: Final[str] = """
-      let elements = document.querySelectorAll(arguments[0]);
-      let element = elements[0];
-  """
-
-  CHECK_ELEMENT_EXISTS: Final[str] = """
-      if (!element) return 0;
-  """
-
-  ELEMENT_SCROLL_INTO_VIEW: Final[str] = """
-      element.scrollIntoView({ block: 'nearest' });
-  """
-
-  CHECK_ELEMENT_RECT: Final[str] = """
-      const rect = element.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return 0;
-  """
-
-  ELEMENT_CLICK: Final[str] = """
-      element.click();
-  """
-
-  RETURN_SUCCESS: Final[str] = """
-      return elements.length;
-  """
-
-  SELECT_WINDOW: Final[str] = """
-      let elements = [window];
-      let element = window;
-  """
-
-  SCROLL_ELEMENT_TO: Final[str] = """
-      element.scrollTo({top:arguments[1], behavior:'smooth'});
-  """
-
-  GET_CURRENT_SCROLL_POSITION: Final[str] = """
-      if (!element) return [0, 0];
-      return [elements.length, element[arguments[1]]];
-  """
-
   # Relative timing weights used to distribute `action.duration` across the
   # various phases of keyboard input. Each character receives a total weight of
   # 10 units, ensuring uniform typing speed across characters.
@@ -211,8 +165,8 @@ class ActionRunner:
     self.browser_platform.setup_virtual_devices(virtual_devices)
 
   @functools.cached_property
-  def _get_window_positions_script(self) -> str:
-    return (SCRIPTS_DIR / "get_window_positions.js").read_text()
+  def _select_element_script(self) -> str:
+    return (SCRIPTS_DIR / "select_element.js").read_text()
 
   @property
   def run(self) -> Run:
@@ -260,42 +214,6 @@ class ActionRunner:
   def teardown(self) -> None:
     if self._bond:
       self._bond.teardown()
-
-  def get_selector_script(
-      self,
-      selector: str,
-      check_element_exists: bool = False,
-      scroll_into_view: bool = False,
-      check_element_rect: bool = False,
-      click: bool = False,
-      return_on_success: bool = False,
-  ) -> tuple[str, str]:
-    # TODO: support more selector types
-    script: str = ""
-
-    prefix = "xpath/"
-    if selector.startswith(prefix):
-      selector = selector[len(prefix):]
-      script = self.XPATH_SELECT_ELEMENT
-    else:
-      script = self.CSS_SELECT_ELEMENT
-
-    if check_element_exists:
-      script += self.CHECK_ELEMENT_EXISTS
-
-    if scroll_into_view:
-      script += self.ELEMENT_SCROLL_INTO_VIEW
-
-    if check_element_rect:
-      script += self.CHECK_ELEMENT_RECT
-
-    if click:
-      script += self.ELEMENT_CLICK
-
-    if return_on_success:
-      script += self.RETURN_SUCCESS
-
-    return selector, script
 
   def run_blocks(self, run: Run, page: InteractivePage,
                  blocks: Iterable[ActionBlock]) -> None:
@@ -401,14 +319,6 @@ class ActionRunner:
     if not selector_config:
       raise RuntimeError("Missing selector")
 
-    selector, script = self.get_selector_script(
-        selector_config.selector,
-        check_element_exists=True,
-        scroll_into_view=selector_config.scroll_into_view,
-        click=True,
-        return_on_success=True,
-    )
-
     with self.actions("ClickAction", measure=False) as actions:
       if selector_config.wait:
         self.wait_for_element_impl(
@@ -417,9 +327,16 @@ class ActionRunner:
             timeout=action.timeout,
             required=selector_config.required,
         )
-      if (not actions.js(script, arguments=[selector]) and
-          selector_config.required):
-        raise ElementNotFoundError(selector)
+      res: SelectElementResult = actions.js(
+          self._select_element_script,
+          arguments=[{
+              "selector": selector_config.selector,
+              "scrollIntoView": selector_config.scroll_into_view,
+              "click": True,
+          }],
+      )
+      if not res["count"] and selector_config.required:
+        raise ElementNotFoundError(selector_config.selector)
 
       if action.verify:
         self.wait_for_element_impl(
@@ -529,34 +446,31 @@ class ActionRunner:
                          actions: Actions,
                          selector: str | None,
                          scroll_into_view: bool = False) -> ViewportInfo:
-    script = ""
-    if selector:
-      selector, script = self.get_selector_script(selector)
-
-    script += self._get_window_positions_script
-
-    pos = WindowPositions(
-        *actions.js(script, arguments=[selector, scroll_into_view]))
-
+    res: SelectElementResult = actions.js(
+        self._select_element_script,
+        arguments=[{
+            "selector": selector,
+            "scrollIntoView": scroll_into_view,
+        }],
+    )
     element_rect: DisplayRectangle | None = None
-    if pos.found_element:
+    if rect := res["element_rect"]:
       element_rect = DisplayRectangle(
-          Point(pos.element_left, pos.element_top), pos.element_width,
-          pos.element_height)
-
+          Point(rect["left"], rect["top"]), rect["width"], rect["height"])
     return ViewportInfo(
-        device_pixel_ratio=pos.pixel_ratio,
-        window_outer_width=pos.outer_width,
-        window_outer_height=pos.outer_height,
-        window_inner_width=pos.inner_width,
-        window_inner_height=pos.inner_height,
-        screen_width=pos.screen_width,
-        screen_height=pos.screen_height,
-        screen_avail_width=pos.avail_width,
-        screen_avail_height=pos.avail_height,
-        window_offset_x=pos.screen_x,
-        window_offset_y=pos.screen_y,
-        element_rect=element_rect)
+        device_pixel_ratio=res["device_pixel_ratio"],
+        window_outer_width=res["window_outer_width"],
+        window_outer_height=res["window_outer_height"],
+        window_inner_width=res["window_inner_width"],
+        window_inner_height=res["window_inner_height"],
+        screen_width=res["screen_width"],
+        screen_height=res["screen_height"],
+        screen_avail_width=res["screen_avail_width"],
+        screen_avail_height=res["screen_avail_height"],
+        window_offset_x=res["window_offset_x"],
+        window_offset_y=res["window_offset_y"],
+        element_rect=element_rect,
+    )
 
   def click_driver(self, action: i_action.ClickAction) -> None:
     if action.duration > dt.timedelta():
@@ -582,29 +496,19 @@ class ActionRunner:
 
   def scroll_js(self, action: i_action.ScrollAction) -> None:
     with self.actions("ScrollAction", measure=False) as actions:
-      selector = ""
-      selector_script = self.SELECT_WINDOW
-
-      if action.selector:
-        selector, selector_script = self.get_selector_script(action.selector)
-
-      current_scroll_position_script = (
-          selector_script + self.GET_CURRENT_SCROLL_POSITION)
-
-      found_element, initial_scroll_y = actions.js(
-          current_scroll_position_script,
-          arguments=[
-              selector,
-              self._get_scroll_field(bool(action.selector)),
-          ],
+      res: SelectElementResult = actions.js(
+          self._select_element_script,
+          arguments=[{
+              "selector": action.selector,
+          }],
       )
 
-      if not found_element:
+      if not res["count"]:
         if action.required:
-          raise ElementNotFoundError(selector)
+          raise ElementNotFoundError(action.selector or "")
         return
 
-      do_scroll_script = selector_script + self.SCROLL_ELEMENT_TO
+      initial_scroll_y = res["scrollTop"]
 
       duration_s = action.duration.total_seconds()
       distance = action.distance
@@ -617,10 +521,22 @@ class ActionRunner:
         if time_delta >= duration_s:
           break
         scroll_y = initial_scroll_y + time_delta / duration_s * distance
-        actions.js(do_scroll_script, arguments=[selector, scroll_y])
+        actions.js(
+            self._select_element_script,
+            arguments=[{
+                "selector": action.selector,
+                "scrollTo": scroll_y,
+            }],
+        )
         actions.wait(0.2)
       scroll_y = initial_scroll_y + distance
-      actions.js(do_scroll_script, arguments=[selector, scroll_y])
+      actions.js(
+          self._select_element_script,
+          arguments=[{
+              "selector": action.selector,
+              "scrollTo": scroll_y,
+          }],
+      )
 
   def scroll_touch(self, action: i_action.ScrollAction) -> None:
     with self.actions("ScrollAction", measure=False) as actions:
@@ -834,22 +750,14 @@ class ActionRunner:
       check_element_rect: bool = False,
       required: bool = True,
   ) -> None:
-    selector, selector_script = self.get_selector_script(
-        selector=selector,
-        check_element_exists=True,
-        scroll_into_view=scroll_into_view,
-        check_element_rect=check_element_rect,
-        return_on_success=True,
-    )
-
     # TODO: if check_element_rect, we should wait for the position to be the
     # same
 
-    def _exact_match(js_result: int) -> bool:
-      return js_result == expected_count
+    def _exact_match(js_result: SelectElementResult) -> bool:
+      return js_result["count"] == expected_count
 
-    def _or_more_match(js_result: int) -> bool:
-      return js_result >= expected_count
+    def _or_more_match(js_result: SelectElementResult) -> bool:
+      return js_result["count"] >= expected_count
 
     success_condition = _exact_match
 
@@ -858,10 +766,14 @@ class ActionRunner:
 
     try:
       actions.wait_js_condition(
-          selector_script,
+          self._select_element_script,
           min_interval=0.2,
           timeout=timeout,
-          arguments=(selector,),
+          arguments=({
+              "selector": selector,
+              "scrollIntoView": scroll_into_view,
+              "checkRect": check_element_rect,
+          },),
           success_condition=success_condition,
       )
     except (TimeoutError, ValueError) as e:
@@ -1047,8 +959,3 @@ class ActionRunner:
     del action
     with self.actions("CloseAllTabsAction", measure=False):
       self.browser.close_all_tabs()
-
-  def _get_scroll_field(self, has_selector: bool) -> str:
-    if has_selector:
-      return "scrollTop"
-    return "scrollY"

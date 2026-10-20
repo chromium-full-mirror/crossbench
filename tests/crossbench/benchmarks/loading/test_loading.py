@@ -16,7 +16,7 @@ from unittest import mock
 from typing_extensions import override
 
 from crossbench.action_runner.action.action_type import ActionType
-from crossbench.action_runner.action_runner import ActionRunner
+from crossbench.action_runner.action_runner import SCRIPTS_DIR, ActionRunner
 from crossbench.benchmarks.loading.config.blocks import ActionBlock, \
     ActionBlockListConfig
 from crossbench.benchmarks.loading.config.login.google import GOOGLE_LOGIN_URL
@@ -148,6 +148,11 @@ class LoadingBenchmarkCliTestCaseMixin:
 
 
 class TestPageLoadBenchmark(LoadingBenchmarkCliTestCaseMixin, SubStoryTestCase):
+
+  @override
+  def setUp(self) -> None:
+    super().setUp()
+    self.fs.add_real_directory(SCRIPTS_DIR, lazy_read=True)
 
   def test_separate_and_combined_flags(self):
     args_sep = self.parse_args("--separate")

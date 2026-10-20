@@ -143,9 +143,9 @@ class ChromeOSLoginTestCase(ActionRunnerTestCase):
         "https://accounts.google.com/v3/signin/speedbump/passkeyenrollment")
     self.browser.expect_js(result=passkey_url)
     # Wait for skip element
-    self.browser.expect_js(result=1)
+    self.browser.expect_js(result={"count": 1})
     # Click skip element
-    self.browser.expect_js(result=1)
+    self.browser.expect_js(result={"count": 1})
     # Wait for URL change
     self.browser.expect_js(result=True)
     # Wait for ready state complete
@@ -154,9 +154,9 @@ class ChromeOSLoginTestCase(ActionRunnerTestCase):
     # Return passkey URL
     self.browser.expect_js(result="https://gds.google.com/web/recoveryoptions")
     # Wait for skip element
-    self.browser.expect_js(result=1)
+    self.browser.expect_js(result={"count": 1})
     # Click skip element
-    self.browser.expect_js(result=1)
+    self.browser.expect_js(result={"count": 1})
     # Wait for URL change
     self.browser.expect_js(result=True)
     # Wait for ready state complete
@@ -165,9 +165,9 @@ class ChromeOSLoginTestCase(ActionRunnerTestCase):
     # Return passkey URL
     self.browser.expect_js(result="https://gds.google.com/web/homeaddress")
     # Wait for skip element
-    self.browser.expect_js(result=1)
+    self.browser.expect_js(result={"count": 1})
     # Click skip element
-    self.browser.expect_js(result=1)
+    self.browser.expect_js(result={"count": 1})
     # Wait for URL change
     self.browser.expect_js(result=True)
     # Wait for ready state complete
@@ -179,13 +179,13 @@ class ChromeOSLoginTestCase(ActionRunnerTestCase):
     # Return suspicious activity is present
     self.browser.expect_js(result=True)
     # Click suspicious activity button
-    self.browser.expect_js(result=1)
+    self.browser.expect_js(result={"count": 1})
     # Wait for 'yes' button
-    self.browser.expect_js(result=1)
+    self.browser.expect_js(result={"count": 1})
     # Click 'yes' button
-    self.browser.expect_js(result=1)
+    self.browser.expect_js(result={"count": 1})
     # Wait 'yes' button not present.
-    self.browser.expect_js(result=1)
+    self.browser.expect_js(result={"count": 1})
 
     self.mock_run.story_secrets = page[0].secrets
     config.pages[0].login.run_with(self.action_runner, self.mock_run, page[0])

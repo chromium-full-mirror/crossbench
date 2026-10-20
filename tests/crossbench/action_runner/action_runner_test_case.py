@@ -7,6 +7,7 @@ import datetime as dt
 import logging
 from unittest import mock
 
+from crossbench.action_runner.action_runner import SCRIPTS_DIR
 from tests.crossbench.base import CrossbenchFakeFsTestCase, \
     CrossbenchMockArgsMixin
 
@@ -15,6 +16,7 @@ class ActionRunnerTestCase(CrossbenchMockArgsMixin, CrossbenchFakeFsTestCase):
 
   def setUp(self) -> None:
     super().setUp()
+    self.fs.add_real_directory(SCRIPTS_DIR, lazy_read=True)
 
     init_time = dt.datetime.now()
     datetime_patcher = mock.patch("datetime.datetime", spec=dt.datetime)

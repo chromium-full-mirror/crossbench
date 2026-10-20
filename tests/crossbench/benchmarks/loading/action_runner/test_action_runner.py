@@ -8,7 +8,7 @@ import contextlib
 import datetime as dt
 import pathlib
 import unittest
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, cast, get_type_hints
 from unittest import mock
 from unittest.mock import MagicMock, call
 
@@ -20,7 +20,7 @@ from crossbench.action_runner.action.scroll import ScrollAction
 from crossbench.action_runner.action.swipe import SwipeAction
 from crossbench.action_runner.action.text_input import TextInputAction
 from crossbench.action_runner.action_runner import SCRIPTS_DIR, ActionRunner, \
-    WindowPositions
+    ElementRectResult, SelectElementResult
 from crossbench.action_runner.display_rectangle import DisplayRectangle
 from crossbench.action_runner.element_not_found_error import \
     ElementNotFoundError
@@ -249,51 +249,51 @@ class DefaultActionRunnerTestCase(ActionRunnerTestCase):
 
 class ActionRunnerInputTestCase(ActionRunnerTestCase):
 
-  _NO_ELEMENT_JS_RESULT: JsInvocation = JsInvocation(result=[
-      False,  # Found element
-      1,  # pixel ratio
-      1920,  # window outer width
-      1080,  # window outer height
-      1920,  # window inner width
-      1080,  # window inner height
-      1920,  # screen width
-      1080,  # screen height
-      1920,  # screen avail width
-      1080,  # screen avail height
-      0,  # screenX
-      0,  # screenY
-      0,  # element left
-      0,  # element top
-      0,  # element width
-      0,  # element height
-  ])
+  _NO_ELEMENT_JS_RESULT: JsInvocation = JsInvocation(
+      result={
+          "count": 0,
+          "scrollTop": 0,
+          "device_pixel_ratio": 1,
+          "window_outer_width": 1920,
+          "window_outer_height": 1080,
+          "window_inner_width": 1920,
+          "window_inner_height": 1080,
+          "screen_width": 1920,
+          "screen_height": 1080,
+          "screen_avail_width": 1920,
+          "screen_avail_height": 1080,
+          "window_offset_x": 0,
+          "window_offset_y": 0,
+          "element_rect": None,
+      })
 
-  _FOUND_ELEMENT_JS_RESULT: JsInvocation = JsInvocation(result=[
-      True,  # Found element
-      1,  # pixel ratio
-      1920,  # window outer width
-      1080,  # window outer height
-      1920,  # window inner width
-      1080,  # window inner height
-      1920,  # screen width
-      1080,  # screen height
-      1920,  # screen avail width
-      1080,  # screen avail height
-      0,  # screenX
-      0,  # screenY
-      100,  # element left
-      200,  # element top
-      50,  # element width
-      40,  # element height
-  ])
+  _FOUND_ELEMENT_JS_RESULT: JsInvocation = JsInvocation(
+      result={
+          "count": 1,
+          "scrollTop": 0,
+          "device_pixel_ratio": 1,
+          "window_outer_width": 1920,
+          "window_outer_height": 1080,
+          "window_inner_width": 1920,
+          "window_inner_height": 1080,
+          "screen_width": 1920,
+          "screen_height": 1080,
+          "screen_avail_width": 1920,
+          "screen_avail_height": 1080,
+          "window_offset_x": 0,
+          "window_offset_y": 0,
+          "element_rect": {
+              "left": 100,
+              "top": 200,
+              "width": 50,
+              "height": 40,
+          },
+      })
 
   def setUp(self) -> None:
     super().setUp()
     self.platform = LinuxMockPlatform()
     self.fs.create_file("/usr/bin/google-chrome", contents="chrome_mock")
-    self.fs.create_file(
-        SCRIPTS_DIR / "get_window_positions.js",
-        contents="get_window_positions")
     self.browser = MockChromeStable(
         "mock browser", settings=Settings(platform=self.platform))
     self.runner = MockRunner()
@@ -486,7 +486,7 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
         InputSource.TOUCH,
         position=PositionConfig.from_selector(
             selector="div#submit", required=True, wait=True))
-    self.browser.expect_js(expected_js=JsInvocation(result=1))
+    self.browser.expect_js(expected_js=JsInvocation(result={"count": 1}))
     self.browser.expect_js(expected_js=self._FOUND_ELEMENT_JS_RESULT)
     self.run_action(click_action)
 
@@ -523,7 +523,7 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
         InputSource.TOUCH,
         position=PositionConfig.from_coordinates(x=10, y=20),
         verify="#success")
-    self.browser.expect_js(expected_js=JsInvocation(result=1))
+    self.browser.expect_js(expected_js=JsInvocation(result={"count": 1}))
     self.run_action(click_action)
 
     self.assert_input_events_injected([
@@ -593,7 +593,7 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
         InputSource.MOUSE,
         position=PositionConfig.from_selector(
             selector="div#submit", required=True, wait=True))
-    self.browser.expect_js(expected_js=JsInvocation(result=1))
+    self.browser.expect_js(expected_js=JsInvocation(result={"count": 1}))
     self.browser.expect_js(expected_js=self._FOUND_ELEMENT_JS_RESULT)
     self.run_action(click_action)
 
@@ -631,7 +631,7 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
         InputSource.MOUSE,
         position=PositionConfig.from_coordinates(x=10, y=20),
         verify="#success")
-    self.browser.expect_js(expected_js=JsInvocation(result=1))
+    self.browser.expect_js(expected_js=JsInvocation(result={"count": 1}))
     self.run_action(click_action)
 
     self.assert_input_events_injected([
@@ -690,7 +690,7 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
         InputSource.TOUCH,
         position=PositionConfig.from_ui_selector(res="button_id"),
         verify="#success")
-    self.browser.expect_js(expected_js=JsInvocation(result=1))
+    self.browser.expect_js(expected_js=JsInvocation(result={"count": 1}))
     with self.patch_get_ui_element_rect() as mock_get_rect:
       self.run_action(click_action)
       mock_get_rect.assert_called_once()
@@ -706,7 +706,7 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
         InputSource.MOUSE,
         position=PositionConfig.from_ui_selector(res="button_id"),
         verify="#success")
-    self.browser.expect_js(expected_js=JsInvocation(result=1))
+    self.browser.expect_js(expected_js=JsInvocation(result={"count": 1}))
     with self.patch_get_ui_element_rect() as mock_get_rect:
       self.run_action(click_action)
       mock_get_rect.assert_called_once()
@@ -847,24 +847,25 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
         InputSource.TOUCH, distance=100, duration=dt.timedelta(milliseconds=50))
     self.browser.expect_js(
         expected_js=JsInvocation(
-            result=WindowPositions(
-                found_element=False,
-                pixel_ratio=2,
-                outer_width=960,
-                outer_height=540,
-                inner_width=960,
-                inner_height=540,
-                screen_width=960,
-                screen_height=540,
-                avail_width=960,
-                avail_height=540,
-                screen_x=0,
-                screen_y=0,
-                element_left=0,
-                element_top=0,
-                element_width=0,
-                element_height=0),
-            arguments=[None, False]))
+            result={
+                "count": 0,
+                "device_pixel_ratio": 2,
+                "window_outer_width": 960,
+                "window_outer_height": 540,
+                "window_inner_width": 960,
+                "window_inner_height": 540,
+                "screen_width": 960,
+                "screen_height": 540,
+                "screen_avail_width": 960,
+                "screen_avail_height": 540,
+                "window_offset_x": 0,
+                "window_offset_y": 0,
+                "element_rect": None,
+            },
+            arguments=[{
+                "selector": None,
+                "scrollIntoView": False,
+            }]))
     self.run_action(scroll_action)
 
     self.inject_events_mock.assert_called_once()
@@ -882,24 +883,30 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
         duration=dt.timedelta(milliseconds=50))
     self.browser.expect_js(
         expected_js=JsInvocation(
-            result=WindowPositions(
-                found_element=True,
-                pixel_ratio=1,
-                outer_width=1920,
-                outer_height=1080,
-                inner_width=1920,
-                inner_height=1080,
-                screen_width=1920,
-                screen_height=1080,
-                avail_width=1920,
-                avail_height=1080,
-                screen_x=0,
-                screen_y=0,
-                element_left=10,
-                element_top=10,
-                element_width=80,
-                element_height=80),
-            arguments=["div#scrollable", False]))
+            result={
+                "count": 1,
+                "device_pixel_ratio": 1,
+                "window_outer_width": 1920,
+                "window_outer_height": 1080,
+                "window_inner_width": 1920,
+                "window_inner_height": 1080,
+                "screen_width": 1920,
+                "screen_height": 1080,
+                "screen_avail_width": 1920,
+                "screen_avail_height": 1080,
+                "window_offset_x": 0,
+                "window_offset_y": 0,
+                "element_rect": {
+                    "left": 10,
+                    "top": 10,
+                    "width": 80,
+                    "height": 80,
+                },
+            },
+            arguments=[{
+                "selector": "div#scrollable",
+                "scrollIntoView": False,
+            }]))
     self.run_action(scroll_action)
 
     self.inject_events_mock.assert_called_once()
@@ -953,13 +960,73 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
     device_name, _ = self.inject_events_mock.call_args[0]
     self.assertEqual(device_name, "custom_ts")
 
+  def test_click_js_selector_success(self) -> None:
+    click_action = ClickAction.create(
+        InputSource.JS,
+        position=PositionConfig.from_selector(
+            selector="div#submit", required=True, scroll_into_view=True))
+    self.browser.expect_js(
+        expected_js=JsInvocation(
+            result={"count": 1},
+            arguments=[{
+                "selector": "div#submit",
+                "scrollIntoView": True,
+                "click": True,
+            }]))
+    self.run_action(click_action)
+
+  def test_click_js_selector_not_found_required_raises(self) -> None:
+    click_action = ClickAction.create(
+        InputSource.JS,
+        position=PositionConfig.from_selector(
+            selector="div#missing", required=True))
+    self.browser.expect_js(expected_js=JsInvocation(result={"count": 0}))
+    with self.assertRaisesRegex(ElementNotFoundError, "div#missing"):
+      self.run_action(click_action)
+
+  def test_scroll_js_window(self) -> None:
+    scroll_action = ScrollAction.create(
+        InputSource.JS, distance=100, duration=dt.timedelta(seconds=1))
+    self.browser.expect_js(
+        expected_js=JsInvocation(
+            result={
+                "count": 1,
+                "scrollTop": 50,
+            },
+            arguments=[{
+                "selector": None,
+            }]))
+    self.browser.expect_js(
+        expected_js=JsInvocation(
+            result={"count": 1},
+            arguments=[{
+                "selector": None,
+                "scrollTo": 150,
+            }]))
+    with mock.patch("crossbench.action_runner.action_runner.time") as mock_time:
+      mock_time.time.side_effect = [0.0, 1.0]
+      self.run_action(scroll_action)
+
 
 class ScriptsDirTestCase(unittest.TestCase):
 
   def test_scripts_dir_exists(self) -> None:
     self.assertTrue(SCRIPTS_DIR.is_dir())
     self.assertTrue(any(SCRIPTS_DIR.iterdir()))
-    self.assertTrue((SCRIPTS_DIR / "get_window_positions.js").is_file())
+    self.assertTrue((SCRIPTS_DIR / "select_element.js").is_file())
+
+  def test_select_element_result_type_hints(self) -> None:
+    expected_keys = set(get_type_hints(SelectElementResult).keys())
+    self.assertEqual(
+        set(ActionRunnerInputTestCase._NO_ELEMENT_JS_RESULT.result.keys()),
+        expected_keys)
+    self.assertEqual(
+        set(ActionRunnerInputTestCase._FOUND_ELEMENT_JS_RESULT.result.keys()),
+        expected_keys)
+    expected_rect_keys = set(get_type_hints(ElementRectResult).keys())
+    self.assertEqual(
+        set(ActionRunnerInputTestCase._FOUND_ELEMENT_JS_RESULT
+            .result["element_rect"].keys()), expected_rect_keys)
 
 
 if __name__ == "__main__":
