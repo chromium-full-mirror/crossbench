@@ -14,26 +14,9 @@ from crossbench.parse import ObjectParser
 
 if TYPE_CHECKING:
   from crossbench.action_runner.action import all as i_action
-  from crossbench.action_runner.action.bond import BondAction
   from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.browsers.browser import Browser
   from crossbench.runner.run import Run
-
-
-class BondActionNotImplementedError(NotImplementedError):
-
-  def __init__(self,
-               runner: BondActionRunner,
-               action: BondAction,
-               msg_context: str = "") -> None:
-    self.runner = runner
-    self.action = action
-
-    if msg_context:
-      msg_context = f", context: {msg_context}"
-    message = (f"{action.TYPE!s}-action "
-               f"not implemented in {type(runner).__name__}{msg_context}")
-    super().__init__(message)
 
 
 class BondActionRunner:

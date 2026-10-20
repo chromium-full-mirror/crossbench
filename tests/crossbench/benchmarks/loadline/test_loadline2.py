@@ -118,11 +118,6 @@ class BaseLoadLine2BenchmarkTestCase(
     return None
 
   @property
-  @override
-  def expected_action_runner(self):
-    return None
-
-  @property
   def tablet_benchmark_cls(self):
     return LoadLine2TabletBenchmark
 
@@ -206,11 +201,6 @@ class BaseLoadLine2WebApiBenchmarkTestCase(
   @property
   @override
   def expected_tabs(self):
-    return None
-
-  @property
-  @override
-  def expected_action_runner(self):
     return None
 
   def test_extra_flags(self) -> None:

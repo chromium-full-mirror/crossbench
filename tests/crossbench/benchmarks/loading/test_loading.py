@@ -16,7 +16,7 @@ from unittest import mock
 from typing_extensions import override
 
 from crossbench.action_runner.action.action_type import ActionType
-from crossbench.action_runner.action_runner import SCRIPTS_DIR, ActionRunner
+from crossbench.action_runner.action_runner import SCRIPTS_DIR
 from crossbench.benchmarks.loading.config.blocks import ActionBlock, \
     ActionBlockListConfig
 from crossbench.benchmarks.loading.config.login.google import GOOGLE_LOGIN_URL
@@ -185,18 +185,13 @@ class TestPageLoadBenchmark(LoadingBenchmarkCliTestCaseMixin, SubStoryTestCase):
                    separate: bool = True,
                    playback: PlaybackController = PlaybackController.default(),
                    tabs: TabController = TabController.default(),
-                   action_runner: ActionRunner | None = None,
                    about_blank_duration: dt.timedelta = dt.timedelta(),
                    run_login: bool = True,
                    run_setup: bool = True) -> LoadingPageFilter:
-    if action_runner is None:
-      action_runner = ActionRunner(self.mock_run())
-
     args = self.mock_args()
     args.about_blank_duration = about_blank_duration
     args.playback = playback
     args.tabs = tabs
-    args.action_runner = action_runner
     args.run_login = run_login
     args.run_setup = run_setup
     story_filter = super().story_filter(patterns, args=args, separate=separate)

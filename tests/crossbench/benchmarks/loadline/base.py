@@ -119,18 +119,12 @@ class BaseLoadLineBenchmarkTestCase(
   def expected_tabs(self):
     pass
 
-  @property
-  @abc.abstractmethod
-  def expected_action_runner(self):
-    pass
-
   @override
   def get_story_filter_args(self) -> argparse.Namespace:
     return argparse.Namespace(
         about_blank_duration=dt.timedelta(),
         playback=PlaybackController.default(),
         tabs=self.expected_tabs,
-        action_runner=self.expected_action_runner,
         run_login=True,
         run_setup=True,
     )

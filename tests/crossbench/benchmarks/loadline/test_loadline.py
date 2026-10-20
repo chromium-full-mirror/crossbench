@@ -10,7 +10,6 @@ from unittest import mock
 import pandas as pd
 from typing_extensions import override
 
-from crossbench.action_runner.action_runner import ActionRunner
 from crossbench.benchmarks.loading.tab_controller import TabController
 from crossbench.benchmarks.loadline import LoadLine1PhoneBenchmark, \
     LoadLine1PhoneDebugBenchmark, LoadLine1PhoneFastBenchmark, \
@@ -38,11 +37,6 @@ class BaseLoadLine1BenchmarkTestCase(
   @override
   def expected_tabs(self):
     return TabController.default()
-
-  @property
-  @override
-  def expected_action_runner(self):
-    return ActionRunner(self.mock_run())
 
   @property
   def tablet_benchmark_cls(self):

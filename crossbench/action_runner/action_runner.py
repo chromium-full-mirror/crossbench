@@ -89,25 +89,7 @@ class SelectElementResult(TypedDict):
   element_rect: ElementRectResult | None
 
 
-class ActionNotImplementedError(NotImplementedError):
-
-  def __init__(
-      self,
-      runner: ActionRunner,
-      action: i_action.Action,
-      msg_context: str = "",
-  ) -> None:
-    self.runner = runner
-    self.action = action
-
-    if msg_context:
-      msg_context = f", context: {msg_context}"
-    message = (f"{action.TYPE!s}-action "
-               f"not implemented in {type(runner).__name__}{msg_context}")
-    super().__init__(message)
-
-
-class InputSourceNotImplementedError(ActionNotImplementedError):
+class InputSourceNotImplementedError(NotImplementedError):
 
   def __init__(
       self,
@@ -116,11 +98,14 @@ class InputSourceNotImplementedError(ActionNotImplementedError):
       input_source: InputSource,
       msg_context: str = "",
   ) -> None:
+    self.runner: ActionRunner = runner
+    self.action: i_action.Action = action
     if msg_context:
       msg_context = f", context: {msg_context}"
-    input_source_message = (
-        f"Source {input_source!r} not implemented{msg_context}")
-    super().__init__(runner, action, input_source_message)
+    message = (f"{action.TYPE!s}-action "
+               f"not implemented in {type(runner).__name__}: "
+               f"Source {input_source!r} not implemented{msg_context}")
+    super().__init__(message)
 
 
 class ActionRunner:
