@@ -46,7 +46,7 @@ class BitsMergeSubcommand(CrossbenchSubcommand):
         help="Path to the benchmark result directory.")
     parser.add_argument(
         "output_dir",
-        type=PathParser.empty_or_new_dir_path,
+        type=PathParser.not_existing_or_empty_path,
         help="Directory to write one archive per run to. Must be empty or "
         "not exist yet.")
     self.cli.add_debugging_arguments(parser)
