@@ -8,7 +8,7 @@ import abc
 import argparse
 import datetime as dt
 import enum
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Mapping, Sequence
+from typing import TYPE_CHECKING, ClassVar, Final, Mapping, Sequence
 
 from typing_extensions import Self, override
 
@@ -86,7 +86,7 @@ def to_ms(duration: dt.timedelta) -> int:
   return int(round(duration.total_seconds() * 1000))
 
 
-def parse_shuffle_seed(value: Any | None) -> ShuffleSeedT:
+def parse_shuffle_seed(value: ShuffleSeedT) -> ShuffleSeedT:
   if value in (None, "off", "generate"):
     return value
   if isinstance(value, int):
@@ -269,7 +269,7 @@ class Speedometer3BenchmarkStoryFilter(SpeedometerBenchmarkStoryFilter):
 
   @classmethod
   @override
-  def url_params_from_cli(cls, args: argparse.Namespace) -> dict[str, Any]:
+  def url_params_from_cli(cls, args: argparse.Namespace) -> dict[str, str]:
     url_params: dict[str, str] = super().url_params_from_cli(args)
     if sync_wait := args.sync_wait:
       url_params["waitBeforeSync"] = str(to_ms(sync_wait))
@@ -304,7 +304,7 @@ class Speedometer3Benchmark(SpeedometerBenchmark, metaclass=abc.ABCMeta):
 
   @classmethod
   @override
-  def kwargs_from_cli(cls, args: argparse.Namespace) -> dict[str, Any]:
+  def kwargs_from_cli(cls, args: argparse.Namespace) -> dict[str, object]:
     kwargs = super().kwargs_from_cli(args)
     kwargs["detailed_metrics"] = args.detailed_metrics
     return kwargs

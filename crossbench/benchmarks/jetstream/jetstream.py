@@ -10,7 +10,7 @@ import json
 import logging
 import statistics
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, ClassVar, Sequence
+from typing import TYPE_CHECKING, ClassVar, Mapping, Sequence
 
 from typing_extensions import override
 
@@ -85,16 +85,18 @@ class JetStreamProbe(
         self._log_result_metrics(data)
 
   @override
-  def _extract_result_metrics_table(self, metrics: dict[str, Any],
+  def _extract_result_metrics_table(self, metrics: JsonDict,
                                     table: dict[str, list[str]]) -> None:
     for metric_key, metric_value in metrics.items():
       if not self.is_valid_metric_key(metric_key):
         continue
+      assert isinstance(metric_value, Mapping)
       table[metric_key].append(
           Metric.format(metric_value["average"], metric_value["stddev"]))
       # Separate runs don't produce a score
     if self.TOTAL_METRIC_KEY in metrics:
       metric_value = metrics[self.TOTAL_METRIC_KEY]
+      assert isinstance(metric_value, Mapping)
       table["Score"].append(
           Metric.format(metric_value["average"], metric_value["stddev"]))
 
@@ -258,7 +260,7 @@ class JetStreamBenchmark(PressBenchmark, metaclass=abc.ABCMeta):
 
   @classmethod
   @override
-  def kwargs_from_cli(cls, args: argparse.Namespace) -> dict[str, Any]:
+  def kwargs_from_cli(cls, args: argparse.Namespace) -> dict[str, object]:
     kwargs = super().kwargs_from_cli(args)
     kwargs["detailed_metrics"] = args.detailed_metrics
     return kwargs

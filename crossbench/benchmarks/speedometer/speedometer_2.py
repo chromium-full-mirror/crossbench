@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, MutableMapping
+from typing import TYPE_CHECKING, ClassVar, MutableMapping
 
 from typing_extensions import override
 
@@ -24,7 +24,7 @@ class Speedometer2Probe(SpeedometerProbe):
 class Speedometer2ProbeContext(SpeedometerProbeContext):
 
   @override
-  def process_json_data(self, json_data: Json) -> Any:
+  def process_json_data(self, json_data: Json) -> Json:
     json_data = ObjectParser.non_empty_sequence(json_data,
                                                 f"{self.probe.name} metrics")
     # Move aggregate scores to the end

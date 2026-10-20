@@ -9,7 +9,7 @@ import datetime as dt
 import itertools
 import json
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Mapping
 
 from typing_extensions import override
 
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
   from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.runner.groups.stories import StoriesRunGroup
   from crossbench.runner.run import Run
-  from crossbench.types import Json
+  from crossbench.types import Json, JsonDict
 
 
 def _clean_up_path_segments(path: tuple[str, ...]) -> str | None:
@@ -93,15 +93,17 @@ class MotionMark1Probe(BenchmarkProbeMixin, JsonResultProbe, abc.ABC):
         self._log_result_metrics(data)
 
   @override
-  def _extract_result_metrics_table(self, metrics: dict[str, Any],
+  def _extract_result_metrics_table(self, metrics: JsonDict,
                                     table: dict[str, list[str]]) -> None:
     for metric_key, metric in metrics.items():
       if not self._valid_metric_key(metric_key):
         continue
+      assert isinstance(metric, Mapping)
       table[metric_key].append(
           Metric.format(metric["average"], metric["stddev"]))
     # Separate runs don't produce a score
     if total_metric := metrics.get("score") or metrics.get("Score"):
+      assert isinstance(total_metric, Mapping)
       table["Score"].append(
           Metric.format(total_metric["average"], total_metric["stddev"]))
 
@@ -120,7 +122,7 @@ class MotionMark1ProbeContext(JsonResultProbeContext):
     return actions.js(self.JS)
 
   @override
-  def flatten_json_data(self, json_data: list) -> Json:
+  def flatten_json_data(self, json_data: Json) -> Json:
     assert isinstance(json_data, list) and len(json_data) == 1, (
         "Motion12MarkProbe requires a results list.")
     first_data = json_data[0]

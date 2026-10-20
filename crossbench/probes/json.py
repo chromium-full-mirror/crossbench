@@ -10,8 +10,8 @@ import json
 import logging
 import re
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Generic, TypeVar, \
-    cast
+from typing import TYPE_CHECKING, Callable, ClassVar, Generic, Mapping, \
+    TypeVar, cast
 
 import xlsxwriter
 from tabulate import tabulate
@@ -340,5 +340,7 @@ class JsonResultProbeContext(
   def process_json_data(self, json_data: Json) -> Json:
     return json_data
 
-  def flatten_json_data(self, json_data: Any) -> Json:
+  def flatten_json_data(self, json_data: Json) -> Json:
+    assert isinstance(
+        json_data, Mapping), f"Expected JsonMapping, got {type(json_data)}"
     return helper.Flatten(json_data, sort=self.probe.SORT_KEYS).data

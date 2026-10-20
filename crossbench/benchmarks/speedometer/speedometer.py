@@ -8,8 +8,7 @@ import abc
 import datetime as dt
 import json
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Iterable, Mapping, \
-    Sequence
+from typing import TYPE_CHECKING, ClassVar, Final, Iterable, Mapping, Sequence
 
 from immutabledict import immutabledict
 from typing_extensions import override
@@ -39,7 +38,7 @@ if TYPE_CHECKING:
   from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.runner.groups.stories import StoriesRunGroup
   from crossbench.runner.run import Run
-  from crossbench.types import Json
+  from crossbench.types import Json, JsonDict
 
 
 def _probe_remove_tests_segments(path: tuple[str, ...]) -> str:
@@ -123,11 +122,12 @@ class SpeedometerProbe(
         self._log_result_metrics(data)
 
   @override
-  def _extract_result_metrics_table(self, metrics: dict[str, Any],
+  def _extract_result_metrics_table(self, metrics: JsonDict,
                                     table: dict[str, list[str]]) -> None:
     for metric_key, metric in metrics.items():
       if not self.is_valid_metric_key(metric_key):
         continue
+      assert isinstance(metric, Mapping)
       table[metric_key].append(
           Metric.format(metric["average"], metric["stddev"]))
 
@@ -142,12 +142,12 @@ class SpeedometerProbeContext(JsonResultProbeContext):
     return json.loads(json_payload)
 
   @override
-  def flatten_json_data(self, json_data: Any) -> Json:
-    json_data = ObjectParser.non_empty_sequence(json_data,
-                                                f"{self.probe.name} metrics")
+  def flatten_json_data(self, json_data: Json) -> Json:
+    metrics_data = ObjectParser.non_empty_sequence(json_data,
+                                                   f"{self.probe.name} metrics")
     # json_data may contain multiple iterations, merge those first
     merged = MetricsMerger(
-        json_data, key_fn=_probe_remove_tests_segments).to_json(
+        metrics_data, key_fn=_probe_remove_tests_segments).to_json(
             value_fn=lambda values: values.average, sort=self.probe.SORT_KEYS)
     return Flatten(merged, sort=self.probe.SORT_KEYS).data
 
@@ -336,7 +336,7 @@ class SpeedometerBenchmarkStoryFilter(PressBenchmarkStoryFilter):
 
   @classmethod
   @override
-  def kwargs_from_cli(cls, args: argparse.Namespace) -> dict[str, Any]:
+  def kwargs_from_cli(cls, args: argparse.Namespace) -> dict[str, object]:
     kwargs = super().kwargs_from_cli(args)
     kwargs["iterations"] = args.iterations
     kwargs["url_params"] = cls.url_params_from_cli(args)

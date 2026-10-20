@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from typing_extensions import override
 
@@ -52,7 +52,7 @@ class SpeedometerMainBenchmarkStoryFilter(Speedometer3BenchmarkStoryFilter):
 
   @classmethod
   @override
-  def url_params_from_cli(cls, args: argparse.Namespace) -> dict[str, Any]:
+  def url_params_from_cli(cls, args: argparse.Namespace) -> dict[str, str]:
     url_params: dict[str, str] = super().url_params_from_cli(args)
     if args.measure_prepare:
       url_params["measurePrepare"] = ""

@@ -30,7 +30,7 @@ class Metric:
   """
 
   @classmethod
-  def format(cls, value: float | Json, stddev: float | Json = None) -> str:
+  def format(cls, value: object, stddev: object = None) -> str:
     """Format value and stdev to only expose significant + 1 digits.
     Example outputs:
       100 ± 10%
@@ -41,8 +41,8 @@ class Metric:
     """
     if not stddev:
       return str(value)
-    assert isinstance(value, (int, float))
-    assert isinstance(stddev, (int, float))
+    assert is_number(value), f"Expected numeric value, got {value!r}"
+    assert is_number(stddev), f"Expected numeric stddev, got {stddev!r}"
     stddev = float(stddev)
     stddev_significant_digit = int(floor(log10(abs(stddev))))
     value_width = max(0, 1 - stddev_significant_digit)
