@@ -21,7 +21,8 @@ class BrowserDriverType(StrEnumWithHelp):
       "Android CDP",
       "Use Chrome DevTools Protocol over ADB directly without ChromeDriver",
   )
-  IOS = ("iOS", "Placeholder, unsupported at the moment")
+  IOS = ("iOS", "Use safaridriver on iOS")
+  IOS_WDA = ("iOS WDA", "Use WebDriverAgent on iOS")
   LINUX_SSH = ("Remote Linux",
                "Use remote webdriver and execute commands via SSH")
   CHROMEOS_SSH = ("Remote ChromeOS",
@@ -47,6 +48,8 @@ class BrowserDriverType(StrEnumWithHelp):
       return BrowserDriverType.ANDROID_CDP
     if identifier in ("android", "adb"):
       return BrowserDriverType.ANDROID
+    if identifier in ("ios-wda", "wda"):
+      return BrowserDriverType.IOS_WDA
     if identifier in ("iphone", "ios"):
       return BrowserDriverType.IOS
     if identifier == "ssh":
@@ -58,6 +61,10 @@ class BrowserDriverType(StrEnumWithHelp):
   @property
   def is_android(self) -> bool:
     return self in (BrowserDriverType.ANDROID, BrowserDriverType.ANDROID_CDP)
+
+  @property
+  def is_ios(self) -> bool:
+    return self in (BrowserDriverType.IOS, BrowserDriverType.IOS_WDA)
 
   @property
   def is_remote_driver(self) -> bool:

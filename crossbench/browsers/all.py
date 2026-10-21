@@ -23,8 +23,8 @@ from crossbench.browsers.firefox.firefox import Firefox
 from crossbench.browsers.firefox.webdriver import FirefoxWebDriver
 from crossbench.browsers.safari.applescript import SafariAppleScript
 from crossbench.browsers.safari.safari import Safari
-from crossbench.browsers.safari.webdriver import SafariWebDriver, \
-    SafariWebdriverIOS
+from crossbench.browsers.safari.webdriver import SafariWdaIOS, \
+    SafariWebDriver, SafariWebdriverIOS
 from crossbench.browsers.shell.d8.d8 import D8
 from crossbench.browsers.webkit.webdriver import WebKitWebDriver
 from crossbench.browsers.webview.browser import WebviewBrowser
@@ -55,6 +55,7 @@ __all__ = [
     "LocalChromiumWebDriverAndroid",
     "Safari",
     "SafariAppleScript",
+    "SafariWdaIOS",
     "SafariWebDriver",
     "SafariWebdriverIOS",
     "WebKitWebDriver",

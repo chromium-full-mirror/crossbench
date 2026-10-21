@@ -228,7 +228,7 @@ class DriverConfig(ConfigObject):
       raise argparse.ArgumentTypeError("adb_bin is only valid for Android.")
     elif self.bundletool:
       raise argparse.ArgumentTypeError("bundletool is only valid for Android.")
-    if self.driver_type == BrowserDriverType.IOS:
+    if self.driver_type.is_ios:
       self.validate_ios()
     if self.driver_type == BrowserDriverType.CHROMEOS_SSH:
       # Unlike the validation functions above for iOS and Android,
@@ -299,7 +299,7 @@ class DriverConfig(ConfigObject):
         BrowserDriverType.ANDROID_CDP,
     ):
       return self.get_adb_platform()
-    if self.driver_type == BrowserDriverType.IOS:
+    if self.driver_type.is_ios:
       return self.get_ios_platform()
     if self.driver_type in (BrowserDriverType.LINUX_SSH,
                             BrowserDriverType.CHROMEOS_SSH):

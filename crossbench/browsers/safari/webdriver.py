@@ -8,7 +8,7 @@ import datetime as dt
 import logging
 import os
 import subprocess
-from typing import TYPE_CHECKING, ClassVar, TypedDict
+from typing import TYPE_CHECKING, ClassVar, Final, Sequence, TypedDict
 
 from selenium import webdriver
 from selenium.webdriver.safari.options import Options as SafariOptions
@@ -17,16 +17,20 @@ from typing_extensions import override
 
 from crossbench import exception
 from crossbench import path as pth
+from crossbench.action_runner.action.enums import WindowTarget
 from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.browsers.safari.safari import Safari, find_safaridriver
+from crossbench.browsers.safari.version import SafariVersion
 from crossbench.browsers.webdriver import DriverException, WebDriverBrowser
 from crossbench.cli.ui import ui
 from crossbench.helper.wait import WaitRange
 from crossbench.plt.ios import IOSPlatform
+from crossbench.plt.wda import WDAError
 
 if TYPE_CHECKING:
   from crossbench.browsers.settings import Settings
   from crossbench.runner.groups.session import BrowserSessionRunGroup
+  from crossbench.types import Json
 
 
 class SafariDriverKwargs(TypedDict):
@@ -277,3 +281,96 @@ class SafariWebdriverIOS(SafariWebDriver):
   def _setup_cache_dir(self) -> pth.AnyPath | None:
     # TODO: Can we manage cache dir on iOS?
     return None
+
+
+class SafariWdaIOS(Safari):
+  """Safari browser implementation on iOS backed by WebDriverAgent."""
+
+  BUNDLE_ID: Final[str] = "com.apple.mobilesafari"
+
+  @classmethod
+  @override
+  def attributes(cls) -> BrowserAttributes:
+    return BrowserAttributes.SAFARI | BrowserAttributes.MOBILE
+
+  @property
+  def ios_platform(self) -> IOSPlatform:
+    assert isinstance(self.platform, IOSPlatform)
+    return self.platform
+
+  @override
+  def _resolve_binary(
+      self,
+      path: pth.AnyPath,
+  ) -> tuple[pth.AnyPath, pth.AnyPath]:
+    return path, path
+
+  @override
+  def _extract_version(self) -> SafariVersion:
+    return SafariVersion.parse(f"Safari {self.platform.version_str}")
+
+  @override
+  def _setup_cache_dir(self) -> pth.AnyPath | None:
+    return None
+
+  @override
+  def start(self, session: BrowserSessionRunGroup) -> None:
+    super().start(session)
+    self._log_browser_start(self._get_browser_flags_for_session(session))
+    # /wda/apps/launch only activates an already running Safari, so terminate
+    # it first to start every session from a fresh process.
+    try:
+      self.ios_platform.wda.terminate_app(self.BUNDLE_ID)
+    except (WDAError, OSError) as e:
+      logging.debug("Safari not running before launch: %s", e)
+    self.ios_platform.wda.launch_app(self.BUNDLE_ID)
+    self._is_running = True
+
+  @override
+  def show_url(
+      self,
+      url: str,
+      target: WindowTarget = WindowTarget.SELF,
+  ) -> None:
+    if target != WindowTarget.SELF:
+      raise NotImplementedError(
+          f"{type(self).__name__}.show_url does not support target {target}")
+    logging.debug("SafariWdaIOS.show_url(%s)", url)
+    # WDA's /url endpoint uses iOS system URL scheme deep-linking (openURL:
+    # via SpringBoard), which only routes http/https URLs to Safari and fails
+    # on about:blank.
+    if not url or url == "about:blank":
+      return
+    self.ios_platform.wda.open_url(url)
+
+  @override
+  def js(
+      self,
+      script: str,
+      timeout: dt.timedelta | None = None,
+      arguments: Sequence[object] = (),
+  ) -> None:
+    del script, timeout, arguments
+    raise NotImplementedError(
+        "JavaScript execution is not supported on iOS Safari via WDA.")
+
+  @override
+  def performance_mark(
+      self,
+      name: str,
+      detail: Json = None,
+      prefix: str = "crossbench-",
+  ) -> None:
+    del detail
+    logging.debug("%s: skipping performance_mark: %s%s", self, prefix, name)
+
+  @override
+  def force_quit(self) -> None:
+    if not self._is_running:
+      return
+    logging.info("SafariWdaIOS.force_quit()")
+    try:
+      self.ios_platform.wda.terminate_app(self.BUNDLE_ID)
+    except (WDAError, OSError) as e:
+      logging.warning("Failed to terminate Safari on iOS: %s", e)
+    self._is_running = False

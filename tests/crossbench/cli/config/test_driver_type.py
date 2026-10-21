@@ -36,6 +36,8 @@ class BrowserDriverTypeTestCase(unittest.TestCase):
         "android-cdp": BrowserDriverType.ANDROID_CDP,
         "iphone": BrowserDriverType.IOS,
         "ios": BrowserDriverType.IOS,
+        "ios-wda": BrowserDriverType.IOS_WDA,
+        "wda": BrowserDriverType.IOS_WDA,
         "ssh": BrowserDriverType.LINUX_SSH,
         "chromeos-ssh": BrowserDriverType.CHROMEOS_SSH,
     }

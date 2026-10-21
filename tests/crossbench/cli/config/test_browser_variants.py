@@ -28,6 +28,8 @@ from crossbench.browsers.chromium.applescript import ChromiumAppleScript
 from crossbench.browsers.chromium.webdriver import ChromiumWebDriver, \
     ChromiumWebDriverAndroid, ChromiumWebDriverSsh
 from crossbench.browsers.safari.safari import Safari
+from crossbench.browsers.safari.webdriver import SafariWdaIOS, \
+    SafariWebdriverIOS
 from crossbench.browsers.webkit.webdriver import WebKitWebDriver
 from crossbench.browsers.webview.browser import WebviewBrowser
 from crossbench.browsers.webview.embedder import WebviewEmbedder
@@ -913,6 +915,18 @@ class TestBrowserVariantsConfig(BaseConfigTestCase):
         }}, args=self.mock_args())
     self.assertEqual(len(config.variants), 1)
     self.assertTrue(issubclass(config.variants[0].browser_cls, Safari))
+
+  def test_safari_ios_driver_classes(self):
+    with mock.patch.object(DriverConfig, "validate_ios"):
+      for driver_type, browser_cls in (
+          (BrowserDriverType.IOS, SafariWebdriverIOS),
+          (BrowserDriverType.IOS_WDA, SafariWdaIOS),
+      ):
+        driver = DriverConfig(driver_type, device_id="00001111")
+        config = BrowserConfig("safari", driver)
+        self.assertIs(
+            BrowserVariantsConfig.get_browser_cls_from_type(
+                BrowserType.SAFARI, config), browser_cls)
 
   def test_flag_combination_with_fixed(self):
     config = BrowserVariantsConfigDict(

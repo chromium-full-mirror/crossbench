@@ -273,6 +273,8 @@ class BaseBrowserVariantsConfig(abc.ABC):
     driver = browser_config.driver.driver_type
     if driver == BrowserDriverType.IOS:
       return all_browsers.SafariWebdriverIOS
+    if driver == BrowserDriverType.IOS_WDA:
+      return all_browsers.SafariWdaIOS
     if driver == BrowserDriverType.WEB_DRIVER:
       return all_browsers.SafariWebDriver
     if driver == BrowserDriverType.APPLE_SCRIPT:
