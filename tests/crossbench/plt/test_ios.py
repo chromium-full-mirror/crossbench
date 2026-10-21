@@ -341,6 +341,41 @@ class IOsMockPlatformTestCase(BaseMockPlatformTestCase):
     platform_sim = IOSPlatform(self.host_platform, IPHONE_SIMULATOR["udid"])
     self.assertTrue(platform_sim.is_simulator)
 
+  def test_devicectl_skips_simulated_devices(self):
+    devicectl_with_simulators = {
+        "result": {
+            "devices": [{
+                "hardwareProperties": {
+                    "udid": "00001111-11AA22BB33DD",
+                },
+                "deviceProperties": {
+                    "name": "An iPhone",
+                    "osVersionNumber": "17.1.2",
+                },
+                "connectionProperties": {
+                    "tunnelState": "connected",
+                },
+            }, {
+                "hardwareProperties": {
+                    "udid": "7600EAC9-72DA-4538-86F6-DA1DC29419E8",
+                    "reality": "simulated",
+                },
+                "deviceProperties": {
+                    "bootState": "shutdown",
+                    "name": "iPhone 17",
+                    "osVersionNumber": "26.5",
+                },
+                "connectionProperties": {
+                    "tunnelState": "disconnected",
+                },
+                "visibilityClass": "simulators",
+            }],
+        },
+    }
+    self.expect_startup_devices(devices=devicectl_with_simulators)
+    devices = ios_devices(self.host_platform)
+    self.assertEqual(list(devices.keys()), ["00001111-11AA22BB33DD"])
+
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)

@@ -62,6 +62,9 @@ def _devicectl_devices(platform: Platform) -> dict[str, IOSDeviceInfo]:
   for device_data in data.get("result", {}).get("devices", []):
     if device_data["connectionProperties"]["tunnelState"] == "unavailable":
       continue
+    if (device_data.get("visibilityClass") == "simulators" or
+        device_data["hardwareProperties"].get("reality") == "simulated"):
+      continue
     device = IOSDeviceInfo(device_data["hardwareProperties"]["udid"],
                            device_data["deviceProperties"]["name"],
                            device_data["deviceProperties"]["osVersionNumber"])
