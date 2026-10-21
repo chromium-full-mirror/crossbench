@@ -466,6 +466,7 @@ class Binaries:
   GCERT: ClassVar = Binary("gcert", posix="gcert")
   GCERTSTATUS: ClassVar = Binary("gcertstatus", posix="gcertstatus")
   GCLOUD: ClassVar = Binary("gcloud", default="gcloud")
+  IPROXY: ClassVar = Binary("iproxy", posix="iproxy")
   LSCPU: ClassVar = LinuxBinary("lscpu")
   LUCI_AUTH: ClassVar = Binary("luci-auth", default="luci-auth")
   MONTAGE: ClassVar = Binary("montage", posix="montage")
@@ -476,6 +477,7 @@ class Binaries:
   RPM2CPIO: ClassVar = LinuxBinary("rpm2cpio")
   SIMPLEPERF: ClassVar = AndroidBinary("simpleperf")
   WMIC: ClassVar = Binary("wmic", win="wmic.exe")
+  XCODEBUILD: ClassVar = MacOsBinary("xcodebuild")
   XCTRACE: ClassVar = MacOsBinary("xctrace")
   CHROMEDRIVER: ClassVar = Binary(
       "chromedriver",

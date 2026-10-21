@@ -8,19 +8,25 @@ import dataclasses
 import datetime as dt
 import functools
 import json
+import logging
 import re
-from typing import TYPE_CHECKING, Final
+import subprocess
+from typing import TYPE_CHECKING, Any, Final, cast
 
 from typing_extensions import override
 
 from crossbench import path as pth
+from crossbench.parse import NumberParser
 from crossbench.plt.base import Platform
+from crossbench.plt.bin import Binaries
 from crossbench.plt.device_info import DeviceInfo
 from crossbench.plt.port_manager import PortManager
 from crossbench.plt.remote import RemotePlatformMixin
 from crossbench.plt.version import PlatformVersion
+from crossbench.plt.wda import WDAClient
 
 if TYPE_CHECKING:
+
   from crossbench.plt.base import CPUFreqInfo
   from crossbench.plt.details import CpuDetails, OsDetails, PythonDetails
   from crossbench.plt.display_info import DisplayInfo
@@ -97,14 +103,71 @@ def _simctl_devices(platform: Platform) -> dict[str, IOSDeviceInfo]:
 
 
 class IOSPortManager(PortManager):
+  PORT_FORWARDING_TIMEOUT: Final[dt.timedelta] = dt.timedelta(seconds=10)
+
+  def __init__(self, platform: IOSPlatform) -> None:
+    super().__init__(platform)
+    self._forward_popens: dict[int, subprocess.Popen[Any]] = {}
+
+  @property
+  def _ios_platform(self) -> IOSPlatform:
+    return cast("IOSPlatform", self.platform)
+
+  @property
+  def _host_platform(self) -> Platform:
+    return self._ios_platform.host_platform
 
   @override
   def forward(self, local_port: int, remote_port: int) -> int:
-    raise NotImplementedError
+    local_port = NumberParser.positive_zero_int(local_port, "local_port")
+    remote_port = NumberParser.port_number(remote_port, "remote_port")
+
+    if self._ios_platform.is_simulator:
+      if local_port and local_port != remote_port:
+        raise ValueError(f"Cannot remap port {remote_port} on iOS simulator.")
+      return remote_port
+
+    if not local_port:
+      local_port = self._host_platform.get_free_port()
+    if local_port in self._forward_popens:
+      raise RuntimeError(f"Cannot forward local port {local_port} twice.")
+
+    iproxy_bin = Binaries.IPROXY.resolve(self._host_platform)
+    cmd = (
+        iproxy_bin,
+        str(local_port),
+        str(remote_port),
+        "-u",
+        self._ios_platform.udid,
+    )
+    proc = self._host_platform.popen(
+        *cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    self._forward_popens[local_port] = proc
+    try:
+      self._host_platform.wait_for_port(local_port,
+                                        self.PORT_FORWARDING_TIMEOUT)
+    except Exception:
+      self.stop_forward(local_port)
+      raise
+    logging.debug(
+        "Forwarded Remote Port: %s:%s <= %s:%s",
+        self._host_platform,
+        local_port,
+        self._ios_platform,
+        remote_port,
+    )
+    return local_port
 
   @override
   def stop_forward(self, local_port: int) -> None:
-    raise NotImplementedError
+    if proc := self._forward_popens.pop(local_port, None):
+      try:
+        proc.terminate()
+      except OSError as e:
+        logging.warning("Failed to stop iproxy on port %s: %s", local_port, e)
 
   @override
   def reverse_forward(self, remote_port: int, local_port: int) -> int:
@@ -113,6 +176,12 @@ class IOSPortManager(PortManager):
   @override
   def stop_reverse_forward(self, remote_port: int) -> None:
     raise NotImplementedError
+
+  @override
+  def _stop_all(self) -> None:
+    super()._stop_all()
+    for local_port in list(self._forward_popens):
+      self.stop_forward(local_port)
 
 
 # TODO: consider using some abstract MacOS base class.
@@ -130,6 +199,7 @@ class IOSPlatform(RemotePlatformMixin, Platform):
     super().__init__(host_platform)
     self._device: Final[IOSDeviceInfo] = self._find_ios_device(
         device_identifier)
+    self._wda: WDAClient | None = None
 
   def _find_ios_device(self,
                        device_identifier: str | None = None) -> IOSDeviceInfo:
@@ -263,6 +333,13 @@ class IOSPlatform(RemotePlatformMixin, Platform):
 
   def get_relative_cpu_speed(self) -> float:
     return 1.0
+
+  @property
+  def wda(self) -> WDAClient:
+    """Return the WebDriverAgent client for this iOS platform."""
+    if self._wda is None:
+      self._wda = WDAClient(self)
+    return self._wda
 
   @override
   def display_details(self) -> tuple[DisplayInfo, ...]:
