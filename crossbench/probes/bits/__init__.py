@@ -10,7 +10,7 @@ import json
 import logging
 import subprocess
 import time
-from typing import IO, TYPE_CHECKING, ClassVar, Iterator, Self
+from typing import IO, TYPE_CHECKING, ClassVar, Final, Iterator, Self
 
 from typing_extensions import override
 
@@ -50,9 +50,9 @@ class _ClockSync:
   def __init__(self, device: plt.Platform) -> None:
     samples = [self._sample(device) for _ in range(self.SAMPLE_COUNT)]
     round_trip_ns, host_realtime_ns, device_boottime_ns = min(samples)
-    self.round_trip_ns: int = round_trip_ns
-    self.host_realtime_ns: int = host_realtime_ns
-    self.device_boottime_ns: int = device_boottime_ns
+    self.round_trip_ns: Final[int] = round_trip_ns
+    self.host_realtime_ns: Final[int] = host_realtime_ns
+    self.device_boottime_ns: Final[int] = device_boottime_ns
 
   @staticmethod
   def _sample(device: plt.Platform) -> tuple[int, int, int]:
@@ -184,15 +184,15 @@ class BitsProbe(Probe):
     super().__init__()
     if duration < dt.timedelta(seconds=1):
       raise ValueError(f"Duration must be at least 1s, but got: {duration}")
-    self._bits_path: pth.LocalPath = bits_path
+    self._bits_path: Final[pth.LocalPath] = bits_path
     assert self._bits_path.is_file()
-    self._bits_service_path: pth.LocalPath = (
+    self._bits_service_path: Final[pth.LocalPath] = (
         bits_path.parent / "bits_service.sh")
-    self._bits_out: str = bits_out
-    self._bits_device: str = bits_device
-    self._duration: dt.timedelta = duration
-    self._port: int = port
-    self._merge_policy: BitsMergePolicy = merge_policy
+    self._bits_out: Final[str] = bits_out
+    self._bits_device: Final[str] = bits_device
+    self._duration: Final[dt.timedelta] = duration
+    self._port: Final[int] = port
+    self._merge_policy: Final[BitsMergePolicy] = merge_policy
     self._service_proc: subprocess.Popen | None = None
 
   @property
@@ -362,8 +362,8 @@ class BitsProbeContext(ProbeContext[BitsProbe]):
 
   def __init__(self, probe: BitsProbe, run: Run) -> None:
     super().__init__(probe, run)
-    self._bits_out_id = self.probe.bits_out or dt.datetime.now().strftime(
-        "%Y%m%d_%H%M%S")
+    self._bits_out_id: Final[str] = self.probe.bits_out or dt.datetime.now(
+    ).strftime("%Y%m%d_%H%M%S")
     self._clock_sync: _ClockSync | None = None
 
   @property

@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, ClassVar, Self
+from typing import TYPE_CHECKING, ClassVar, Final, Self
 
 from typing_extensions import override
 
@@ -69,7 +69,7 @@ class FrequencyProbe(EnvModifier):
 
   def __init__(self, cpus: CPUFrequencyMap) -> None:
     super().__init__()
-    self._cpu_frequency_map: CPUFrequencyMap = cpus
+    self._cpu_frequency_map: Final[CPUFrequencyMap] = cpus
 
   @classmethod
   @override
@@ -116,7 +116,7 @@ class FrequencyProbeContext(ProbeContext[FrequencyProbe]):
 
   def __init__(self, probe: FrequencyProbe, run: Run) -> None:
     super().__init__(probe, run)
-    self._previous_frequencies: list[_FrequencyState] = []
+    self._previous_frequencies: Final[list[_FrequencyState]] = []
 
   def start(self) -> None:
     target_cpu_frequencies: immutabledict[pth.AnyPosixPath, int] = (

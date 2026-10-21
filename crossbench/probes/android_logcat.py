@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar, Iterable, Self
+from typing import TYPE_CHECKING, ClassVar, Final, Iterable, Self
 
 from typing_extensions import override
 
@@ -42,7 +42,7 @@ class LogcatAndroidProbe(Probe):
 
   def __init__(self, filterspec: Iterable[str]) -> None:
     super().__init__()
-    self._filterspec = tuple(filterspec)
+    self._filterspec: Final[tuple[str, ...]] = tuple(filterspec)
 
   @property
   def filterspec(self) -> tuple[str, ...]:

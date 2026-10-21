@@ -50,7 +50,7 @@ class VramProbe(JsonResultProbe):
     super().__init__()
     if interval < _MIN_POLL_INTERVAL:
       raise ValueError(f"Interval {interval} is too small, must be >= 0.05s")
-    self._interval = interval
+    self._interval: Final[dt.timedelta] = interval
 
   @property
   def interval(self) -> dt.timedelta:
@@ -77,13 +77,13 @@ class VramPoller:
   intervals."""
 
   def __init__(self, platform: Platform, interval: dt.timedelta) -> None:
-    self._platform: Platform = platform
-    self._interval: dt.timedelta = interval
+    self._platform: Final[Platform] = platform
+    self._interval: Final[dt.timedelta] = interval
     self._thread: threading.Thread | None = None
-    self._stop_event = threading.Event()
+    self._stop_event: Final[threading.Event] = threading.Event()
     self._baseline: dict[str, float] = {}
     self._peak: dict[str, float] = {}
-    self._lock = threading.Lock()
+    self._lock: Final[threading.Lock] = threading.Lock()
 
   @property
   def peak(self) -> dict[str, float]:

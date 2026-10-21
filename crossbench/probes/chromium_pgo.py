@@ -58,7 +58,7 @@ class ChromiumPgoProbe(ChromiumProbe):
       remote_pgo_root_path: pth.AnyPath = DEFAULT_REMOTE_PGO_ROOT_PATH,
   ) -> None:
     super().__init__()
-    self._remote_pgo_root_path = remote_pgo_root_path
+    self._remote_pgo_root_path: Final[pth.AnyPath] = remote_pgo_root_path
 
   @override
   def attach(self, browser: Browser) -> None:

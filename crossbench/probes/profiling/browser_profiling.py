@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import abc
 import enum
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Final, Self
 
 from selenium.webdriver.safari.options import Options as SafariOptions
 from typing_extensions import override
@@ -110,8 +110,8 @@ class BrowserProfilingProbe(Probe):
                | None = None,
                traceconv: pth.LocalPath | None = None) -> None:
     super().__init__()
-    self._moz_profiler_startup_features: list[
-        MozProfilerStartupFeatures] = moz_profiler_startup_features or []
+    self._moz_profiler_startup_features: Final[
+        list[MozProfilerStartupFeatures]] = moz_profiler_startup_features or []
     self._traceconv: pth.LocalPath | None = traceconv
     if not traceconv:
       self._traceconv = TraceconvFinder(self.host_platform).local_path

@@ -9,7 +9,7 @@ import json
 import logging
 import re
 from enum import IntEnum
-from typing import TYPE_CHECKING, ClassVar, Iterable
+from typing import TYPE_CHECKING, ClassVar, Final, Iterable
 
 from typing_extensions import override
 
@@ -79,8 +79,8 @@ class ThermalMonitorProbe(InternalJsonResultProbe):
                cool_down_time: dt.timedelta = dt.timedelta(),
                threshold: ThermalStatus | None = None) -> None:
     super().__init__()
-    self._threshold: ThermalStatus | None = threshold
-    self._cool_down_time: dt.timedelta = cool_down_time
+    self._threshold: Final[ThermalStatus | None] = threshold
+    self._cool_down_time: Final[dt.timedelta] = cool_down_time
     if threshold is not None and threshold <= 0:
       raise ValueError("Threshold must be positive")
 

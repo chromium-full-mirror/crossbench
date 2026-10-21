@@ -221,9 +221,9 @@ class TracingProbe(ChromiumProbe):
                record_format: RecordFormat = RecordFormat.PROTO,
                traceconv: pth.LocalPath | None = None) -> None:
     super().__init__()
-    self._trace_config: pth.LocalPath | None = trace_config
+    self._trace_config: Final[pth.LocalPath | None] = trace_config
     self._categories: set[str] = set(categories or MINIMAL_CONFIG)
-    self._preset: str | None = preset
+    self._preset: Final[str | None] = preset
     if preset:
       self._categories.update(TRACE_PRESETS[preset])
     if self._trace_config:
@@ -233,9 +233,9 @@ class TracingProbe(ChromiumProbe):
             "trace categories or a trace_config file.")
       self._categories = set()
 
-    self._startup_duration: int = startup_duration
-    self._record_mode: RecordMode = record_mode
-    self._record_format: RecordFormat = record_format
+    self._startup_duration: Final[int] = startup_duration
+    self._record_mode: Final[RecordMode] = record_mode
+    self._record_format: Final[RecordFormat] = record_format
     self._traceconv: pth.LocalPath | None = traceconv
     if not traceconv and self._record_format == RecordFormat.PROTO_JSON:
       self._traceconv = TraceconvFinder(self.host_platform).local_path

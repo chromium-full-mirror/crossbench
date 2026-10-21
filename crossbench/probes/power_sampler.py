@@ -9,7 +9,7 @@ import datetime as dt
 import enum
 import logging
 import subprocess
-from typing import TYPE_CHECKING, ClassVar, Self, Sequence
+from typing import TYPE_CHECKING, ClassVar, Final, Self, Sequence
 
 from typing_extensions import override
 
@@ -88,15 +88,15 @@ class PowerSamplerProbe(Probe):
                samplers: Sequence[SamplerType] = SAMPLERS,
                wait_for_battery: bool = True) -> None:
     super().__init__()
-    self._bin_path: pth.AnyPath | None = bin_path
+    self._bin_path: Final[pth.AnyPath | None] = bin_path
     if not self._bin_path:
       logging.debug("No default power_sampler binary provided.")
-    self._sampling_interval = sampling_interval
+    self._sampling_interval: Final[dt.timedelta] = sampling_interval
     if sampling_interval.total_seconds() < 0:
       raise ValueError(f"Invalid sampling_interval={sampling_interval}")
     assert SamplerType.BATTERY not in samplers
-    self._samplers = tuple(samplers)
-    self._wait_for_battery = wait_for_battery
+    self._samplers: Final[tuple[SamplerType, ...]] = tuple(samplers)
+    self._wait_for_battery: Final[bool] = wait_for_battery
 
   @property
   @override
@@ -172,14 +172,15 @@ class PowerSamplerProbeContext(ProbeContext[PowerSamplerProbe]):
 
   def __init__(self, probe: PowerSamplerProbe, run: Run) -> None:
     super().__init__(probe, run)
-    self._bin_path: pth.AnyPath = probe.find_power_sampler_bin(self.browser)
+    self._bin_path: Final[pth.AnyPath] = probe.find_power_sampler_bin(
+        self.browser)
     self._active_user_process: subprocess.Popen | None = None
     self._power_process: subprocess.Popen | None = None
     self._power_battery_process: subprocess.Popen | None = None
-    self._power_output: pth.AnyPath = self.result_path.with_suffix(
+    self._power_output: Final[pth.AnyPath] = self.result_path.with_suffix(
         ".power.json")
-    self._power_battery_output: pth.AnyPath = self.result_path.with_suffix(
-        ".power_battery.json")
+    self._power_battery_output: Final[
+        pth.AnyPath] = self.result_path.with_suffix(".power_battery.json")
 
   def setup(self) -> None:
     self._active_user_process = self.browser_platform.popen(

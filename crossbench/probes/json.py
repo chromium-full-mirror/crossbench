@@ -27,6 +27,9 @@ from crossbench.probes.probe_error import ProbeMissingDataError
 from crossbench.probes.results import LocalProbeResult, ProbeResult
 
 if TYPE_CHECKING:
+  from xlsxwriter.format import Format
+  from xlsxwriter.worksheet import Worksheet
+
   from crossbench import path as pth
   from crossbench.runner.actions import Actions
   from crossbench.runner.groups.base import RunGroup
@@ -199,16 +202,17 @@ class XLSXWriter:
     instance.write_xlsx()
 
   def __init__(self, table: TableData, path: pth.LocalPath) -> None:
-    self._table: TableData = table
-    self._nof_header_cols: int = self._detect_header_cols()
-    self._nof_header_rows: int = self._detect_header_rows()
+    self._table: Final[TableData] = table
+    self._nof_header_cols: Final[int] = self._detect_header_cols()
+    self._nof_header_rows: Final[int] = self._detect_header_rows()
 
-    self._path = path
-    self._workbook = xlsxwriter.Workbook(self._path)
-    self._worksheet = self._workbook.add_worksheet()
-    self._percent_format = self._workbook.add_format(
+    self._path: Final[pth.LocalPath] = path
+    self._workbook: Final[xlsxwriter.Workbook] = xlsxwriter.Workbook(self._path)
+    self._worksheet: Final[Worksheet] = self._workbook.add_worksheet()
+    self._percent_format: Final[Format] = self._workbook.add_format(
         {"num_format": "+0.0%;-0.0%;0.0%"})
-    self._num_format = self._workbook.add_format({"num_format": "0.000"})
+    self._num_format: Final[Format] = self._workbook.add_format(
+        {"num_format": "0.000"})
 
   def _detect_header_cols(self) -> int:
     nof_header_cols: int = 0

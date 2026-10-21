@@ -43,9 +43,9 @@ class Flatten:
         key_fn (optional): Maps property paths (tuple[str,...]) to strings used
           as final result keys, or None to skip property paths.
     """
-    self._accumulator: JsonDict = {}
-    self._key_fn: KeyFnType = key_fn or default_flatten_key_fn
-    self._sort: bool = sort
+    self._accumulator: Final[JsonDict] = {}
+    self._key_fn: Final[KeyFnType] = key_fn or default_flatten_key_fn
+    self._sort: Final[bool] = sort
     self.append(*args)
 
   @property

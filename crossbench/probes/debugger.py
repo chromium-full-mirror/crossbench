@@ -82,11 +82,11 @@ class DebuggerProbe(Probe):
       geometry: str = DEFAULT_GEOMETRY,
       args: Iterable[str] = ()) -> None:
     super().__init__()
-    self._debugger_bin = debugger
-    self._debugger_args = args
-    self._auto_run = auto_run
-    self._geometry = geometry
-    self._spare_renderer_process = spare_renderer_process
+    self._debugger_bin: Final[pth.LocalPath] = debugger
+    self._debugger_args: Final[Iterable[str]] = args
+    self._auto_run: Final[bool] = auto_run
+    self._geometry: Final[str] = geometry
+    self._spare_renderer_process: Final[bool] = spare_renderer_process
 
   @property
   @override

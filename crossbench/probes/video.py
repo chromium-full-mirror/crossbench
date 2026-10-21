@@ -89,10 +89,9 @@ class VideoProbe(Probe):
                merge_runs: bool = True,
                orientation: Orientation = Orientation.HORIZONTAL) -> None:
     super().__init__()
-    self._duration = None
-    self._generate_timestrip = generate_timestrip
-    self._merge_runs = merge_runs
-    self._orientation = orientation
+    self._generate_timestrip: Final[bool] = generate_timestrip
+    self._merge_runs: Final[bool] = merge_runs
+    self._orientation: Final[Orientation] = orientation
 
   @property
   @override

@@ -52,10 +52,10 @@ class _RunResults:
   """
 
   def __init__(self, run_dir: pth.LocalPath) -> None:
-    self._run_dir = run_dir
-    self._path = run_dir / ResultsSummaryProbe.FILE_NAME
-    self._results: JsonDict = _read_json(self._path)
-    self._recorded_cwd = pth.LocalPath(
+    self._run_dir: Final[pth.LocalPath] = run_dir
+    self._path: Final[pth.LocalPath] = run_dir / ResultsSummaryProbe.FILE_NAME
+    self._results: Final[JsonDict] = _read_json(self._path)
+    self._recorded_cwd: Final[pth.LocalPath] = pth.LocalPath(
         ObjectParser.non_empty_str(
             self._results.get("cwd"), f"cwd in {self._path}"))
 

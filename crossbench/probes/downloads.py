@@ -56,8 +56,8 @@ class DownloadsProbe(Probe):
                clear_downloads: bool = False,
                save_downloads: bool = False) -> None:
     super().__init__()
-    self._clear_downloads: bool = clear_downloads
-    self._save_downloads: bool = save_downloads
+    self._clear_downloads: Final[bool] = clear_downloads
+    self._save_downloads: Final[bool] = save_downloads
 
   @override
   def create_context(self, run: Run) -> DownloadsProbeContext:
@@ -120,9 +120,9 @@ class FileWatchDownloadsProbeContext(DownloadsProbeContext):
   def __init__(self, probe: DownloadsProbe, run: Run,
                downloads_dir: pth.AnyPath) -> None:
     super().__init__(probe, run)
-    self._downloads_dir: pth.AnyPath = downloads_dir
+    self._downloads_dir: Final[pth.AnyPath] = downloads_dir
     self._existing_downloads: set[pth.AnyPath] = set()
-    self._results: list[pth.AnyPath] = []
+    self._results: Final[list[pth.AnyPath]] = []
 
   def downloads(self, include_pending: bool = True) -> Iterable[pth.AnyPath]:
     downloads = self.browser_platform.iterdir(self._downloads_dir)
@@ -170,8 +170,8 @@ class AndroidWebDriverDownloadsProbeContext(DownloadsProbeContext):
   def __init__(self, probe: DownloadsProbe, run: Run) -> None:
     super().__init__(probe, run)
     self._existing_downloads: set[AndroidDownload] = set()
-    self._user_id: str = str(self.browser_platform.user_id())
-    self._results: list[pth.AnyPath] = []
+    self._user_id: Final[str] = str(self.browser_platform.user_id())
+    self._results: Final[list[pth.AnyPath]] = []
 
   def downloads(self,
                 include_pending: bool = True) -> Iterable[AndroidDownload]:

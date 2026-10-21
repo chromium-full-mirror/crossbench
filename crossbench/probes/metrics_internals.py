@@ -56,10 +56,10 @@ class ChromeMetricsInternalsProbe(JsonResultProbe):
   def __init__(self, project_name: str, event_name: str, event_index: int,
                metric_key: str) -> None:
     super().__init__()
-    self._project_name = project_name
-    self._event_name = event_name
-    self._event_index = event_index
-    self._metric_key = metric_key
+    self._project_name: Final[str] = project_name
+    self._event_name: Final[str] = event_name
+    self._event_index: Final[int] = event_index
+    self._metric_key: Final[str] = metric_key
 
   @property
   def project_name(self) -> str:

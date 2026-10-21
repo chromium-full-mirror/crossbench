@@ -53,8 +53,8 @@ class PollingProbe(Probe, metaclass=abc.ABCMeta):
       interval: dt.timedelta = _DEFAULT_POLL_INTERVAL,
   ) -> None:
     super().__init__()
-    self._cmd: TupleCmdArgs = tuple(cmd)
-    self._interval = interval
+    self._cmd: Final[TupleCmdArgs] = tuple(cmd)
+    self._interval: Final[dt.timedelta] = interval
     if interval < _MIN_POLL_INTERVAL:
       raise ValueError(f"Polling interval must be >= {_MIN_POLL_INTERVAL}s, "
                        f"but got: {interval}")
@@ -132,14 +132,14 @@ class CMDPoller(threading.Thread):
   def __init__(self, platform: plt.Platform, cmd: Iterable[CmdArg],
                interval: dt.timedelta, path: pth.LocalPath) -> None:
     super().__init__()
-    self._platform = platform
-    self._cmd: TupleCmdArgs = tuple(cmd)
-    self._path: pth.LocalPath = path
+    self._platform: Final[plt.Platform] = platform
+    self._cmd: Final[TupleCmdArgs] = tuple(cmd)
+    self._path: Final[pth.LocalPath] = path
     if interval < dt.timedelta(seconds=0.1):
       raise ValueError("Poller interval should be >= 0.1s for accuracy, "
                        f"but got {interval}s")
-    self._interval_seconds = interval.total_seconds()
-    self._event = threading.Event()
+    self._interval_seconds: Final[float] = interval.total_seconds()
+    self._event: Final[threading.Event] = threading.Event()
 
   def stop(self) -> None:
     self._event.set()

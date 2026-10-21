@@ -43,8 +43,8 @@ class ChromeHistogramMetric(abc.ABC):
 
   def __init__(self, name: str, histogram_name: str) -> None:
     super().__init__()
-    self._name = name
-    self._histogram_name = histogram_name
+    self._name: Final[str] = name
+    self._histogram_name: Final[str] = histogram_name
 
   @property
   def name(self) -> str:
@@ -86,7 +86,7 @@ class ChromeHistogramPercentileMetric(ChromeHistogramMetric):
 
   def __init__(self, histogram_name: str, percentile: int) -> None:
     super().__init__(f"{histogram_name}_p{percentile}", histogram_name)
-    self._percentile = percentile
+    self._percentile: Final[int] = percentile
 
   @override
   def compute(self, delta: ChromeHistogramSample,
@@ -160,8 +160,8 @@ class ChromeHistogramsProbe(JsonResultProbe):
                metrics: Sequence[ChromeHistogramMetric],
                use_baseline: bool = True) -> None:
     super().__init__()
-    self._metrics = metrics
-    self._use_baseline = use_baseline
+    self._metrics: Final[Sequence[ChromeHistogramMetric]] = metrics
+    self._use_baseline: Final[bool] = use_baseline
 
   @property
   def metrics(self) -> Sequence[ChromeHistogramMetric]:
@@ -271,12 +271,12 @@ class ChromeHistogramSample:
                flags: int = 0,
                bucket_counts: dict[int, int] | None = None,
                bucket_maxes: dict[int, int] | None = None) -> None:
-    self._name = name
-    self._count = count
-    self._mean = mean
-    self._flags = flags
-    self._bucket_counts = bucket_counts or {}
-    self._bucket_maxes = bucket_maxes or {}
+    self._name: Final[str] = name
+    self._count: Final[int] = count
+    self._mean: Final[float | None] = mean
+    self._flags: Final[int] = flags
+    self._bucket_counts: Final[dict[int, int]] = bucket_counts or {}
+    self._bucket_maxes: Final[dict[int, int]] = bucket_maxes or {}
     bucket_sum = sum(self._bucket_counts.values())
     if count != bucket_sum:
       raise ValueError(f"Histogram {name} has {count} total samples, "

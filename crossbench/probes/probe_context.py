@@ -7,7 +7,8 @@ from __future__ import annotations
 import abc
 import contextlib
 import datetime as dt
-from typing import TYPE_CHECKING, Generic, Iterable, Iterator, Mapping, TypeVar
+from typing import TYPE_CHECKING, Final, Generic, Iterable, Iterator, \
+    Mapping, TypeVar
 
 from typing_extensions import override
 
@@ -44,8 +45,8 @@ class BaseProbeContext(Generic[ProbeT], metaclass=abc.ABCMeta):
   """
 
   def __init__(self, probe: ProbeT, result_origin: ResultOrigin) -> None:
-    self._probe: ProbeT = probe
-    self._result_origin = result_origin
+    self._probe: Final[ProbeT] = probe
+    self._result_origin: Final[ResultOrigin] = result_origin
     self._is_active: bool = False
     self._is_success: bool = False
     self._start_time: dt.datetime | None = None
@@ -204,7 +205,7 @@ class ProbeContext(BaseProbeContext[ProbeT], metaclass=abc.ABCMeta):
 
   def __init__(self, probe: ProbeT, run: Run) -> None:
     super().__init__(probe, run)
-    self._run: Run = run
+    self._run: Final[Run] = run
     self._default_result_path: pth.AnyPath = self.get_default_result_path()
 
   def get_default_result_path(self) -> pth.AnyPath:
@@ -315,8 +316,9 @@ class ProbeSessionContext(BaseProbeContext[ProbeT], metaclass=abc.ABCMeta):
 
   def __init__(self, probe: ProbeT, session: BrowserSessionRunGroup) -> None:
     super().__init__(probe, session)
-    self._session: BrowserSessionRunGroup = session
-    self._default_result_path: pth.AnyPath = self.get_default_result_path()
+    self._session: Final[BrowserSessionRunGroup] = session
+    self._default_result_path: Final[
+        pth.AnyPath] = self.get_default_result_path()
 
   def get_default_result_path(self) -> pth.AnyPath:
     return self._session.get_default_probe_result_path(self._probe)

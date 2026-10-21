@@ -8,7 +8,8 @@ import json
 import logging
 import statistics
 from math import floor, log10
-from typing import TYPE_CHECKING, Callable, Iterable, Sequence, TypeGuard
+from typing import TYPE_CHECKING, Callable, Final, Iterable, Sequence, \
+    TypeGuard
 
 from crossbench.probes import helper
 
@@ -194,9 +195,10 @@ class MetricsMerger:
         key_fn (optional): Maps property paths (tuple[str,...]) to strings used
           as keys to group/merge values, or None to skip property paths.
     """
-    self._data: dict[str, Metric] = {}
-    self._key_fn: helper.KeyFnType = key_fn or helper.default_flatten_key_fn
-    self._ignored_keys: set[str] = set()
+    self._data: Final[dict[str, Metric]] = {}
+    self._key_fn: Final[
+        helper.KeyFnType] = key_fn or helper.default_flatten_key_fn
+    self._ignored_keys: Final[set[str]] = set()
     for data in args:
       self.add(data)
 
@@ -316,7 +318,7 @@ class CSVFormatter:
                headers: Sequence[tuple[object, ...]] = (),
                include_parts: bool = True,
                sort: bool = True):
-    self._table: list[Sequence[object]] = []
+    self._table: Final[list[Sequence[object]]] = []
     converted = metrics.to_json(value_fn, sort)
     items = self.format_items(converted, sort=sort)
     max_path_depth: int = self.extract_max_depth(items, include_parts)

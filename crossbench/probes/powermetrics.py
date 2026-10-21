@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime as dt
 import enum
 import subprocess
-from typing import TYPE_CHECKING, ClassVar, Self, Sequence
+from typing import TYPE_CHECKING, ClassVar, Final, Self, Sequence
 
 from typing_extensions import override
 
@@ -68,10 +68,10 @@ class PowerMetricsProbe(Probe):
                sampling_interval: dt.timedelta = dt.timedelta(),
                samplers: Sequence[SamplerType] = SAMPLERS) -> None:
     super().__init__()
-    self._sampling_interval = sampling_interval
+    self._sampling_interval: Final[dt.timedelta] = sampling_interval
     if sampling_interval.total_seconds() < 0:
       raise ValueError(f"Invalid sampling_interval={sampling_interval}")
-    self._samplers = tuple(samplers)
+    self._samplers: Final[tuple[SamplerType, ...]] = tuple(samplers)
 
   @property
   @override
@@ -103,7 +103,7 @@ class PowerMetricsProbeContext(ProbeContext[PowerMetricsProbe]):
   def __init__(self, probe: PowerMetricsProbe, run: Run) -> None:
     super().__init__(probe, run)
     self._power_metrics_process: subprocess.Popen | None = None
-    self._output_plist_file: pth.AnyPath = self.result_path.with_suffix(
+    self._output_plist_file: Final[pth.AnyPath] = self.result_path.with_suffix(
         ".plist")
 
   def start(self) -> None:

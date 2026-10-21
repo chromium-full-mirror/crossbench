@@ -8,7 +8,7 @@ import io
 import logging
 import subprocess
 from functools import cached_property
-from typing import TYPE_CHECKING, Iterable, Self
+from typing import TYPE_CHECKING, Final, Iterable, Self
 
 from typing_extensions import override
 
@@ -102,12 +102,12 @@ class EtmProbe(ChromiumProbe):
       flush_interval: int | None = None,
   ) -> None:
     super().__init__()
-    self._cpu: int = cpu
-    self._aux_buffer_size: str | None = aux_buffer_size
-    self._record_timestamp: bool = record_timestamp
-    self._record_cycles: bool = record_cycles
-    self._cycle_threshold: int | None = cycle_threshold
-    self._flush_interval: int | None = flush_interval
+    self._cpu: Final[int] = cpu
+    self._aux_buffer_size: Final[str | None] = aux_buffer_size
+    self._record_timestamp: Final[bool] = record_timestamp
+    self._record_cycles: Final[bool] = record_cycles
+    self._cycle_threshold: Final[int | None] = cycle_threshold
+    self._flush_interval: Final[int | None] = flush_interval
 
   @property
   def key(self) -> ProbeKeyT:

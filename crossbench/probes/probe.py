@@ -7,7 +7,8 @@ from __future__ import annotations
 import abc
 import enum
 import logging
-from typing import TYPE_CHECKING, ClassVar, Hashable, Iterable, Self, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Final, Hashable, Iterable, Self, \
+    TypeVar
 
 from typing_extensions import override
 
@@ -51,7 +52,7 @@ class ProbeConfigParser(ConfigParser[ProbeT]):
         key=probe_name,
         title=f"{probe_name} probe parser",
         unused_properties_mode=UnusedPropertiesMode.ERROR)
-    self._probe_cls: type[ProbeT] = probe_cls
+    self._probe_cls: Final[type[ProbeT]] = probe_cls
 
   @property
   def probe_cls(self) -> type[ProbeT]:
@@ -138,7 +139,7 @@ class Probe(ProbeResultKey, abc.ABC):
 
   def __init__(self) -> None:
     assert self.name is not None, "A Probe must define a name"
-    self._browsers: set[Browser] = set()
+    self._browsers: Final[set[Browser]] = set()
 
   def __str__(self) -> str:
     return type(self).__name__

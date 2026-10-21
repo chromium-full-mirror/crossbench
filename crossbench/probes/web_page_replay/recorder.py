@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import shutil
-from typing import TYPE_CHECKING, ClassVar, Iterable, Self, TypedDict
+from typing import TYPE_CHECKING, ClassVar, Final, Iterable, Self, TypedDict
 
 from typing_extensions import override
 
@@ -21,6 +21,7 @@ from crossbench.probes.results import EmptyProbeResult, LocalProbeResult, \
 if TYPE_CHECKING:
   from crossbench import path as pth
   from crossbench.browsers.browser import Browser
+  from crossbench.plt.base import Platform
   from crossbench.plt.port_manager import PortScope
   from crossbench.runner.groups.base import RunGroup
   from crossbench.runner.groups.browsers import BrowsersRunGroup
@@ -93,7 +94,7 @@ class WebPageReplayProbe(Probe):
                use_test_root_certificate: bool = False,
                record_setup: bool = True) -> None:
     super().__init__()
-    self._recorder_kwargs: WprRecorderKwargs = {
+    self._recorder_kwargs: Final[WprRecorderKwargs] = {
         "http_port": http_port,
         "https_port": https_port,
         "inject_scripts": inject_scripts,
@@ -101,10 +102,10 @@ class WebPageReplayProbe(Probe):
         "cert_file": cert_file,
     }
 
-    self._https_port = https_port
-    self._http_port = http_port
-    self._use_test_root_certificate = use_test_root_certificate
-    self._record_setup = record_setup
+    self._https_port: Final[int] = https_port
+    self._http_port: Final[int] = http_port
+    self._use_test_root_certificate: Final[bool] = use_test_root_certificate
+    self._record_setup: Final[bool] = record_setup
 
   @property
   def https_port(self) -> int:
@@ -199,17 +200,17 @@ class WprRecorderProbeContext(ProbeContext[WebPageReplayProbe]):
 
   def __init__(self, probe: WebPageReplayProbe, run: Run) -> None:
     super().__init__(probe, run)
-    self._wprgo_log: pth.LocalPath = self.local_result_path.with_name(
+    self._wprgo_log: Final[pth.LocalPath] = self.local_result_path.with_name(
         "wpr_record.log")
-    self._host: str = "127.0.0.1"
-    self._recorder = WprRecorder(
+    self._host: Final[str] = "127.0.0.1"
+    self._recorder: Final[WprRecorder] = WprRecorder(
         platform=run.host_platform,
         log_path=self._wprgo_log,
         archive_path=self.result_path,
         bin_path=WprGoFinder(run.host_platform).wpr(run.host_platform),
         **self.probe.recorder_kwargs,
     )
-    self._browser_platform = run.browser_platform
+    self._browser_platform: Final[Platform] = run.browser_platform
     self._ports: PortScope = run.host_platform.ports
 
   @override

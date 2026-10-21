@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from typing import TYPE_CHECKING, ClassVar, NotRequired, Self, TypedDict, cast
+from typing import TYPE_CHECKING, ClassVar, Final, NotRequired, Self, \
+    TypedDict, cast
 
 from typing_extensions import override
 
@@ -49,7 +50,7 @@ class MeminfoProbeContext(ProbeContext[MeminfoProbe]):
 
   def __init__(self, probe: MeminfoProbe, run: Run) -> None:
     super().__init__(probe, run)
-    self._results: list[pth.AnyPath] = []
+    self._results: Final[list[pth.AnyPath]] = []
 
   @override
   def get_default_result_path(self) -> pth.AnyPath:

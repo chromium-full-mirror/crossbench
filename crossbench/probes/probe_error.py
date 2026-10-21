@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
   from crossbench.browsers.browser import Browser
@@ -18,7 +18,7 @@ class ProbeMissingDataError(ValueError):
 class ProbeValidationError(ValueError):
 
   def __init__(self, probe: Probe, message: str) -> None:
-    self.probe = probe
+    self.probe: Final[Probe] = probe
     super().__init__(f"Probe({probe.NAME}): {message}")
 
 

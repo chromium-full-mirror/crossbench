@@ -155,17 +155,17 @@ class V8LogProbe(ChromiumProbe):
       d8_binary: pth.LocalPath | None = None,
       v8_checkout: pth.LocalPath | None = None) -> None:
     super().__init__()
-    self._profview: bool = profview
-    self._logview: bool = logview
-    self._js_flags = JSFlags()
-    self._categories: tuple[LogviewCategory, ...] = tuple(
+    self._profview: Final[bool] = profview
+    self._logview: Final[bool] = logview
+    self._js_flags: Final[JSFlags] = JSFlags()
+    self._categories: Final[tuple[LogviewCategory, ...]] = tuple(
         ObjectParser.enum_list("categories", LogviewCategory, categories or ()))
     for cat in self._categories:
       self._js_flags.set(cat.flag)
-    self._prof_sampling_interval: dt.timedelta = (
+    self._prof_sampling_interval: Final[dt.timedelta] = (
         prof_sampling_interval or dt.timedelta())
-    self._d8_binary: pth.LocalPath | None = d8_binary
-    self._v8_checkout: pth.LocalPath | None = v8_checkout
+    self._d8_binary: Final[pth.LocalPath | None] = d8_binary
+    self._v8_checkout: Final[pth.LocalPath | None] = v8_checkout
     assert isinstance(log_all,
                       bool), (f"Expected bool value, got log_all={log_all}")
     assert isinstance(prof, bool), f"Expected bool value, got log_all={prof}"

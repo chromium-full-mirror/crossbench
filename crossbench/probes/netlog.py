@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import TYPE_CHECKING, ClassVar, Self
+from typing import TYPE_CHECKING, ClassVar, Final, Self
 
 from typing_extensions import override
 
@@ -83,7 +83,7 @@ class NetLogProbe(ChromiumProbe):
       capture_mode: NetLogCaptureMode = NetLogCaptureMode.DEFAULT,
   ) -> None:
     super().__init__()
-    self._capture_mode = capture_mode
+    self._capture_mode: Final[NetLogCaptureMode] = capture_mode
 
   @property
   def capture_mode(self) -> NetLogCaptureMode:

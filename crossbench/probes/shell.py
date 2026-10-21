@@ -5,7 +5,8 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, ClassVar, Generic, Iterable, Self, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Final, Generic, Iterable, Self, \
+    TypeVar
 
 from typing_extensions import override
 
@@ -78,14 +79,14 @@ class ShellProbeBase(Probe):
                stop_cmd: Iterable[CmdArg] | None = None,
                teardown_cmd: Iterable[CmdArg] | None = None) -> None:
     super().__init__()
-    self._setup_cmd: TupleCmdArgs = tuple(setup_cmd) if setup_cmd else ()
-    self._start_cmd: TupleCmdArgs = tuple(start_cmd) if start_cmd else ()
-    self._start_story_run_cmd: TupleCmdArgs = (
+    self._setup_cmd: Final[TupleCmdArgs] = tuple(setup_cmd) if setup_cmd else ()
+    self._start_cmd: Final[TupleCmdArgs] = tuple(start_cmd) if start_cmd else ()
+    self._start_story_run_cmd: Final[TupleCmdArgs] = (
         tuple(start_story_run_cmd) if start_story_run_cmd else ())
-    self._stop_story_run_cmd: TupleCmdArgs = (
+    self._stop_story_run_cmd: Final[TupleCmdArgs] = (
         tuple(stop_story_run_cmd) if stop_story_run_cmd else ())
-    self._stop_cmd: TupleCmdArgs = tuple(stop_cmd) if stop_cmd else ()
-    self._teardown_cmd: TupleCmdArgs = (
+    self._stop_cmd: Final[TupleCmdArgs] = tuple(stop_cmd) if stop_cmd else ()
+    self._teardown_cmd: Final[TupleCmdArgs] = (
         tuple(teardown_cmd) if teardown_cmd else ())
 
   @abc.abstractmethod
@@ -190,7 +191,7 @@ class ShellProbeContextBase(ProbeContext[ProbeT], Generic[ProbeT]):
 
   def __init__(self, probe: ProbeT, run: Run) -> None:
     super().__init__(probe, run)
-    self._result_files: list[pth.LocalPath] = []
+    self._result_files: Final[list[pth.LocalPath]] = []
 
   @property
   @abc.abstractmethod

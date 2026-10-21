@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import subprocess
-from typing import TYPE_CHECKING, ClassVar, Self, TextIO
+from typing import TYPE_CHECKING, ClassVar, Final, Self, TextIO
 
 from typing_extensions import override
 
@@ -41,7 +41,7 @@ class DTraceProbe(Probe):
 
   def __init__(self, script_path: pth.LocalPath) -> None:
     super().__init__()
-    self._script_path = script_path.resolve()
+    self._script_path: Final[pth.LocalPath] = script_path.resolve()
 
   @property
   @override
@@ -94,10 +94,11 @@ class DTraceProbeContext(ProbeContext[DTraceProbe]):
 
   def __init__(self, probe: DTraceProbe, run: Run) -> None:
     super().__init__(probe, run)
-    self._script_path: pth.LocalPath = probe.script_path
-    self._output_path: pth.LocalPath = (
+    self._script_path: Final[pth.LocalPath] = probe.script_path
+    self._output_path: Final[pth.LocalPath] = (
         self.local_result_path.with_suffix(".output.txt"))
-    self._log_path: pth.LocalPath = self.local_result_path.with_suffix(".log")
+    self._log_path: Final[pth.LocalPath] = self.local_result_path.with_suffix(
+        ".log")
     self._dtrace_process: subprocess.Popen | None = None
     self._log_file: TextIO | None = None
 

@@ -230,32 +230,32 @@ class ProfilingProbe(Probe):
       add_counters: Sequence[str] = (),
   ) -> None:
     super().__init__()
-    self._sample_js: bool = js
-    self._sample_browser_process: bool = browser_process
-    self._spare_renderer_process: bool = spare_renderer_process
-    self._pprof_mode: PprofMode = ObjectParser.enum("pprof", PprofMode, pprof,
-                                                    PprofMode)
-    self._traceconv_mode: TraceconvMode = ObjectParser.enum(
+    self._sample_js: Final[bool] = js
+    self._sample_browser_process: Final[bool] = browser_process
+    self._spare_renderer_process: Final[bool] = spare_renderer_process
+    self._pprof_mode: Final[PprofMode] = ObjectParser.enum(
+        "pprof", PprofMode, pprof, PprofMode)
+    self._traceconv_mode: Final[TraceconvMode] = ObjectParser.enum(
         "traceconv", TraceconvMode, traceconv, TraceconvMode)
-    self._cleanup_mode: CleanupMode = ObjectParser.enum("cleanup", CleanupMode,
-                                                        cleanup, CleanupMode)
+    self._cleanup_mode: Final[CleanupMode] = ObjectParser.enum(
+        "cleanup", CleanupMode, cleanup, CleanupMode)
     if v8_interpreted_frames is None:
       v8_interpreted_frames = js
-    self._expose_v8_interpreted_frames: bool = v8_interpreted_frames
+    self._expose_v8_interpreted_frames: Final[bool] = v8_interpreted_frames
     if v8_interpreted_frames:
       assert js, "Cannot expose V8 interpreted frames without js profiling."
-    self._target: TargetMode = ObjectParser.enum("target", TargetMode, target,
-                                                 TargetMode)
-    self._pin_renderer_main_core: int | None = pin_renderer_main_core
-    self._call_graph_mode: CallGraphMode = ObjectParser.enum(
+    self._target: Final[TargetMode] = ObjectParser.enum("target", TargetMode,
+                                                        target, TargetMode)
+    self._pin_renderer_main_core: Final[int | None] = pin_renderer_main_core
+    self._call_graph_mode: Final[CallGraphMode] = ObjectParser.enum(
         "call_graph_mode", CallGraphMode, call_graph_mode, CallGraphMode)
-    self._frequency: int | str | None = frequency
-    self._clockid: str | None = clockid
-    self._count: int | None = count
-    self._cpu: tuple[int, ...] = tuple(cpu)
-    self._events: tuple[str, ...] = tuple(events)
-    self._grouped_events: tuple[str, ...] = tuple(grouped_events)
-    self._add_counters: tuple[str, ...] = tuple(add_counters)
+    self._frequency: Final[int | str | None] = frequency
+    self._clockid: Final[str | None] = clockid
+    self._count: Final[int | None] = count
+    self._cpu: Final[tuple[int, ...]] = tuple(cpu)
+    self._events: Final[tuple[str, ...]] = tuple(events)
+    self._grouped_events: Final[tuple[str, ...]] = tuple(grouped_events)
+    self._add_counters: Final[tuple[str, ...]] = tuple(add_counters)
 
   @property
   @override

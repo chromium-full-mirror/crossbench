@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import TYPE_CHECKING, ClassVar, Self
+from typing import TYPE_CHECKING, ClassVar, Final, Self
 
 from typing_extensions import override
 
@@ -46,7 +46,7 @@ class DumpHeapProbeContext(ProbeContext[DumpHeapProbe]):
 
   def __init__(self, probe: DumpHeapProbe, run: Run) -> None:
     super().__init__(probe, run)
-    self._results: list[pth.AnyPath] = []
+    self._results: Final[list[pth.AnyPath]] = []
 
   def start(self) -> None:
     pass

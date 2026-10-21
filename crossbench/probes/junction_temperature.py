@@ -67,7 +67,7 @@ class JunctionTemperatureProbe(Probe):
 
   def __init__(self, mode: _JtMode = _JtMode.STORY) -> None:
     super().__init__()
-    self._mode = mode
+    self._mode: Final[_JtMode] = mode
 
   @property
   def mode(self) -> _JtMode:

@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, ClassVar, Self
+from typing import TYPE_CHECKING, ClassVar, Final, Self
 
 from typing_extensions import override
 
@@ -57,8 +57,8 @@ class JSProbe(JsonResultProbe):
 
   def __init__(self, js: str | None, setup: str | None = None) -> None:
     super().__init__()
-    self._setup_js = setup
-    self._metric_js = js
+    self._setup_js: Final[str | None] = setup
+    self._metric_js: Final[str | None] = js
 
   @property
   def setup_js(self) -> str | None:

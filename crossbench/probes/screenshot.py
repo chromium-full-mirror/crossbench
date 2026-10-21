@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import TYPE_CHECKING, ClassVar, Self, Sequence
+from typing import TYPE_CHECKING, ClassVar, Final, Self, Sequence
 
 from typing_extensions import override
 
@@ -61,7 +61,7 @@ class ScreenshotProbeContext(ProbeContext[ScreenshotProbe]):
 
   def __init__(self, probe: ScreenshotProbe, run: Run) -> None:
     super().__init__(probe, run)
-    self._results: list[pth.AnyPath] = []
+    self._results: Final[list[pth.AnyPath]] = []
 
   @override
   def get_default_result_path(self) -> pth.AnyPath:

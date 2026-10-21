@@ -6,8 +6,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final, Mapping
 
-from crossbench import exception
-from crossbench import plt
+from crossbench import exception, plt
 
 if TYPE_CHECKING:
   import crossbench.path as pth
@@ -40,9 +39,9 @@ class PerfettoToolDownloader:
                tool: str,
                version: str = "v53.0",
                platform: plt.Platform | None = None) -> None:
-    self._version = version
-    self._tool = tool
-    self._platform = platform or plt.PLATFORM
+    self._version: Final[str] = version
+    self._tool: Final[str] = tool
+    self._platform: Final[plt.Platform] = platform or plt.PLATFORM
 
   @property
   def version(self) -> str:

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import abc
 import logging
-from typing import TYPE_CHECKING, Iterable, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Final, Iterable, TypeVar, cast, overload
 
 from immutabledict import immutabledict
 from ordered_set import OrderedSet
@@ -57,12 +57,12 @@ class ProbeResult(abc.ABC):
     # Do last and allow duplicated
     self._extend(
         tmp_files, self._perfetto_list, suffix=None, allow_duplicates=True)
-    self._files: immutabledict[str, tuple[pth.LocalPath, ...]] = immutabledict({
-        suffix: tuple(files) for suffix, files in tmp_files.items()
-    })
+    self._files: Final[immutabledict[str, tuple[
+        pth.LocalPath, ...]]] = immutabledict({
+            suffix: tuple(files) for suffix, files in tmp_files.items()
+        })
     # TODO: Add Metric object for keeping metrics in-memory instead of reloading
     # them from serialized JSON files for merging.
-    self._values = None
     self._validate()
 
   def _append(self,
@@ -251,11 +251,11 @@ class BrowserProbeResult(ProbeResult):
                file: Iterable[pth.AnyPath] | None = None,
                perfetto: Iterable[pth.AnyPath] | None = None,
                **kwargs: Iterable[pth.AnyPath]) -> None:
-    self._browser_file = file
+    self._browser_file: Final[Iterable[pth.AnyPath] | None] = file
     local_file: Iterable[pth.LocalPath] | None = None
     local_perfetto: Iterable[pth.LocalPath] | None = None
     local_kwargs: dict[str, Iterable[pth.LocalPath]] = {}
-    self._is_remote = result_origin.is_remote
+    self._is_remote: Final[bool] = result_origin.is_remote
     if self._is_remote:
       if file:
         local_file = self._copy_files(result_origin, file)
@@ -313,8 +313,8 @@ class ProbeResultDict:
   """
 
   def __init__(self, path: pth.AnyPath) -> None:
-    self._path = path
-    self._dict: dict[str, ProbeResult] = {}
+    self._path: Final[pth.AnyPath] = path
+    self._dict: Final[dict[str, ProbeResult]] = {}
 
   def __setitem__(self, probe: ProbeResultKey, result: ProbeResult) -> None:
     assert isinstance(result, ProbeResult)
