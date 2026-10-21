@@ -74,7 +74,7 @@ class Environ(collections.abc.MutableMapping, metaclass=abc.ABCMeta):
 class LocalEnviron(Environ):
 
   def __init__(self) -> None:
-    self._environ = os.environ
+    self._environ: Final[os._Environ[str]] = os.environ
 
   def __getitem__(self, key: str) -> str:
     return self._environ.__getitem__(key)
@@ -97,7 +97,7 @@ class SubprocessError(subprocess.CalledProcessError):
 
   def __init__(self, platform: Platform,
                process: subprocess.CompletedProcess) -> None:
-    self.platform = platform
+    self.platform: Final[Platform] = platform
     super().__init__(process.returncode, shlex.join(map(str, process.args)),
                      process.stdout, process.stderr)
 
@@ -133,12 +133,12 @@ class Platform(abc.ABC):
 
   def __init__(self) -> None:
     self._id: Final[int] = _next_id()
-    self._binary_lookup_override: dict[str, pth.AnyPath] = {}
+    self._binary_lookup_override: Final[dict[str, pth.AnyPath]] = {}
     self._cache_dir_root: pth.AnyPath | None = None
     self._default_port_manager: Final[PortManager] = self._create_port_manager()
     self._default_tmp_dir: Final[pth.AnyPath] = self._create_default_tmp_dir()
-    self._popens: weakref.WeakSet[subprocess.Popen] = weakref.WeakSet()
-    self._virtual_device_configs: dict[str, VirtualDeviceConfig] = {}
+    self._popens: Final[weakref.WeakSet[subprocess.Popen]] = weakref.WeakSet()
+    self._virtual_device_configs: Final[dict[str, VirtualDeviceConfig]] = {}
     atexit.register(self.kill_all_popens)
 
   def _create_port_manager(self) -> PortManager:

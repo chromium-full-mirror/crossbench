@@ -19,8 +19,8 @@ class Spinner:
   def __init__(self, is_atty: bool, sleep: float, title: str) -> None:
     self._is_running: bool = False
     # Only enable the spinner if the output is an interactive terminal.
-    self._is_atty: bool = is_atty
-    self._sleep_time_seconds: float = sleep
+    self._is_atty: Final[bool] = is_atty
+    self._sleep_time_seconds: Final[float] = sleep
     self._title: str = title
     self._message: str = ""
     self._cursor: str = " "

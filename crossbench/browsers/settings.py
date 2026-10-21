@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from crossbench import path as pth
 from crossbench import plt
@@ -46,23 +46,24 @@ class Settings:
       apk_config: ApkConfig | None = None,
       browser_version: str | None = None,
   ) -> None:
-    self._flags = self._convert_flags(flags, "flags")
-    self._js_flags = self._extract_js_flags(self._flags, js_flags)
-    self._cache_dir = cache_dir
-    self._clear_cache_dir = clear_cache_dir
-    self._platform = platform or plt.PLATFORM
-    self._driver_path = driver_path
-    self._network: Network = network or LiveNetwork()
+    self._flags: Final[Flags] = self._convert_flags(flags, "flags")
+    self._js_flags: Final[Flags] = self._extract_js_flags(self._flags, js_flags)
+    self._cache_dir: Final[pth.AnyPath | None] = cache_dir
+    self._clear_cache_dir: Final[bool] = clear_cache_dir
+    self._platform: Final[plt.Platform] = platform or plt.PLATFORM
+    self._driver_path: Final[pth.AnyPath | None] = driver_path
+    self._network: Final[Network] = network or LiveNetwork()
     self._viewport: Viewport = viewport or Viewport.DEFAULT
-    self._splash_screen: SplashScreen = splash_screen or SplashScreen.DEFAULT
-    self._secrets: Secrets = secrets
-    self._driver_logging = driver_logging
-    self._wipe_system_user_data = wipe_system_user_data
-    self._http_request_timeout = http_request_timeout
-    self._env_config = env_config or EnvConfig.default()
-    self._extensions = extensions or ()
-    self._apk_config = apk_config
-    self._browser_version = browser_version
+    self._splash_screen: Final[
+        SplashScreen] = splash_screen or SplashScreen.DEFAULT
+    self._secrets: Final[Secrets] = secrets
+    self._driver_logging: Final[bool] = driver_logging
+    self._wipe_system_user_data: Final[bool] = wipe_system_user_data
+    self._http_request_timeout: Final[dt.timedelta] = http_request_timeout
+    self._env_config: Final[EnvConfig] = env_config or EnvConfig.default()
+    self._extensions: Final[tuple[ExtensionConfig, ...]] = extensions or ()
+    self._apk_config: Final[ApkConfig | None] = apk_config
+    self._browser_version: Final[str | None] = browser_version
 
   def _extract_js_flags(self, flags: Flags,
                         js_flags: FlagsData | None) -> Flags:

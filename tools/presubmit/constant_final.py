@@ -65,7 +65,7 @@ class ConstantFinalVisitor(ast.NodeVisitor):
 
   def __init__(self) -> None:
     super().__init__()
-    self.violations: list[tuple[int, int, str]] = []
+    self.violations: Final[list[tuple[int, int, str]]] = []
 
   def visit_Module(self, node: ast.Module) -> None:
     for stmt in node.body:

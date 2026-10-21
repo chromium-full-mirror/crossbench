@@ -58,7 +58,7 @@ class VersionParseResult(NamedTuple):
 class PartialBrowserVersionError(ValueError):
 
   def __init__(self, version: BrowserVersion):
-    self.version = version
+    self.version: Final[BrowserVersion] = version
     msg = f"Got partial browser version: {version!r}"
     super().__init__(msg)
 

@@ -270,7 +270,7 @@ class DeviceConfigSetter:
     self._requirements: Final[DeviceConfigRequirements] = requirements
     # Discrepancies fixed by a write; restore() writes back their actual
     # values.
-    self._changed: list[DeviceConfigDiscrepancy] = []
+    self._changed: Final[list[DeviceConfigDiscrepancy]] = []
 
   def apply(self) -> None:
     """Writes the target of every failing requirement, then checks them all.

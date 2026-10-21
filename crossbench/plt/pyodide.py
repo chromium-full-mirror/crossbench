@@ -8,7 +8,7 @@ import datetime as dt
 import json
 import sys
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Final, Protocol
 
 import google.cloud.storage.blob as gcloud_blob  # type: ignore
 from typing_extensions import override
@@ -28,6 +28,58 @@ def is_pyodide_env() -> bool:
   return sys.platform == "emscripten"
 
 
+class WebAdb(Protocol):
+  serial: str
+
+  def gcsGetMetadata(self, url: str) -> str:  # noqa: N802
+    ...
+
+  def gcsDownloadFile(self, url: str, dest: str) -> None:  # noqa: N802
+    ...
+
+  def isInterrupted(self) -> bool:  # noqa: N802
+    ...
+
+  def acknowledgeInterrupt(self) -> None:  # noqa: N802
+    ...
+
+  def root(self) -> None:
+    ...
+
+  def unroot(self) -> None:
+    ...
+
+  def push(self, src: str, dest: str) -> None:
+    ...
+
+  def pull(self, src: str, dest: str) -> None:
+    ...
+
+  def shell(self, cmd: str) -> str | bytes:
+    ...
+
+  def startDevTools(self) -> str:  # noqa: N802
+    ...
+
+  def stopDevTools(self) -> str:  # noqa: N802
+    ...
+
+  def switchTab(self, url: str = "about:blank") -> str:  # noqa: N802
+    ...
+
+  def sendCdpCommand(self, method: str, params: str) -> str:  # noqa: N802
+    ...
+
+  def spawnProcess(self, cmd: str) -> int:  # noqa: N802
+    ...
+
+  def readProcessLog(self, proc_id: int, offset: int) -> str:  # noqa: N802
+    ...
+
+  def killProcess(self, proc_id: int) -> None:  # noqa: N802
+    ...
+
+
 class PyodideGcsBlob(gcloud_blob.Blob):
   """GCS Blob wrapper for Pyodide WebAssembly environment."""
 
@@ -36,12 +88,12 @@ class PyodideGcsBlob(gcloud_blob.Blob):
       gcs_url: str,
       md5_hash: str = "",
       size: int = 0,
-      webadb: Any | None = None,
+      webadb: WebAdb | None = None,
   ) -> None:
-    self._gcs_url: str = gcs_url
+    self._gcs_url: Final[str] = gcs_url
     self._md5_hash: str = md5_hash
     self._size: int = size
-    self._webadb: Any = webadb
+    self._webadb: WebAdb | None = webadb
     if self._webadb is None and js is not None:
       self._webadb = js.webadb
 
@@ -90,11 +142,11 @@ class PyodideGcsBlob(gcloud_blob.Blob):
 class PyodidePlatform(plt_linux.LinuxPlatform):
   """Host platform running inside Pyodide/Emscripten WebAssembly."""
 
-  def __init__(self, webadb: Any | None = None) -> None:
+  def __init__(self, webadb: WebAdb | None = None) -> None:
     super().__init__()
     if webadb is None and js is not None:
       webadb = js.webadb
-    self._webadb: Any = webadb
+    self._webadb: Final[WebAdb | None] = webadb
 
   @property
   def is_pyodide(self) -> bool:

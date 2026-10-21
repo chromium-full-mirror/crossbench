@@ -138,7 +138,7 @@ class ExceptionAnnotator:
   def __init__(self,
                throw: bool = False,
                throw_cls: type[BaseException] | None = None) -> None:
-    self._exceptions: OrderedSet[Entry] = OrderedSet()
+    self._exceptions: Final[OrderedSet[Entry]] = OrderedSet()
     self.throw: Final[bool] = throw
     self._throw_cls: Final[type[BaseException] | None] = throw_cls
     # The info_stack adds additional meta information to handle exceptions.
@@ -148,7 +148,7 @@ class ExceptionAnnotator:
     # Associates raised exception with the info_stack at that time for later
     # use in the `handle` method.
     # This is cleared whenever we enter a  new ExceptionAnnotationScope.
-    self._pending_exceptions: dict[TExceptionId, TInfoStack] = {}
+    self._pending_exceptions: Final[dict[TExceptionId, TInfoStack]] = {}
     self._depth = 0
 
   @property

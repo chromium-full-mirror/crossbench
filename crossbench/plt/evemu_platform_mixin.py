@@ -238,7 +238,7 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
 
   def __init__(self, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
-    self._virtual_devices: dict[str, VirtualDeviceState] = {}
+    self._virtual_devices: Final[dict[str, VirtualDeviceState]] = {}
 
   @abc.abstractmethod
   def _start_virtual_device(self, device_name: str,

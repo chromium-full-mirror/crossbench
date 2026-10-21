@@ -61,7 +61,7 @@ class ConfigArgParser:
                depends_on: Iterable[str] | None = None):
     self.parser: Final[ConfigParser] = parser
     self.name: Final[str] = name
-    self.aliases = tuple(aliases)
+    self.aliases: Final[tuple[str, ...]] = tuple(aliases)
     self._validate_aliases()
     self.type: Final[ArgParserType | None] = type
     self.required: Final[bool] = required
@@ -1041,8 +1041,8 @@ class _ConfigKwargsParser:
 
   def __init__(self, parser: ConfigParser, config_data: dict[str, object]):
     self._parser: Final[ConfigParser] = parser
-    self._kwargs: dict[str, object] = {}
-    self._processed_args: set[str] = set()
+    self._kwargs: Final[dict[str, object]] = {}
+    self._processed_args: Final[set[str]] = set()
     self._config_data: Final[dict[str, object]] = config_data
     self._parse()
 
@@ -1124,12 +1124,12 @@ class ConfigParser(Generic[ConfigResultObjectT]):
         raise TypeError(
             f"Default value '{default}' is not an instance of {cls.__name__}")
     self._default: Final[ConfigResultObjectT | None] = default
-    self._args: dict[str, ConfigArgParser] = {}
+    self._args: Final[dict[str, ConfigArgParser]] = {}
     self._default_arg: ConfigArgParser | None = None
-    self._arg_names: set[str] = set()
+    self._arg_names: Final[set[str]] = set()
     self._unused_properties_mode: Final[
         UnusedPropertiesMode] = unused_properties_mode
-    self._mutually_exclusive_groups: list[tuple[str, ...]] = []
+    self._mutually_exclusive_groups: Final[list[tuple[str, ...]]] = []
 
   @property
   def default(self) -> ConfigResultObjectT | None:

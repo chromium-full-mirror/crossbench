@@ -88,7 +88,7 @@ class _CrossbenchUiAutomatorDevice(android_device.AndroidDevice):
   """
 
   def __init__(self, serial: str = "", root_device: bool = True):
-    self._root_device = root_device
+    self._root_device: Final[bool] = root_device
     super().__init__(serial)
 
   @override
@@ -677,7 +677,7 @@ class AndroidAdbPortManager(PortManager):
 
   def __init__(self, platform: AndroidAdbPlatform, adb: Adb) -> None:
     super().__init__(platform)
-    self._adb: Adb = adb
+    self._adb: Final[Adb] = adb
 
   @property
   def host_platform(self) -> Platform:

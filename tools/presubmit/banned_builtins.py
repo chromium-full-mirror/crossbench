@@ -26,7 +26,7 @@ class BannedBuiltinVisitor(ast.NodeVisitor):
 
   def __init__(self) -> None:
     super().__init__()
-    self.violations: list[tuple[int, int, str]] = []
+    self.violations: Final[list[tuple[int, int, str]]] = []
 
   def visit_Call(self, node: ast.Call) -> None:
     func_name: str | None = None

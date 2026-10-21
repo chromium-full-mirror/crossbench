@@ -8,14 +8,14 @@ import abc
 import ast
 import enum
 import unittest
-from typing import Any, Callable, ClassVar, Iterable, TypeAlias
+from typing import Any, Callable, ClassVar, Final, Iterable, TypeAlias
 from unittest import mock
 
 from typing_extensions import override
 
 from tests import test_helper
-from tools.presubmit import (ast_checks, banned_builtins, constant_final,
-                             toplevel_files)
+from tools.presubmit import ast_checks, banned_builtins, constant_final, \
+    toplevel_files
 from tools.presubmit.toplevel_files import FileAction
 
 ChangedLines: TypeAlias = set[int] | None
@@ -143,9 +143,9 @@ class MockAffectedFile:
       changed_lines: ChangedLines = None,
       action: FileAction = FileAction.ADD,
   ) -> None:
-    self._path: str = path
-    self._changed_lines: ChangedLines = changed_lines
-    self._action: FileAction = action
+    self._path: Final[str] = path
+    self._changed_lines: Final[ChangedLines] = changed_lines
+    self._action: Final[FileAction] = action
 
   def LocalPath(self) -> str:  # noqa: N802
     return self._path

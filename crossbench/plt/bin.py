@@ -260,7 +260,7 @@ class BinaryNotFoundError(RuntimeError):
 class UnsupportedPlatformError(BinaryNotFoundError):
 
   def __init__(self, binary: Binary, platform: Platform, expected: str) -> None:
-    self.expected_platform_name: str = expected
+    self.expected_platform_name: Final[str] = expected
     super().__init__(binary, platform)
 
   @override
@@ -283,15 +283,15 @@ class Binary:
                macos: BinaryPathArg | None = None,
                win: BinaryPathArg | None = None,
                chromeos: BinaryPathArg | None = None) -> None:
-    self._name = name
-    self._default = self._convert(default)
-    self._posix = self._convert(posix)
-    self._linux = self._convert(linux)
-    self._android = self._convert(android)
-    self._macos = self._convert(macos)
-    self._win = self._convert(win)
+    self._name: Final[str] = name
+    self._default: Final[tuple[BinaryPath, ...]] = self._convert(default)
+    self._posix: Final[tuple[BinaryPath, ...]] = self._convert(posix)
+    self._linux: Final[tuple[BinaryPath, ...]] = self._convert(linux)
+    self._android: Final[tuple[BinaryPath, ...]] = self._convert(android)
+    self._macos: Final[tuple[BinaryPath, ...]] = self._convert(macos)
+    self._win: Final[tuple[BinaryPath, ...]] = self._convert(win)
     self._validate_win()
-    self._chromeos = self._convert(chromeos)
+    self._chromeos: Final[tuple[BinaryPath, ...]] = self._convert(chromeos)
     if not any((chromeos, default, posix, linux, android, macos, win)):
       raise ValueError("At least one platform binary must be provided")
 

@@ -36,8 +36,8 @@ class PortScope:
     self._manager: Final[PortManager] = manager
     self._parent_scope: Final[Self | None] = parent_scope
     assert parent_scope is not self
-    self._forwarded_ports: dict[int, int | str] = {}
-    self._reverse_forwarded_ports: dict[int, int] = {}
+    self._forwarded_ports: Final[dict[int, int | str]] = {}
+    self._reverse_forwarded_ports: Final[dict[int, int]] = {}
 
   @property
   def parent_scope(self) -> Self | None:
@@ -178,8 +178,8 @@ class PortManager(abc.ABC):
   """
 
   def __init__(self, platform: Platform, throw: bool = False) -> None:
-    self._platform: Platform = platform
-    self._throw: bool = throw
+    self._platform: Final[Platform] = platform
+    self._throw: Final[bool] = throw
     self._is_active: bool = False
     # Keeps track of scoped ports.
     self._port_scope: PortScope = PortScope(self, None)

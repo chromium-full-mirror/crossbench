@@ -941,8 +941,8 @@ class LateArgumentError(argparse.ArgumentTypeError):
 
   def __init__(self, flag: str, message: str) -> None:
     super().__init__(message)
-    self.flag = flag
-    self.message = message
+    self.flag: Final[str] = flag
+    self.message: Final[str] = message
 
 
 class DurationParseError(argparse.ArgumentTypeError):

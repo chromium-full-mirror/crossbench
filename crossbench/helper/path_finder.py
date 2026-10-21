@@ -53,7 +53,7 @@ class ChromiumBuildBinaryFinder(BasePathFinder):
   def __init__(self, platform: Platform, binary_name: str,
                candidates: tuple[pth.AnyPath, ...]) -> None:
     self._binary_name: Final[str] = binary_name
-    self._candidates = candidates
+    self._candidates: Final[tuple[pth.AnyPath, ...]] = candidates
     super().__init__(platform)
 
   @override
@@ -140,7 +140,7 @@ class V8ToolsFinder:
                platform: Platform,
                d8_binary: pth.AnyPath | None = None,
                v8_checkout: pth.AnyPath | None = None) -> None:
-    self.platform = platform
+    self.platform: Final[Platform] = platform
     self.d8_binary: pth.AnyPath | None = d8_binary
     self.v8_checkout: pth.AnyPath | None = None
     if v8_checkout:

@@ -11,7 +11,7 @@ import logging
 import shlex
 import subprocess
 import time
-from typing import IO, TYPE_CHECKING, Any, Mapping, cast
+from typing import IO, TYPE_CHECKING, Final, Mapping, cast
 
 from typing_extensions import override
 
@@ -23,6 +23,7 @@ if TYPE_CHECKING:
   from crossbench import path as pth
   from crossbench.flags.base import FlagsData
   from crossbench.plt.base import Platform
+  from crossbench.plt.pyodide import WebAdb
   from crossbench.plt.signals import Signals
   from crossbench.plt.types import CmdArg, ProcessIo
   from crossbench.types import JsonDict
@@ -40,13 +41,13 @@ class PyodideAdb(android_adb.Adb):
       self,
       host_platform: Platform | None = None,
       device_identifier: str | None = None,
-      webadb: Any | None = None,
+      webadb: WebAdb | None = None,
   ) -> None:
     if webadb is None and js is not None:
       webadb = js.webadb
     if webadb is None:
       raise ValueError("PyodideAdb requires a valid webadb JavaScript object.")
-    self._webadb: Any = webadb
+    self._webadb: Final[WebAdb] = webadb
     if host_platform is None:
       host_platform = PyodidePlatform(webadb=webadb)
     # Skip native binary discovery by manually initializing superclass state
@@ -58,7 +59,7 @@ class PyodideAdb(android_adb.Adb):
     self._device_info = device_info  # type: ignore[misc]
 
   @property
-  def webadb(self) -> Any:
+  def webadb(self) -> WebAdb:
     return self._webadb
 
   @override
@@ -282,7 +283,7 @@ class PyodideAndroidAdbPlatform(android_adb.AndroidAdbPlatform):
       host_platform: Platform | None = None,
       device_identifier: str | None = None,
       adb: android_adb.Adb | None = None,
-      webadb: Any | None = None,
+      webadb: WebAdb | None = None,
   ) -> None:
     if host_platform is None:
       host_platform = PyodidePlatform(webadb=webadb)
@@ -302,7 +303,7 @@ class PyodideAndroidAdbPlatform(android_adb.AndroidAdbPlatform):
     return True
 
   @property
-  def webadb(self) -> Any:
+  def webadb(self) -> WebAdb:
     assert isinstance(self.adb, PyodideAdb)
     return self.adb.webadb
 
@@ -458,10 +459,10 @@ class PyodideStreamingPopen(subprocess.Popen):
       stderr: ProcessIo = None,
       local_log_file: IO[str] | None = None,
   ) -> None:
-    self._platform: PyodideAndroidAdbPlatform = platform
-    self._proc_id: int = proc_id
-    self._cmd: str = cmd
-    self._local_log_file: IO[str] | None = local_log_file
+    self._platform: Final[PyodideAndroidAdbPlatform] = platform
+    self._proc_id: Final[int] = proc_id
+    self._cmd: Final[str] = cmd
+    self._local_log_file: Final[IO[str] | None] = local_log_file
     self._last_log_offset: int = 0
     self.returncode: int | None = None
     self.args = cmd

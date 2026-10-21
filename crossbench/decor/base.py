@@ -7,7 +7,7 @@ from __future__ import annotations
 import abc
 import datetime as dt
 import enum
-from typing import TYPE_CHECKING, ClassVar, Generic, Self, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Final, Generic, Self, TypeVar
 
 from crossbench import plt
 from crossbench.config import ConfigParser
@@ -28,7 +28,7 @@ class DecoratorConfigParser(ConfigParser[DecoratorT]):
 
   def __init__(self, probe_cls: type[DecoratorT]) -> None:
     super().__init__(probe_cls)
-    self._probe_cls = probe_cls
+    self._probe_cls: Final[type[DecoratorT]] = probe_cls
 
 
 class Decorator(abc.ABC, Generic[DecoratorTargetT]):
@@ -52,7 +52,7 @@ class Decorator(abc.ABC, Generic[DecoratorTargetT]):
 
   def __init__(self) -> None:
     assert self.name is not None, f"{type(self).__name__} must have a name"
-    self._targets: set[DecoratorTargetT] = set()
+    self._targets: Final[set[DecoratorTargetT]] = set()
 
   def __str__(self) -> str:
     return type(self).__name__
@@ -97,13 +97,14 @@ class DecoratorContext(abc.ABC, Generic[DecoratorT, DecoratorTargetT]):
     FAILURE = enum.auto()
 
   def __init__(self, decorator: DecoratorT, target: DecoratorTargetT) -> None:
-    self._decorator = decorator
-    self._target: DecoratorTargetT = target
-    self._state = StateMachine(self._State.READY)
+    self._decorator: Final[DecoratorT] = decorator
+    self._target: Final[DecoratorTargetT] = target
+    self._state: Final[StateMachine[DecoratorContext._State]] = StateMachine(
+        self._State.READY)
     self._is_success: bool = False
     self._start_time: dt.datetime | None = None
     self._stop_time: dt.datetime | None = None
-    self._label = f"{type(self).__name__} {self.name}"
+    self._label: Final[str] = f"{type(self).__name__} {self.name}"
 
   @property
   def name(self) -> str:

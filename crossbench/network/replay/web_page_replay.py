@@ -53,10 +53,11 @@ class WprBase(abc.ABC):
                platform: Platform = PLATFORM) -> None:
     self._platform: Final[Platform] = platform
     self._process: subprocess.Popen | None = None
-    self._log_path: pth.LocalPath | None = self._validate_log_path(log_path)
+    self._log_path: Final[pth.LocalPath
+                          | None] = self._validate_log_path(log_path)
     self._log_file: TextIO | None = None
     self._bin_path: Final[pth.AnyPath] = bin_path
-    self._run_as_root: bool = run_as_root
+    self._run_as_root: Final[bool] = run_as_root
 
     self._num_parsed_ports: int = 0
     self._host_http_port: int = 0
@@ -384,10 +385,10 @@ class WprReplayServer(WprBase):
     super().__init__(archive_path, bin_path, http_port, https_port, host,
                      inject_scripts, key_file, cert_file, log_path, run_as_root,
                      platform)
-    self._no_archive_certificates = no_archive_certificates
-    self._rules_file: pth.AnyPath | None = rules_file
-    self._fuzzy_url_matching: bool = fuzzy_url_matching
-    self._serve_chronologically: bool = serve_chronologically
+    self._no_archive_certificates: Final[bool] = no_archive_certificates
+    self._rules_file: Final[pth.AnyPath | None] = rules_file
+    self._fuzzy_url_matching: Final[bool] = fuzzy_url_matching
+    self._serve_chronologically: Final[bool] = serve_chronologically
 
   @override
   def _validate_archive_path(self, path: pth.AnyPath) -> pth.AnyPath:

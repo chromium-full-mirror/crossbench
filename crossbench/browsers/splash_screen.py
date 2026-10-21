@@ -65,7 +65,7 @@ class BaseURLSplashScreen(SplashScreen, metaclass=abc.ABCMeta):
 
   def __init__(self, timeout: float = 2) -> None:
     super().__init__()
-    self._timeout = timeout
+    self._timeout: Final[float] = timeout
 
   def run(self, action: Actions, info: SplashScreenData) -> None:
     action.show_url(self.get_url(info))
@@ -144,7 +144,7 @@ class URLSplashScreen(BaseURLSplashScreen):
 
   def __init__(self, url: str, timeout: float = 2) -> None:
     super().__init__(timeout)
-    self._url = url
+    self._url: Final[str] = url
 
   @override
   def get_url(self, info: SplashScreenData) -> str:

@@ -15,13 +15,9 @@ from crossbench.plt.ssh_port_manager import SshPortManager
 
 if TYPE_CHECKING:
   from crossbench import path as pth
-  from crossbench.plt.arch import MachineArch
-  from crossbench.plt.base import Platform
-  from crossbench.plt.details import CpuDetails
   from crossbench.plt.port_manager import PortManager
-  from crossbench.plt.types import CmdArg, CmdArgs, ListCmdArgs, \
-      ProcessInfo, TupleCmdArgs
-  from crossbench.types import JsonDict
+  from crossbench.plt.types import CmdArg, CmdArgs, ListCmdArgs, ProcessInfo, \
+      TupleCmdArgs
 
 
 class LinuxSshPlatform(SshPlatformMixin, RemoteLinuxPlatform):
@@ -35,13 +31,6 @@ class LinuxSshPlatform(SshPlatformMixin, RemoteLinuxPlatform):
       "-o",
       "CanonicalizeHostname=no",
   )
-
-  def __init__(self, host_platform: Platform, host: str, port: int,
-               ssh_port: int, ssh_user: str) -> None:
-    super().__init__(host_platform, host, port, ssh_port, ssh_user)
-    self._machine: MachineArch | None = None
-    self._system_details: JsonDict | None = None
-    self._cpu_details: CpuDetails | None = None
 
   def _create_port_manager(self) -> PortManager:
     return SshPortManager(self)

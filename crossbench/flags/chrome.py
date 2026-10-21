@@ -51,10 +51,10 @@ class ChromeFlags(Flags):
     return ChromeFlags(initial_data)
 
   def __init__(self, initial_data: FlagsData = None) -> None:
-    self._features: ChromeFeatures = ChromeFeatures()
-    self._blink_features: ChromeBlinkFeatures = ChromeBlinkFeatures()
-    self._js_flags: JSFlags = JSFlags()
-    self._extensions: ChromeExtensions = ChromeExtensions()
+    self._features: Final[ChromeFeatures] = ChromeFeatures()
+    self._blink_features: Final[ChromeBlinkFeatures] = ChromeBlinkFeatures()
+    self._js_flags: Final[JSFlags] = JSFlags()
+    self._extensions: Final[ChromeExtensions] = ChromeExtensions()
     super().__init__(initial_data)
 
   @override

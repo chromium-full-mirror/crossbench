@@ -27,8 +27,8 @@ class SshPortManager(PortManager):
   def __init__(self, platform: Platform) -> None:
     assert isinstance(platform, SshPlatformMixin)
     super().__init__(platform)
-    self._forward_popens: dict[int, subprocess.Popen] = {}
-    self._reverse_forward_popens: dict[int, subprocess.Popen] = {}
+    self._forward_popens: Final[dict[int, subprocess.Popen]] = {}
+    self._reverse_forward_popens: Final[dict[int, subprocess.Popen]] = {}
 
   def _build_ssh_cmd(self, *args: CmdArg, shell: bool = False) -> ListCmdArgs:
     assert isinstance(self.platform, SshPlatformMixin)

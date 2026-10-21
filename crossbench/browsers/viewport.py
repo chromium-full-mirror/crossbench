@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import enum
 from argparse import ArgumentTypeError
-from typing import ClassVar
+from typing import ClassVar, Final
 
 from crossbench.parse import NumberParser
 
@@ -71,11 +71,11 @@ class Viewport:
                x: int = 10,
                y: int = 50,
                mode: ViewportMode = ViewportMode.SIZE) -> None:
-    self._width = width
-    self._height = height
-    self._x = x
-    self._y = y
-    self._mode = mode
+    self._width: Final[int] = width
+    self._height: Final[int] = height
+    self._x: Final[int] = x
+    self._y: Final[int] = y
+    self._mode: Final[ViewportMode] = mode
     self._validate()
 
   def _validate(self) -> None:

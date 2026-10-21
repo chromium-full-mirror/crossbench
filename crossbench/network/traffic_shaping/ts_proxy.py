@@ -87,14 +87,14 @@ class TsProxyServer:
     self._proc: TsProxyProcess | None = None
     self._ts_proxy_path: Final[pth.LocalPath] = PathParser.existing_file_path(
         ts_proxy_path)
-    self._socks_proxy_port = socks_proxy_port
-    self._host = host
-    self._http_port = http_port
-    self._https_port = https_port
-    self._rtt_ms = rtt_ms
-    self._in_kbps = in_kbps
-    self._out_kbps = out_kbps
-    self._window = window
+    self._socks_proxy_port: Final[int | None] = socks_proxy_port
+    self._host: Final[str | None] = host
+    self._http_port: Final[int | None] = http_port
+    self._https_port: Final[int | None] = https_port
+    self._rtt_ms: Final[int | None] = rtt_ms
+    self._in_kbps: Final[int | None] = in_kbps
+    self._out_kbps: Final[int | None] = out_kbps
+    self._window: Final[int | None] = window
     self._verbose: Final[bool] = verbose
     self.verify_ports(http_port, https_port)
 
@@ -194,14 +194,14 @@ class TsProxyProcess:
                window: int | None = None,
                verbose: bool = False,
                timeout: float = ts_proxy_settings.DEFAULT_TIMEOUT) -> None:
-    self._platform = platform
+    self._platform: Final[Platform] = platform
     """Start TsProxy server and verify that it started."""
     cmd: ListCmdArgs = [
         sys.executable or "python3",
         ts_proxy_path,
     ]
     self._socks_proxy_port: int | None = socks_proxy_port
-    self._initial_socks_proxy_port: int | None = socks_proxy_port
+    self._initial_socks_proxy_port: Final[int | None] = socks_proxy_port
     if not socks_proxy_port:
       # Use port 0 so tsproxy picks a random available port.
       cmd.append("--port=0")
@@ -215,17 +215,17 @@ class TsProxyProcess:
     self._out_kbps: int | None = out_kbps
     if out_kbps:
       cmd.append(f"--outkbps={out_kbps}")
-    self._window: int | None = window
+    self._window: Final[int | None] = window
     if window:
       cmd.append(f"--window={window}")
     self._rtt_ms: int | None = rtt_ms
     if rtt_ms:
       cmd.append(f"--rtt={rtt_ms}")
-    self._host: str | None = host
+    self._host: Final[str | None] = host
     if host:
       cmd.append(f"--desthost={host}")
-    self._http_port: int | None = http_port
-    self._https_port: int | None = https_port
+    self._http_port: Final[int | None] = http_port
+    self._https_port: Final[int | None] = https_port
     TsProxyServer.verify_ports(http_port, https_port)
     mapports = []
     if https_port:
@@ -246,7 +246,7 @@ class TsProxyProcess:
         universal_newlines=True)
     assert process and process.stdout and process.stdin, (
         "Could not start ts_proxy")
-    self._process = process
+    self._process: Final[subprocess.Popen[str]] = process
     if stdout := process.stdout:
       self._stdout: IO[str] = stdout
     else:
@@ -395,7 +395,7 @@ class TsProxyTrafficShaper(TrafficShaper):
         out_kbps=out_kbps,
         window=window)
     # TODO: support custom name
-    self._name = "tsproxy"
+    self._name: Final[str] = "tsproxy"
 
   @property
   def ts_proxy(self) -> TsProxyServer:

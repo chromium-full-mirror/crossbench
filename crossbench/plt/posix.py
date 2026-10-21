@@ -542,8 +542,8 @@ class PosixPlatform(Platform, metaclass=abc.ABCMeta):
 class RemotePosixEnviron(Environ):
 
   def __init__(self, platform: PosixPlatform) -> None:
-    self._platform = platform
-    self._environ = {}
+    self._platform: Final[PosixPlatform] = platform
+    self._environ: Final[dict[str, str]] = {}
     for line in self._platform.sh_stdout("env").splitlines():
       parts = line.split("=", maxsplit=1)
       if len(parts) == 2:

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import ast
 import pathlib
-from typing import Any
+from typing import Any, Final
 
 from tools.presubmit.banned_builtins import BANNED_BUILTIN_FUNCTIONS, \
     BannedBuiltinViolation
@@ -24,8 +24,8 @@ class CombinedAstVisitor(ast.NodeVisitor):
 
   def __init__(self) -> None:
     super().__init__()
-    self.banned_builtin_violations: list[tuple[int, int, str]] = []
-    self.constant_final_violations: list[tuple[int, int, str]] = []
+    self.banned_builtin_violations: Final[list[tuple[int, int, str]]] = []
+    self.constant_final_violations: Final[list[tuple[int, int, str]]] = []
 
   def visit_Module(self, node: ast.Module) -> None:
     # Check top-level statements for constants marked Final

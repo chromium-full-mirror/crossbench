@@ -7,7 +7,7 @@ from __future__ import annotations
 import contextlib
 import datetime as dt
 import logging
-from typing import Iterator, Self
+from typing import Final, Iterator, Self
 
 
 class Durations:
@@ -16,7 +16,7 @@ class Durations:
   """
 
   def __init__(self) -> None:
-    self._durations: dict[str, dt.timedelta] = {}
+    self._durations: Final[dict[str, dt.timedelta]] = {}
 
   def __getitem__(self, name: str) -> dt.timedelta:
     return self._durations[name]
@@ -52,8 +52,8 @@ class TimeScope:
   """
 
   def __init__(self, message: str, level: int = 3) -> None:
-    self._message = message
-    self._level = level
+    self._message: Final[str] = message
+    self._level: Final[int] = level
     self._start: dt.datetime | None = None
     self._duration: dt.timedelta = dt.timedelta()
 

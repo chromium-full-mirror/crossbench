@@ -13,7 +13,7 @@ VersionPartsData: TypeAlias = Iterable[int] | int
 class VersionParseError(ValueError):
 
   def __init__(self, name: str, msg: str, version_str: str) -> None:
-    self._version_str = version_str
+    self._version_str: Final[str] = version_str
     super().__init__(f"Invalid {name} {version_str!r}: {msg}")
 
   @property

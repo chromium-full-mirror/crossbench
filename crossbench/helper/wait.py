@@ -8,7 +8,7 @@ import datetime as dt
 import logging
 import math
 import time
-from typing import TYPE_CHECKING, Iterator, NamedTuple
+from typing import TYPE_CHECKING, Final, Iterator, NamedTuple
 
 if TYPE_CHECKING:
   from crossbench.runner.timing import AnyTime, AnyTimeUnit
@@ -54,7 +54,7 @@ class WaitRange:
                max: AnyTime | None = None,
                max_iterations: float = math.inf,
                delay: AnyTime = 0) -> None:
-    self._min: dt.timedelta = as_timedelta(min)
+    self._min: Final[dt.timedelta] = as_timedelta(min)
     assert self._min.total_seconds() > 0
     if not max:
       self._max: dt.timedelta = self._min * 10
@@ -62,13 +62,13 @@ class WaitRange:
       self._max = as_timedelta(max)
     assert self._min <= self._max
     assert 1.0 < factor
-    self._factor: float = factor
-    self._timeout: dt.timedelta = as_timedelta(timeout)
+    self._factor: Final[float] = factor
+    self._timeout: Final[dt.timedelta] = as_timedelta(timeout)
     assert 0 < self._timeout.total_seconds()
-    self._delay = as_timedelta(delay)
+    self._delay: Final[dt.timedelta] = as_timedelta(delay)
     assert self._delay <= self._timeout
     assert max_iterations > 0
-    self._max_iterations: int | float = max_iterations
+    self._max_iterations: Final[int | float] = max_iterations
 
   @property
   def timeout(self) -> dt.timedelta:

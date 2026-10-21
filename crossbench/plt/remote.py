@@ -61,7 +61,7 @@ class RemotePopen(subprocess.Popen):
                stdout: ProcessIo = None,
                stderr: ProcessIo = None,
                stdin: ProcessIo = None) -> None:
-    self._platform: Platform = platform
+    self._platform: Final[Platform] = platform
     assert self._platform.is_remote, (
         f"Cannot create remote process on local platform {self._platform}")
     self._remote_pid: int | None = None

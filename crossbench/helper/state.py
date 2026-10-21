@@ -5,14 +5,14 @@
 from __future__ import annotations
 
 import enum
-from typing import Generic, Iterable, TypeVar, cast
+from typing import Final, Generic, Iterable, TypeVar, cast
 
 
 class UnexpectedStateError(RuntimeError):
 
   def __init__(self, state: BaseState, expected: Iterable[BaseState]) -> None:
-    self._state = state
-    self._expected = tuple(expected)
+    self._state: Final[BaseState] = state
+    self._expected: Final[tuple[BaseState, ...]] = tuple(expected)
     names = ", ".join(tuple(s.name for s in expected))
     super().__init__(f"Unexpected state got={state.name} expected=({names})")
 
