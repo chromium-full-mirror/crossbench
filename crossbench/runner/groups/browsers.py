@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Final, Iterable
 
 from typing_extensions import override
 
@@ -25,7 +25,7 @@ class BrowsersRunGroup(RunGroup):
   def __init__(self, story_groups: Iterable[StoriesRunGroup],
                throw: bool) -> None:
     super().__init__(throw)
-    self._story_groups = tuple(story_groups)
+    self._story_groups: Final[tuple[StoriesRunGroup, ...]] = tuple(story_groups)
     if not story_groups:
       raise ValueError("No story groups provided")
     self._set_path(self._story_groups[0].path.parents[1])

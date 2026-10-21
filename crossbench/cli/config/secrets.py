@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import dataclasses
 import secrets
-from typing import TYPE_CHECKING, Self, TypeVar
+from typing import TYPE_CHECKING, Final, Self, TypeVar
 
 from typing_extensions import override
 
@@ -23,9 +23,9 @@ class SecretsMergeError(ValueError):
 
   def __init__(self, name: str, primary: Secret, fallback: Secret) -> None:
     super().__init__(f"Conflicting {name} secrets: {primary} vs {fallback}")
-    self.name = name
-    self.primary = primary
-    self.fallback = fallback
+    self.name: Final[str] = name
+    self.primary: Final[Secret] = primary
+    self.fallback: Final[Secret] = fallback
 
 
 @dataclasses.dataclass(frozen=True)

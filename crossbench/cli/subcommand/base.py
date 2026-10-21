@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, ClassVar, Sequence
+from typing import TYPE_CHECKING, ClassVar, Final, Sequence
 
 from crossbench.cli.parser import CBArgumentParser, CBNamespace
 
@@ -21,7 +21,7 @@ class CrossbenchSubcommand(abc.ABC):
   NAME: ClassVar[str] = ""
 
   def __init__(self, cli: CrossBenchCLI) -> None:
-    self._cli = cli
+    self._cli: Final[CrossBenchCLI] = cli
     self._parser: argparse.ArgumentParser | None = None
     self._parser_populated = False
 

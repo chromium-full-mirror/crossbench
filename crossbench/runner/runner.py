@@ -297,36 +297,37 @@ class Runner:
           RequiredDeviceConfigMode.SET),
       pause_on_error: bool = False,
   ) -> None:
-    self.out_dir = out_dir.absolute()
-    self._disabled_probes: frozenset[str] = frozenset(disabled_probes)
+    self.out_dir: Final[pth.LocalPath] = out_dir.absolute()
+    self._disabled_probes: Final[frozenset[str]] = frozenset(disabled_probes)
     self._required_device_config_mode = required_device_config_mode
-    self._device_config_setters: list[DeviceConfigSetter] = []
+    self._device_config_setters: Final[list[DeviceConfigSetter]] = []
     assert not self.out_dir.exists(), f"out_dir={self.out_dir} exists already"
     self.out_dir.mkdir(parents=True)
-    self._state = RunnerStateMachine(self)
-    self._timing = timing
-    self._cool_down_threshold: ThermalStatus | None = cool_down_threshold
-    self._browsers: tuple[Browser, ...] = tuple(browsers)
+    self._state: Final[RunnerStateMachine] = RunnerStateMachine(self)
+    self._timing: Final[Timing] = timing
+    self._cool_down_threshold: Final[ThermalStatus | None] = cool_down_threshold
+    self._browsers: Final[tuple[Browser, ...]] = tuple(browsers)
     self._validate_browser_labels()
-    self._benchmark = benchmark
-    self._stories = tuple(benchmark.stories)
+    self._benchmark: Final[Benchmark] = benchmark
+    self._stories: Final[tuple[Story, ...]] = tuple(benchmark.stories)
     self._repetitions = NumberParser.positive_int(repetitions, "repetitions")
     self._warmup_repetitions = NumberParser.positive_zero_int(
         warmup_repetitions, "warmup repetitions")
-    self._cache_temperatures: tuple[CacheTemperature, ...] = tuple(
+    self._cache_temperatures: Final[tuple[CacheTemperature, ...]] = tuple(
         ObjectParser.enum_list("cache_temperatures", CacheTemperature,
                                cache_temperatures))
     self._probes: dict[str, Probe] = {}
-    self._default_probes: list[Probe] = []
+    self._default_probes: Final[list[Probe]] = []
     # Contains both measure and warmup runs:
     self._all_runs: list[Run] = []
     self._measured_runs: list[Run] = []
-    self._thread_mode = thread_mode
-    self._exceptions = exception.Annotator(throw)
-    self._platform = platform or plt.PLATFORM
-    self._env = RunnerEnv(self.platform, self.out_dir, self.browsers,
-                          self.probes, self.repetitions, env_config,
-                          env_validation_mode)
+    self._thread_mode: Final[ThreadMode] = thread_mode
+    self._exceptions: Final[exception.Annotator] = exception.Annotator(throw)
+    self._platform: Final[plt.Platform] = platform or plt.PLATFORM
+    self._env: Final[RunnerEnv] = RunnerEnv(self.platform, self.out_dir,
+                                            self.browsers, self.probes,
+                                            self.repetitions, env_config,
+                                            env_validation_mode)
     self._prepare_benchmark()
     self._prepare_probes(probes)
     self._sort_probes()
@@ -338,10 +339,11 @@ class Runner:
     self._repetitions_groups: tuple[RepetitionsRunGroup, ...] = ()
     self._story_groups: tuple[StoriesRunGroup, ...] = ()
     self._browser_group: BrowsersRunGroup | None = None
-    self._create_symlinks: bool = create_symlinks
-    self._step_by_step_mode: bool = step_by_step_mode
-    self._ignore_partial_failures: bool = ignore_partial_failures
-    self._pause_controller = PauseController(pause_on_error=pause_on_error)
+    self._create_symlinks: Final[bool] = create_symlinks
+    self._step_by_step_mode: Final[bool] = step_by_step_mode
+    self._ignore_partial_failures: Final[bool] = ignore_partial_failures
+    self._pause_controller: Final[PauseController] = PauseController(
+        pause_on_error=pause_on_error)
 
   def check_pause(self, run: Run) -> ResumeMode:
     """Pauses and prompts for a ResumeMode if requested or if a run failed."""

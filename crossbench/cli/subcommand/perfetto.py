@@ -7,7 +7,7 @@ from __future__ import annotations
 import abc
 import datetime as dt
 import json
-from typing import TYPE_CHECKING, Mapping, Sequence
+from typing import TYPE_CHECKING, Final, Mapping, Sequence
 
 import tabulate as tbl
 from typing_extensions import TypeAlias, override
@@ -105,7 +105,7 @@ class PerfettoCrossbenchSubcommand(CrossbenchSubcommand):
 class PerfettoBaseSubcommand(abc.ABC):
 
   def __init__(self, parent: PerfettoCrossbenchSubcommand) -> None:
-    self._parent = parent
+    self._parent: Final[PerfettoCrossbenchSubcommand] = parent
     self._parser = self.add_cli_parser()
     self._parser.set_defaults(perfetto_subcommand=self)
 

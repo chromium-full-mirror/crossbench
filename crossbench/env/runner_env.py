@@ -69,10 +69,10 @@ class RunnerEnv(BaseEnv):
                validation_mode: ValidationMode = ValidationMode.THROW) -> None:
     super().__init__(platform, config, validation_mode)
     self._wait_until: dt.datetime = dt.datetime.now()
-    self._out_dir: pth.LocalPath = out_dir
-    self._browsers: tuple[Browser, ...] = tuple(browsers)
+    self._out_dir: Final[pth.LocalPath] = out_dir
+    self._browsers: Final[tuple[Browser, ...]] = tuple(browsers)
     self._probes: tuple[Probe, ...] = tuple(probes)
-    self._repetitions: int = repetitions
+    self._repetitions: Final[int] = repetitions
 
   @property
   def repetitions(self) -> int:

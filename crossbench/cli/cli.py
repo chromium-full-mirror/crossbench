@@ -12,7 +12,7 @@ import os
 import sys
 import textwrap
 import traceback
-from typing import TYPE_CHECKING, Iterator, Sequence, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Final, Iterator, Sequence, TypeAlias, TypeVar
 
 import tabulate as tbl
 from immutabledict import immutabledict
@@ -211,16 +211,17 @@ class CrossBenchCLI:
   RUNNER_CLS: type[Runner] = Runner
 
   def __init__(self, enable_logging: bool = True) -> None:
-    self._enable_logging: bool = enable_logging
+    self._enable_logging: Final[bool] = enable_logging
     self._console_handler: logging.StreamHandler | None = None
-    self.parser = MainCrossBenchArgumentParser(
-        description=("A cross browser and cross benchmark runner "
-                     "with configurable measurement probes.\n"))
-    self._subparsers = self._setup_subparsers()
+    self.parser: Final[
+        MainCrossBenchArgumentParser] = MainCrossBenchArgumentParser(
+            description=("A cross browser and cross benchmark runner "
+                         "with configurable measurement probes.\n"))
+    self._subparsers: Final[Subparsers] = self._setup_subparsers()
     self._setup_parser()
     self._last_subcommand: CrossbenchSubcommand | None = None
     self.args: CBNamespace = CBNamespace()
-    self._benchmark_subcommands: BenchmarkSubcommands = (
+    self._benchmark_subcommands: Final[BenchmarkSubcommands] = (
         self._setup_subcommands())
 
   def _setup_subcommands(self) -> BenchmarkSubcommands:

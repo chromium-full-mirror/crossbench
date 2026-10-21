@@ -9,7 +9,7 @@ import datetime as dt
 import itertools
 import logging
 import sys
-from typing import TYPE_CHECKING, Iterable, Sequence
+from typing import TYPE_CHECKING, Final, Iterable, Sequence
 
 from typing_extensions import override
 
@@ -95,8 +95,8 @@ class BenchmarkSubcommand(CrossbenchSubcommand):
 
   def __init__(self, cli: CrossBenchCLI,
                benchmark_cls: type[Benchmark]) -> None:
-    self._benchmark_cls = benchmark_cls
-    self._runner_cls: type[Runner] = Runner
+    self._benchmark_cls: Final[type[Benchmark]] = benchmark_cls
+    self._runner_cls: Final[type[Runner]] = Runner
     self._runner: Runner | None = None
     super().__init__(cli)
 

@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Final, Iterable
 
 from typing_extensions import Self, override
 
@@ -43,9 +43,9 @@ class RepetitionsRunGroup(RunGroup):
 
   def __init__(self, throw: bool = False) -> None:
     super().__init__(throw)
-    self._cache_temperatures_groups: list[CacheTemperaturesRunGroup] = []
-    self._cache_temperature_repetitions_groups: dict[
-        str, CacheTemperatureRepetitionsRunGroup] = {}
+    self._cache_temperatures_groups: Final[list[CacheTemperaturesRunGroup]] = []
+    self._cache_temperature_repetitions_groups: Final[dict[
+        str, CacheTemperatureRepetitionsRunGroup]] = {}
     self._story: Story | None = None
     self._browser: Browser | None = None
 
@@ -127,10 +127,10 @@ class CacheTemperatureRepetitionsRunGroup(RunGroup):
                repetitions_group: RepetitionsRunGroup,
                throw: bool = False) -> None:
     super().__init__(throw)
-    self._repetitions_group = repetitions_group
+    self._repetitions_group: Final[RepetitionsRunGroup] = repetitions_group
     self._set_path(repetitions_group.path)
     self._cache_temperature: str = ""
-    self._runs: list[Run] = []
+    self._runs: Final[list[Run]] = []
 
   @property
   def repetitions_group(self) -> RepetitionsRunGroup:

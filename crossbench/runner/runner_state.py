@@ -11,7 +11,7 @@ import enum
 import json
 import os
 import threading
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING, Final, Iterator
 
 from typing_extensions import override
 
@@ -40,16 +40,15 @@ class RunnerStateMachine(StateMachine[RunnerState]):
 
   def __init__(self, runner: Runner) -> None:
     super().__init__(RunnerState.INITIAL)
-    self._status_lock: threading.Lock = threading.Lock()
-    self._status_file: pth.LocalPath = runner.out_dir / "status.json"
-    self._active_runs: set[int] = set()
+    self._status_lock: Final[threading.Lock] = threading.Lock()
+    self._status_file: Final[pth.LocalPath] = runner.out_dir / "status.json"
+    self._active_runs: Final[set[int]] = set()
     self._pid: int | None = os.getpid()
     self._success_count: int = 0
     self._failed_count: int = 0
     self._total_runs: int = 0
-    self._runs_dir_str: str = str(runner.runs_dir)
-    self._created: str = dt.datetime.now().isoformat()
-    self._interrupted: bool = False
+    self._runs_dir_str: Final[str] = str(runner.runs_dir)
+    self._created: Final[str] = dt.datetime.now().isoformat()
     atexit.register(self._atexit_handler)
     self._write_nolock()
 

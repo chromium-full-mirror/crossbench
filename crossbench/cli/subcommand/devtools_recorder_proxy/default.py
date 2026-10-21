@@ -78,14 +78,14 @@ class CrossbenchDevToolsRecorderProxy:
   _websocket: ws_server.ServerConnection
 
   def __init__(self, use_auth_token: bool = True) -> None:
-    self._token: str = secrets.token_hex(16)
-    self._use_auth_token: bool = use_auth_token
+    self._token: Final[str] = secrets.token_hex(16)
+    self._use_auth_token: Final[bool] = use_auth_token
     self._print_cmd_output: bool = False
     self._port: int = self.DEFAULT_PORT
-    self._state = StateMachine(State.CONNECTED)
+    self._state: Final[StateMachine[State]] = StateMachine(State.CONNECTED)
     self._crossbench_task: asyncio.Task | None = None
     self._crossbench_process: Process | None = None
-    self._tmp_json = pth.LocalPath(
+    self._tmp_json: Final[pth.LocalPath] = pth.LocalPath(
         tempfile.mkdtemp("crossbench_proxy")) / "devtools_recorder.json"
 
   def run(self) -> None:

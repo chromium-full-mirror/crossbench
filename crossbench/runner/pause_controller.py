@@ -37,7 +37,7 @@ class PauseController:
   """
 
   def __init__(self, pause_on_error: bool) -> None:
-    self._pause_on_error: bool = pause_on_error
+    self._pause_on_error: Final[bool] = pause_on_error
     self._pause_requested: Final[threading.Event] = threading.Event()
 
   def __enter__(self) -> Self:

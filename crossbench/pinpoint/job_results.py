@@ -8,7 +8,7 @@ import datetime as dt
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import cache, partial
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Final
 from urllib.parse import urlparse
 
 import google.cloud.storage as gcloud_storage  # type: ignore
@@ -31,17 +31,17 @@ class PinpointJobResults:
       self,
       job_id: str,
   ) -> None:
-    self.job_id: str = job_id
-    self.data: JsonDict = fetch_job_config(job_id, full=True)
+    self.job_id: Final[str] = job_id
+    self.data: Final[JsonDict] = fetch_job_config(job_id, full=True)
     with annotate("Parsing job results"):
       if self.status.lower() != "completed":
         raise ValueError(f"Job is not completed. Status: {self.status}")
 
-      self.name: str = f"pinpoint_{self.benchmark}_{self.bot}"
-      self.results_url: str | None = ObjectParser.optional_str(
+      self.name: Final[str] = f"pinpoint_{self.benchmark}_{self.bot}"
+      self.results_url: Final[str | None] = ObjectParser.optional_str(
           self.data.get("results_url"), "results_url")
       state = ObjectParser.sequence(self.data.get("state", ()), "state")
-      self.variants: list[PinpointVariantResults] = [
+      self.variants: Final[list[PinpointVariantResults]] = [
           PinpointVariantResults(ObjectParser.dict(v, f"state[{i}]"), i)
           for i, v in enumerate(state)
       ]
@@ -174,16 +174,17 @@ class PinpointJobResults:
 class PinpointVariantResults:
 
   def __init__(self, data: JsonDict, index: int) -> None:
-    self.data = data
-    self.index = index
-    self.name = self.form_variant_name()
+    self.data: Final[JsonDict] = data
+    self.index: Final[int] = index
+    self.name: Final[str] = self.form_variant_name()
     attempts = ObjectParser.sequence(data.get("attempts", ()), "attempts")
-    self.attempts = [
+    self.attempts: Final[list[PinpointAttemptResults]] = [
         PinpointAttemptResults(
             ObjectParser.dict(attempt, f"attempts[{attempt_index}]"),
             attempt_index) for attempt_index, attempt in enumerate(attempts)
     ]
-    self.download_count = sum(a.download_count for a in self.attempts)
+    self.download_count: Final[int] = sum(
+        a.download_count for a in self.attempts)
 
   @property
   def change(self) -> JsonDict:
@@ -210,10 +211,11 @@ class PinpointVariantResults:
 class PinpointAttemptResults:
 
   def __init__(self, data: JsonDict, index: int) -> None:
-    self.data = data
-    self.index = index
-    self.cas_isolate = self.find_results_isolate()
-    self.perfetto_trace_url_by_name = self.find_perfetto_traces()
+    self.data: Final[JsonDict] = data
+    self.index: Final[int] = index
+    self.cas_isolate: Final[str | None] = self.find_results_isolate()
+    self.perfetto_trace_url_by_name: Final[dict[
+        str, str]] = self.find_perfetto_traces()
 
     self.download_count = len(self.perfetto_trace_url_by_name)
     if self.cas_isolate:

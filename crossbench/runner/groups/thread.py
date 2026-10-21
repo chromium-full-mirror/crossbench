@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Final, Iterable
 
 from ordered_set import OrderedSet
 
@@ -31,14 +31,15 @@ class RunThreadGroup(threading.Thread):
                index: int = 0,
                throw: bool = False) -> None:
     super().__init__()
-    self._index = index
-    self._exceptions = exception.Annotator(throw)
-    self._runs = tuple(runs)
+    self._index: Final[int] = index
+    self._exceptions: Final[exception.Annotator] = exception.Annotator(throw)
+    self._runs: Final[tuple[Run, ...]] = tuple(runs)
     assert self._runs, "Got unexpected empty runs list"
-    self._runner: Runner = self._runs[0].runner
-    self._total_run_count = len(self._runner.runs)
-    self._browser_sessions: OrderedSet[BrowserSessionRunGroup] = OrderedSet(
-        run.browser_session for run in self._runs)
+    self._runner: Final[Runner] = self._runs[0].runner
+    self._total_run_count: Final[int] = len(self._runner.runs)
+    self._browser_sessions: Final[
+        OrderedSet[BrowserSessionRunGroup]] = OrderedSet(
+            run.browser_session for run in self._runs)
     self.is_dry_run: bool = False
     self._verify_contains_all_browser_session_runs()
     self._verify_same_runner()

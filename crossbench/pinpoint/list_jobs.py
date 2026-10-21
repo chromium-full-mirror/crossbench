@@ -30,8 +30,8 @@ if TYPE_CHECKING:
 class Column:
 
   def __init__(self, name: str, description: str) -> None:
-    self.name = name
-    self.description = description
+    self.name: Final[str] = name
+    self.description: Final[str] = description
 
 
 EXTRA_COLUMNS: Final[list[Column]] = [

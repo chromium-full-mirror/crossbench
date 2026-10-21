@@ -7,7 +7,7 @@ from __future__ import annotations
 import contextlib
 import enum
 import logging
-from typing import TYPE_CHECKING, Iterable, Iterator
+from typing import TYPE_CHECKING, Final, Iterable, Iterator
 
 from typing_extensions import override
 
@@ -60,19 +60,19 @@ class BrowserSessionRunGroup(RunGroup, ResultOrigin):
                extra_flags: Flags, index: int, root_dir: pth.LocalPath,
                create_symlinks: bool, throw: bool) -> None:
     super().__init__(throw)
-    self._state: StateMachine[State] = StateMachine(State.BUILDING)
-    self._env = env
-    self._create_symlinks = create_symlinks
-    self._probes: tuple[Probe, ...] = tuple(probes)
-    self._durations = Durations()
-    self._browser = browser
-    self._network: Network = browser.network
-    self._index: int = index
-    self._runs: list[Run] = []
-    self._root_dir: pth.LocalPath = root_dir
+    self._state: Final[StateMachine[State]] = StateMachine(State.BUILDING)
+    self._env: Final[RunnerEnv] = env
+    self._create_symlinks: Final[bool] = create_symlinks
+    self._probes: Final[tuple[Probe, ...]] = tuple(probes)
+    self._durations: Final[Durations] = Durations()
+    self._browser: Final[Browser] = browser
+    self._network: Final[Network] = browser.network
+    self._index: Final[int] = index
+    self._runs: Final[list[Run]] = []
+    self._root_dir: Final[pth.LocalPath] = root_dir
     self._browser_tmp_dir: pth.AnyPath | None = None
-    self._extra_js_flags = JSFlags()
-    self._extra_flags = extra_flags
+    self._extra_js_flags: Final[JSFlags] = JSFlags()
+    self._extra_flags: Final[Flags] = extra_flags
     # Temporary objects, reset after all runs are ready (see set_ready).
     self._probe_results = ProbeResultDict(root_dir)
     self._probe_session_context_manager = ProbeSessionContextManager(

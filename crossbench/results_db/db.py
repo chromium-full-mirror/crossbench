@@ -52,14 +52,15 @@ def set_sqlite_pragma(dbapi_connection: sqlite3.Connection,
 class ResultsDB:
 
   def __init__(self, db_file: pth.LocalPath | None = None):
-    self._db_file: pth.LocalPath | None = db_file
+    self._db_file: Final[pth.LocalPath | None] = db_file
     init_tables: bool = True
     engine_url: str = "sqlite:///:memory:"
     if db_file:
       init_tables = not db_file.exists()
       engine_url = f"sqlite:///{self._db_file}"
     is_debug_logging = logging.getLogger().isEnabledFor(logging.DEBUG)
-    self._engine = sqlalchemy.create_engine(engine_url, echo=is_debug_logging)
+    self._engine: Final[sqlalchemy.engine.Engine] = sqlalchemy.create_engine(
+        engine_url, echo=is_debug_logging)
     if init_tables:
       self._init_tables()
 

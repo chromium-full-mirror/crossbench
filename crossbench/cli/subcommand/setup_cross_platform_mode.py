@@ -9,7 +9,7 @@ import datetime
 import logging
 import subprocess
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from typing_extensions import override
 
@@ -88,7 +88,7 @@ class SetupCrossPlatformModeSubcommand(CrossbenchSubcommand):
 class SetupNetwork:
 
   def __init__(self, interface: str) -> None:
-    self._interface: str = interface
+    self._interface: Final[str] = interface
     self._dnsmasq_process: subprocess.Popen | None = None
     self._is_android: bool = False
     assert self._interface, "Missing network interface"

@@ -41,7 +41,7 @@ class MergedTraceUriResolver(TraceUriResolver):
 
     listdir = list(result_path.glob("*/stories/**/merged_trace.zip"))
 
-    self._resolved = [
+    self._resolved: Final[list[TraceUriResolver.Result]] = [
         TraceUriResolver.Result(trace=str(path), metadata=metadata(path))
         for path in listdir
     ]
@@ -53,7 +53,7 @@ class MergedTraceUriResolver(TraceUriResolver):
 class BTPUtil:
 
   def __init__(self) -> None:
-    self.parser = CBArgumentParser(
+    self.parser: Final[CBArgumentParser] = CBArgumentParser(
         description=("Runs trace processor queries in a batch mode on existing "
                      "benchmark results, without re-running the benchmark "
                      "itself."),

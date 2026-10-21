@@ -102,9 +102,10 @@ class BaseBrowserVariantsConfig(abc.ABC):
       browser_lookup_override: BrowserLookupTableT | None = None,
   ) -> None:
     self.flags_config: FlagsConfig = FlagsConfig()
-    self._variants: list[BrowserVariantConfig] = []
-    self._unique_labels: set[str] = set()
-    self._browser_lookup_override = browser_lookup_override or {}
+    self._variants: Final[list[BrowserVariantConfig]] = []
+    self._unique_labels: Final[set[str]] = set()
+    self._browser_lookup_override: Final[
+        BrowserLookupTableT] = browser_lookup_override or {}
 
   @property
   def variants(self) -> list[BrowserVariantConfig]:

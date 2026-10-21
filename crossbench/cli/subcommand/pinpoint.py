@@ -75,7 +75,7 @@ def collect_metrics_context(action: str) -> Iterator[None]:
 class PinpointBaseSubcommand(abc.ABC):
 
   def __init__(self, parent: PinpointSubcommand) -> None:
-    self._parent = parent
+    self._parent: Final[PinpointSubcommand] = parent
     self._parser = self.add_cli_arguments()
     self._parser.set_defaults(pinpoint_subcommand=self)
     if epilog := self._parser.epilog:
@@ -746,7 +746,7 @@ class PinpointBenchmarkSubcommand(PinpointBaseStartSubcommand):
 
   def __init__(self, parent: PinpointSubcommand,
                benchmark_cls: BenchmarkClass) -> None:
-    self._benchmark_cls = benchmark_cls
+    self._benchmark_cls: Final[BenchmarkClass] = benchmark_cls
     super().__init__(parent)
 
   @override

@@ -10,7 +10,8 @@ import logging
 import re
 import sys
 import time as py_time
-from typing import TYPE_CHECKING, Any, Callable, Iterator, Self, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Final, Iterator, Self, \
+    Sequence
 
 import selenium.common.exceptions
 
@@ -54,14 +55,14 @@ class Actions(TimeScope):
                performance_mark: str = "") -> None:
     assert message, "Actions need a name"
     super().__init__(message)
-    self._exception_annotation: ExceptionAnnotationScope = run.exceptions.info(
-        f"Action: {message}")
-    self._run: Run = run
-    self._browser: Browser = browser or run.browser
-    self._runner: Runner = runner or run.runner
+    self._exception_annotation: Final[
+        ExceptionAnnotationScope] = run.exceptions.info(f"Action: {message}")
+    self._run: Final[Run] = run
+    self._browser: Final[Browser] = browser or run.browser
+    self._runner: Final[Runner] = runner or run.runner
     self._is_active: bool = False
-    self._verbose: bool = verbose
-    self._measure = measure
+    self._verbose: Final[bool] = verbose
+    self._measure: Final[bool] = measure
     if timeout:
       self._max_end_datetime = min(dt.datetime.now() + timeout,
                                    run.max_end_datetime())

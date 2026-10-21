@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
   from crossbench import path as pth
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class BaseUploader(abc.ABC):
 
   def __init__(self, url: str) -> None:
-    self._url = url
+    self._url: Final[str] = url
 
   @abc.abstractmethod
   def upload(self, file_path: pth.LocalPath) -> str:

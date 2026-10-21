@@ -8,7 +8,8 @@ import abc
 import contextlib
 import datetime as dt
 import logging
-from typing import TYPE_CHECKING, Generic, Iterable, Iterator, Self, TypeVar
+from typing import TYPE_CHECKING, Final, Generic, Iterable, Iterator, Self, \
+    TypeVar
 
 from crossbench.helper.state import State, StateMachine
 from crossbench.probes.all import PROBE_LOOKUP
@@ -17,6 +18,8 @@ from crossbench.probes.results import EmptyProbeResult, ProbeResult
 from crossbench.runner.result_origin import ResultOrigin
 
 if TYPE_CHECKING:
+  from crossbench.exception import ExceptionAnnotator
+  from crossbench.helper.durations import Durations
   from crossbench.probes.probe import Probe, ProbeT
   from crossbench.probes.results import ProbeResultDict
 
@@ -28,16 +31,16 @@ class ProbeContextManager(abc.ABC, Generic[ResultOriginT, ProbeContextT]):
 
   def __init__(self, result_origin: ResultOriginT,
                probe_results: ProbeResultDict) -> None:
-    self._state = StateMachine(State.INITIAL)
-    self._origin = result_origin
-    self._probe_results = probe_results
+    self._state: Final[StateMachine[State]] = StateMachine(State.INITIAL)
+    self._origin: Final[ResultOriginT] = result_origin
+    self._probe_results: Final[ProbeResultDict] = probe_results
     self._probe_contexts: dict[type[Probe], ProbeContextT] = {}
     # Contains all probe context where the setup succeeded.
     self._setup_probe_contexts: list[ProbeContextT] = []
     self._failed_probe_contexts: list[ProbeContextT] = []
     # TODO: either prefix timers or use custom duration
-    self._durations = result_origin.durations
-    self._exceptions = result_origin.exceptions
+    self._durations: Final[Durations] = result_origin.durations
+    self._exceptions: Final[ExceptionAnnotator] = result_origin.exceptions
 
   @property
   def is_ready(self) -> bool:

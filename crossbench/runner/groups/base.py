@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Final, Iterable
 
 from crossbench import exception
 from crossbench import path as pth
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 class RunGroup(abc.ABC):
 
   def __init__(self, throw: bool = False) -> None:
-    self._exceptions = exception.Annotator(throw)
+    self._exceptions: Final[exception.Annotator] = exception.Annotator(throw)
     self._path: pth.LocalPath | None = None
     self._merged_probe_results: ProbeResultDict = ProbeResultDict(pth.AnyPath())
 

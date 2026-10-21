@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime as dt
 import enum
 import logging
-from typing import TYPE_CHECKING, Iterable, TypedDict
+from typing import TYPE_CHECKING, Final, Iterable, TypedDict
 
 from typing_extensions import override
 
@@ -107,31 +107,33 @@ class Run(ResultOrigin):
       throw: bool = False,
       env_validation_mode: ValidationMode = ValidationMode.THROW) -> None:
     super().__init__()
-    self._state = StateMachine(State.INITIAL)
-    self._runner = runner
-    self._browser_session = browser_session
-    self._browser: Browser = browser_session.browser
+    self._state: Final[StateMachine[State]] = StateMachine(State.INITIAL)
+    self._runner: Final[Runner] = runner
+    self._browser_session: Final[BrowserSessionRunGroup] = browser_session
+    self._browser: Final[Browser] = browser_session.browser
     browser_session.append(self)
-    self._env = RunEnv(self, self._browser.settings.env_config,
-                       env_validation_mode)
-    self._story = story
-    self._action_runner = runner.new_action_runner(self)
-    self._repetition = NumberParser.positive_zero_int(repetition, "repetition")
-    self._is_warmup = is_warmup
+    self._env: Final[RunEnv] = RunEnv(self, self._browser.settings.env_config,
+                                      env_validation_mode)
+    self._story: Final[Story] = story
+    self._action_runner: Final[ActionRunner] = runner.new_action_runner(self)
+    self._repetition: Final[int] = NumberParser.positive_zero_int(
+        repetition, "repetition")
+    self._is_warmup: Final[bool] = is_warmup
     assert temperature, "Missing cache-temperature value."
-    self._temperature = temperature
-    self._index = NumberParser.positive_zero_int(index, "index")
-    self._name = name
-    self._out_dir = self._get_out_dir().absolute()
-    self._probe_results = ProbeResultDict(self._out_dir)
-    self._durations = Durations()
+    self._temperature: Final[str] = temperature
+    self._index: Final[int] = NumberParser.positive_zero_int(index, "index")
+    self._name: Final[str | None] = name
+    self._out_dir: Final[pth.LocalPath] = self._get_out_dir().absolute()
+    self._probe_results: Final[ProbeResultDict] = ProbeResultDict(self._out_dir)
+    self._durations: Final[Durations] = Durations()
     self._start_datetime = dt.datetime.fromtimestamp(0, dt.UTC)
-    self._timeout = timeout
-    self._exceptions = Annotator(throw)
+    self._timeout: Final[dt.timedelta] = timeout
+    self._exceptions: Final[Annotator] = Annotator(throw)
     self._browser_tmp_dir: pth.AnyPath | None = None
-    self._probe_context_manager = ProbeRunContextManager(
-        self, self._probe_results)
-    self._annotations: set[RunAnnotation] = set()
+    self._probe_context_manager: Final[
+        ProbeRunContextManager] = ProbeRunContextManager(
+            self, self._probe_results)
+    self._annotations: Final[set[RunAnnotation]] = set()
     self._is_skipped: bool = False
 
   def __str__(self) -> str:

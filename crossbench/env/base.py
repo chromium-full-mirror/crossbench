@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import abc
 import logging
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Final, Iterable
 
 import colorama
 
@@ -29,9 +29,9 @@ class BaseEnv(abc.ABC):
                platform: Platform,
                config: EnvConfig | None = None,
                validation_mode: ValidationMode = ValidationMode.THROW) -> None:
-    self._platform = platform
-    self._config: EnvConfig = config or EnvConfig()
-    self._validation_mode: ValidationMode = validation_mode
+    self._platform: Final[Platform] = platform
+    self._config: Final[EnvConfig] = config or EnvConfig()
+    self._validation_mode: Final[ValidationMode] = validation_mode
 
   @property
   def platform(self) -> Platform:
