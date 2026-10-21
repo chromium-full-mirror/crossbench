@@ -7,7 +7,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import enum
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from typing_extensions import override
 
@@ -23,6 +23,7 @@ if TYPE_CHECKING:
   from crossbench.cli.parser import CBArgumentParser
   from crossbench.runner.actions import Actions
   from crossbench.runner.run import Run
+  from crossbench.types import Json
 
 
 class AmbientMode(enum.StrEnum):
@@ -87,7 +88,7 @@ class WebPowerMediaPlaybackStory(WebPowerStory):
   # TODO(eladalon): Move this simulated user gesture capability into the core of
   # Crossbench so standard actions can leverage it natively, and get rid of
   # the `noqa: SLF001` suppressions.
-  def _evaluate_with_gesture(self, browser: Browser, js_code: str) -> Any:
+  def _evaluate_with_gesture(self, browser: Browser, js_code: str) -> Json:
     assert isinstance(browser, WebDriverBrowser), "Unsupported browser."
     result = browser._private_driver.execute_cdp_cmd(  # noqa: SLF001
         "Runtime.evaluate", {

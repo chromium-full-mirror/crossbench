@@ -7,7 +7,7 @@ from __future__ import annotations
 import csv
 import functools
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Iterable, NamedTuple, cast
+from typing import TYPE_CHECKING, ClassVar, Iterable, NamedTuple, cast
 
 import pandas as pd
 from perfetto.batch_trace_processor.api import BatchTraceProcessor
@@ -199,8 +199,9 @@ class WebPowerProbe(BenchmarkProbeMixin, Probe):
     return pd.DataFrame(records)
 
   @classmethod
-  def _parse_bits_run_record(cls, csv_file: pth.LocalPath,
-                             result_dir: pth.LocalPath) -> dict[str, Any]:
+  def _parse_bits_run_record(
+      cls, csv_file: pth.LocalPath,
+      result_dir: pth.LocalPath) -> dict[str, str | int | float]:
     """Extracts run metadata and channel metrics for a single BITS CSV file."""
     try:
       cb_browser, _, cb_story, cb_run, *_ = csv_file.relative_to(

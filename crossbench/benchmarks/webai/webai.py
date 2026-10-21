@@ -8,13 +8,14 @@ import abc
 import datetime as dt
 import json
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Sequence
+from typing import TYPE_CHECKING, ClassVar, Sequence
 
 from typing_extensions import override
 
 from crossbench.benchmarks.base import PressBenchmark, \
     PressBenchmarkStoryFilter
 from crossbench.benchmarks.benchmark_probe import BenchmarkProbeMixin
+from crossbench.parse import ObjectParser
 from crossbench.probes.json import JsonResultProbe, JsonResultProbeContext
 from crossbench.probes.metric import Metric, MetricsMerger
 from crossbench.stories.press_benchmark import PressBenchmarkStory
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
   from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.runner.groups.stories import StoriesRunGroup
   from crossbench.runner.run import Run
-  from crossbench.types import Json
+  from crossbench.types import Json, JsonDict
 
 
 class WebAIProbe(BenchmarkProbeMixin, JsonResultProbe, metaclass=abc.ABCMeta):
@@ -93,7 +94,7 @@ class WebAIProbe(BenchmarkProbeMixin, JsonResultProbe, metaclass=abc.ABCMeta):
         self._log_result_metrics(data)
 
   @override
-  def _extract_result_metrics_table(self, metrics: dict[str, Any],
+  def _extract_result_metrics_table(self, metrics: JsonDict,
                                     table: dict[str, list[str]]) -> None:
     for metric_key, metric in metrics.items():
       if isinstance(metric,
@@ -113,13 +114,14 @@ class WebAIProbeContext(JsonResultProbeContext):
     return json.loads(json_payload)
 
   @override
-  def flatten_json_data(self, json_data: Any) -> Json:
+  def flatten_json_data(self, json_data: Json) -> Json:
     if isinstance(json_data, list):
-      merged = MetricsMerger(json_data).to_json(
+      metrics_data = ObjectParser.non_empty_sequence(
+          json_data, f"{self.probe.name} metrics")
+      return MetricsMerger(metrics_data).to_json(
           value_fn=lambda values: values.average)
-      return merged
     if isinstance(json_data, dict):
-      result: dict[str, Any] = {}
+      result: JsonDict = {}
       for name, metric in json_data.items():
         if isinstance(metric, dict):
           if "mean" in metric:

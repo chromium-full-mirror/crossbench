@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Sequence
+from typing import TYPE_CHECKING, ClassVar, Sequence
 
 from typing_extensions import override
 
@@ -46,7 +46,7 @@ class WebPowerBenchmark(WebPowerBenchmarkBase):
 
   @classmethod
   @override
-  def fast_mode_default_overrides(cls) -> dict[str, Any]:
+  def fast_mode_default_overrides(cls) -> dict[str, object]:
     overrides = super().fast_mode_default_overrides()
     for benchmark_cls in WebPowerBenchmarkBase.scenario_benchmarks():
       overrides.update(benchmark_cls.fast_mode_default_overrides())

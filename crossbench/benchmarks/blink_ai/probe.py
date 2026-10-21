@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Self
+from typing import TYPE_CHECKING, ClassVar, Final, Self
 
 from typing_extensions import override
 
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
   from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.runner.groups.stories import StoriesRunGroup
   from crossbench.runner.run import Run
-  from crossbench.types import Json
+  from crossbench.types import Json, JsonDict
 
 BYTES_PER_MB: Final[int] = 1024 * 1024
 DEFAULT_VRAM_INTERVAL: Final[dt.timedelta] = dt.timedelta(seconds=1)
@@ -119,7 +119,7 @@ class BlinkAIProbeContext(JsonResultProbeContext[BlinkAIProbe]):
 
   @override
   def to_json(self, actions: Actions) -> Json:
-    metrics: dict[str, Any] = {}
+    metrics: JsonDict = {}
     if json_payload := actions.js(self.JS):
       metrics.update(json.loads(json_payload))
     self._extract_vram_metrics(metrics)
@@ -127,7 +127,7 @@ class BlinkAIProbeContext(JsonResultProbeContext[BlinkAIProbe]):
 
   def _record_vram_stats(
       self,
-      metrics: dict[str, Any],
+      metrics: JsonDict,
       prefix: str,
       peak_mb: float,
       baseline_mb: float,
@@ -142,16 +142,15 @@ class BlinkAIProbeContext(JsonResultProbeContext[BlinkAIProbe]):
       metrics[f"{prefix}_{key}_bytes"] = round(val_mb * BYTES_PER_MB)
     return {f"{key}_mb": val_mb for key, val_mb in stats.items()}
 
-  def _extract_vram_metrics(self, metrics: dict[str, Any]) -> None:
+  def _extract_vram_metrics(self, metrics: JsonDict) -> None:
     peak = self._vram_poller.peak
     if not peak:
       return
     baseline = self._vram_poller.baseline
     total_peak = sum(peak.values())
     total_baseline = sum(baseline.get(gpu_id, 0.0) for gpu_id in peak)
-    vram_dict: dict[str,
-                    Any] = self._record_vram_stats(metrics, "vram", total_peak,
-                                                   total_baseline)
+    vram_dict: JsonDict = dict(
+        self._record_vram_stats(metrics, "vram", total_peak, total_baseline))
     for gpu_id, gpu_peak in peak.items():
       gpu_base = baseline.get(gpu_id, 0.0)
       if len(peak) > 1:

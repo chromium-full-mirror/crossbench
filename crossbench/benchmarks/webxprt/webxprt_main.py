@@ -11,8 +11,8 @@ import json
 import logging
 import re
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, Iterable, Sequence, \
-    TypeVar
+from typing import TYPE_CHECKING, ClassVar, Generic, Iterable, Mapping, \
+    Sequence, TypeVar
 
 from tabulate import tabulate
 from typing_extensions import override
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
   from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.runner.groups.stories import StoriesRunGroup
   from crossbench.runner.run import Run
-  from crossbench.types import Json
+  from crossbench.types import Json, JsonDict
 
 WebXPRTProbeT = TypeVar("WebXPRTProbeT", bound="WebXPRT5Probe")
 
@@ -82,10 +82,10 @@ class WebXPRT5Probe(
       logging.info("- " * 40)
 
     with results_json.open(encoding="utf-8") as f:
-      data: dict[str, Any] = json.load(f)
+      data: JsonDict = json.load(f)
       if single_result:
         score_keys = ("Score", "Geomean", "Variance")
-        score_table: list[list[Any]] = [
+        score_table: list[list[Json]] = [
             [key, data.pop(key)] for key in score_keys if key in data
         ]
         if score_table:
@@ -102,7 +102,7 @@ class WebXPRT5Probe(
         self._log_result_metrics(data)
 
   @override
-  def _extract_result_metrics_table(self, metrics: dict[str, Any],
+  def _extract_result_metrics_table(self, metrics: JsonDict,
                                     table: dict[str, list[str]]) -> None:
     for metric_key, metric in metrics.items():
       if isinstance(metric,
@@ -131,7 +131,7 @@ class WebXPRT5ProbeContext(
     return ObjectParser.non_empty_dict(raw_data, f"{self.probe.name} raw json")
 
   @override
-  def flatten_json_data(self, json_data: Any) -> Json:
+  def flatten_json_data(self, json_data: Json) -> Json:
     """
     Example data from JS:
     json_data: dict{
@@ -166,8 +166,8 @@ class WebXPRT5ProbeContext(
     self._extract_summary_metrics(json_data, result)
     return result
 
-  def _extract_summary_metrics(self, json_data: dict[str, Any],
-                               result: dict[str, Any]) -> None:
+  def _extract_summary_metrics(self, json_data: Mapping[str, object],
+                               result: dict[str, float]) -> None:
     test_info = self._get_test_info(json_data)
     info = ObjectParser.non_empty_dict(test_info["additionalInfo"],
                                        "additionalInfo")
@@ -191,8 +191,8 @@ class WebXPRT5ProbeContext(
     if variance is not None:
       result["Variance"] = variance
 
-  def _extract_workload_metrics(self, json_data: dict[str, Any],
-                                result: dict[str, Any]) -> None:
+  def _extract_workload_metrics(self, json_data: Mapping[str, object],
+                                result: dict[str, float]) -> None:
     workloads = json_data["workloads"]
     workloads_seq = ObjectParser.non_empty_sequence(workloads, "workloads")
 
@@ -212,23 +212,24 @@ class WebXPRT5ProbeContext(
                          f"{workload_name}, but got {len(durations)}")
       result[workload_name] = Metric(durations).average
 
-  def _get_test_info(self, json_data: dict[str, Any]) -> dict[str, Any]:
+  def _get_test_info(self, json_data: Mapping[str,
+                                              object]) -> dict[str, object]:
     tests = json_data["tests"]
     tests_seq = ObjectParser.non_empty_sequence(tests, "tests")
     return ObjectParser.non_empty_dict(tests_seq[0], "test")
 
-  def _get_expected_iters(self, json_data: dict[str, Any]) -> int:
+  def _get_expected_iters(self, json_data: Mapping[str, object]) -> int:
     test_info = self._get_test_info(json_data)
     return NumberParser.positive_int(test_info["iters"], "expected iterations")
 
-  def _get_workload_name(self, item: dict[str, Any]) -> str:
+  def _get_workload_name(self, item: Mapping[str, object]) -> str:
     workload_id = NumberParser.int_range(0, len(WebXPRT5Story.SUBSTORIES))(
         item["workloadID"])
     workload_key = WebXPRT5Story.SUBSTORIES[workload_id]
     return WebXPRT5Story.WORKLOADS[workload_key]
 
   def _extract_metric_value(self,
-                            data: dict[str, Any],
+                            data: Mapping[str, object],
                             key: str,
                             min_value: float | None = None) -> float | None:
     if key not in data:

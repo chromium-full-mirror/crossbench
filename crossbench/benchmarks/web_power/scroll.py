@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import atexit
 import tempfile
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from typing_extensions import override
 
@@ -159,7 +159,7 @@ class WebPowerScrollBenchmark(WebPowerBenchmarkBase):
 
   @classmethod
   @override
-  def fast_mode_default_overrides(cls) -> dict[str, Any]:
+  def fast_mode_default_overrides(cls) -> dict[str, object]:
     overrides = super().fast_mode_default_overrides()
     overrides["scroll_count"] = 1
     return overrides

@@ -277,7 +277,7 @@ class WebPowerStoryFilter(StoryFilter[WebPowerStoryT], Generic[WebPowerStoryT]):
       separate: bool = True,
       tags: Iterable[str] = (),
       url: str = "",
-      **story_kwargs: Any,
+      **story_kwargs: object,
   ) -> None:
     self._url: str = url
     self._story_kwargs = story_kwargs
@@ -325,7 +325,8 @@ class WebPowerStoryFilter(StoryFilter[WebPowerStoryT], Generic[WebPowerStoryT]):
     return tuple(
         self._instantiate_story(self.story_cls, name) for name in names)
 
-  def _filter_kwargs(self, story_cls: type[WebPowerStoryT]) -> dict[str, Any]:
+  def _filter_kwargs(self,
+                     story_cls: type[WebPowerStoryT]) -> dict[str, object]:
     """Filters all parsed CLI arguments to only forward parameters accepted by
     the target story constructor (preventing TypeErrors)."""
     constructor_sig = inspect.signature(story_cls.__init__)
@@ -375,7 +376,7 @@ class WebPowerBenchmarkBase(SubStoryBenchmark):
     raise NotImplementedError
 
   @classmethod
-  def fast_mode_default_overrides(cls) -> dict[str, Any]:
+  def fast_mode_default_overrides(cls) -> dict[str, object]:
     overrides = super().fast_mode_default_overrides()
     overrides["duration"] = dt.timedelta(seconds=3)
     overrides["repetitions"] = 1
