@@ -605,12 +605,61 @@ class WDAClient:
               ),
       })
     total_duration = len(swipes) * (duration + settle_duration + lift_duration)
-    self._request(
-        "POST",
-        f"/session/{session_id}/actions",
-        {"actions": pointer_chains},
-        timeout=self.REQUEST_TIMEOUT + total_duration,
-    )
+    try:
+      self._request(
+          "POST",
+          f"/session/{session_id}/actions",
+          {"actions": pointer_chains},
+          timeout=self.REQUEST_TIMEOUT + total_duration,
+      )
+    except BaseException:
+      self.stop()
+      self._abort_device_actions()
+      raise
+
+  def _abort_device_actions(self) -> None:
+    """Force-kill on-device XCTest runner and testmanagerd to abort gestures."""
+    if self._platform.is_simulator:
+      return
+    host_platform = self._platform.host_platform
+    try:
+      with host_platform.NamedTemporaryFile(suffix=".json") as tmp_file:
+        host_platform.sh_stdout(
+            "xcrun",
+            "devicectl",
+            "device",
+            "info",
+            "processes",
+            "--device",
+            self._platform.udid,
+            f"--json-output={tmp_file}",
+        )
+        data = json.loads(host_platform.read_text(tmp_file))
+    except (subprocess.SubprocessError, OSError, ValueError) as e:
+      logging.warning("Failed to list device processes for abort: %s", e)
+      return
+
+    processes = data.get("result", {}).get("runningProcesses", [])
+    for suffix in ("/WebDriverAgentRunner-Runner", "/testmanagerd"):
+      for proc in processes:
+        executable = str(proc.get("executable", ""))
+        if (pid :=
+            proc.get("processIdentifier")) and executable.endswith(suffix):
+          try:
+            host_platform.sh(
+                "xcrun",
+                "devicectl",
+                "device",
+                "process",
+                "terminate",
+                "--device",
+                self._platform.udid,
+                "--pid",
+                str(pid),
+                "--kill",
+            )
+          except (subprocess.SubprocessError, OSError) as e:
+            logging.warning("Failed to terminate device process %s: %s", pid, e)
 
   def scroll(self, direction: str = "down") -> None:
     """Perform a native scroll gesture (down, up, left, right)."""
@@ -641,13 +690,17 @@ class WDAClient:
 
   def terminate_app(self, bundle_id: str) -> None:
     """Terminate an application on the device by bundle identifier."""
-    session_id = self.ensure_session()
-    self._request(
-        "POST",
-        f"/session/{session_id}/wda/apps/terminate",
-        {"bundleId": bundle_id},
-        timeout=self.REQUEST_TIMEOUT,
-    )
+    if not self._session_id:
+      return
+    try:
+      self._request(
+          "POST",
+          f"/session/{self._session_id}/wda/apps/terminate",
+          {"bundleId": bundle_id},
+          timeout=dt.timedelta(seconds=5),
+      )
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+      logging.warning("Failed to terminate app %s via WDA: %s", bundle_id, e)
 
   def open_url(self, url: str) -> None:
     """Open a URL in the active browser on device."""
@@ -661,7 +714,7 @@ class WDAClient:
 
   def stop(self) -> None:
     """Tear down any active xcodebuild process."""
-    atexit.unregister(self.stop)
+    self._session_id = None
     if proc := self._xcodebuild_proc:
       self._xcodebuild_proc = None
       try:

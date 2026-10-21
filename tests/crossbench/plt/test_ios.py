@@ -878,6 +878,86 @@ class IOsMockPlatformTestCase(BaseMockPlatformTestCase):
     self.assertIn("code 1", str(cm.exception))
     self.assertIn("Unknown failure occurred", str(cm.exception))
 
+  def test_wda_swipe_sequence_interrupt_stops_runner(self):
+    self.expect_startup_devices(
+        devices=DEVICES_SINGLE, simulators=SIMULATORS_SAMPLE)
+    platform = IOSPlatform(self.host_platform, "00001111-11AA22BB33DD")
+    wda = WDAClient(platform)
+    wda._session_id = "test-session-123"
+    mock_proc = mock.MagicMock()
+    wda._xcodebuild_proc = mock_proc
+
+    self.fs.remove_object("/devicectl_output.json")
+    self.fs.create_file(
+        "/devicectl_output.json",
+        contents=json.dumps({
+            "result": {
+                "runningProcesses": [
+                    {
+                        "executable": "file:///System/Developer/usr/libexec"
+                                      "/testmanagerd",
+                        "processIdentifier": 823,
+                    },
+                    {
+                        "executable": "file:///private/var/containers/Bundle"
+                                      "/WebDriverAgentRunner-Runner.app"
+                                      "/WebDriverAgentRunner-Runner",
+                        "processIdentifier": 827,
+                    },
+                ],
+            },
+        }),
+    )
+    self.host_platform.expect_sh(
+        "xcrun",
+        "devicectl",
+        "device",
+        "info",
+        "processes",
+        "--device",
+        "00001111-11AA22BB33DD",
+        "--json-output=/devicectl_output.json",
+        result="",
+    )
+    self.host_platform.expect_sh(
+        "xcrun",
+        "devicectl",
+        "device",
+        "process",
+        "terminate",
+        "--device",
+        "00001111-11AA22BB33DD",
+        "--pid",
+        "827",
+        "--kill",
+        result="",
+    )
+    self.host_platform.expect_sh(
+        "xcrun",
+        "devicectl",
+        "device",
+        "process",
+        "terminate",
+        "--device",
+        "00001111-11AA22BB33DD",
+        "--pid",
+        "823",
+        "--kill",
+        result="",
+    )
+
+    with mock.patch.object(
+        wda, "_request", side_effect=KeyboardInterrupt) as mock_request:
+      with self.assertRaises(KeyboardInterrupt):
+        wda.swipe_sequence([(100, 500, 100, 200)])
+      mock_proc.terminate.assert_called_once_with()
+      self.assertIsNone(wda._session_id)
+
+      # Subsequent terminate_app should be a no-op since session was stopped.
+      mock_request.reset_mock()
+      wda.terminate_app("com.apple.mobilesafari")
+      mock_request.assert_not_called()
+
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)
