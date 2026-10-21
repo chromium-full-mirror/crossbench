@@ -60,7 +60,7 @@ class Story(abc.ABC):
     self._name: str = pth.safe_filename(name)
     self._duration: Final[dt.timedelta] = duration
     self._secrets: Final[Secrets] = secrets or Secrets()
-    self._tags: frozenset[str] = frozenset(tags)
+    self._tags: Final[frozenset[str]] = frozenset(tags)
     if self._duration:
       assert self._duration.total_seconds() > 0, (
           f"Duration must be non-empty, but got: {duration}")

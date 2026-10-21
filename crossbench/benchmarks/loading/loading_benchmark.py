@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-from typing import TYPE_CHECKING, Any, ClassVar, Iterable, Mapping, Self, \
-    Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, Final, Iterable, Mapping, \
+    Self, Sequence
 
 from typing_extensions import override
 
@@ -192,7 +192,7 @@ class LoadingPageFilter(StoryFilter[Page]):
       tags: Iterable[str] = (),
       pages_config: PagesConfig | None = None,
   ) -> None:
-    self._pages_config = pages_config
+    self._pages_config: Final[PagesConfig | None] = pages_config
     super().__init__(story_cls, patterns, args, separate, tags)
 
   @property

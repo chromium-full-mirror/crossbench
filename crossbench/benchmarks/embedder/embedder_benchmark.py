@@ -37,7 +37,7 @@ class EmbedderStory(Story, metaclass=abc.ABCMeta):
 
   def __init__(self, name: str, actions: Sequence[ActionBlock]):
     duration = dt.timedelta(seconds=30)
-    self._actions = actions
+    self._actions: Final[Sequence[ActionBlock]] = actions
     super().__init__(name, duration)
 
   def setup(self, run: Run) -> None:
@@ -111,14 +111,16 @@ class EmbedderBenchmark(SubStoryBenchmark):
     for story in stories:
       assert isinstance(story, self.DEFAULT_STORY_CLS)
     super().__init__(stories, action_runner_config)
-    self._embedder_process_name = embedder_process_name
-    self._embedder_push_files = embedder_push_files
-    self._embedder_setup_command_config = embedder_setup_command_config
-    self._embedder_teardown_command_config = embedder_teardown_command_config
-    self._embedder_drop_caches = embedder_drop_caches
-    self._android_action = android_action
-    self._android_activity = android_activity
-    self._android_extras: immutabledict[str, str] = (
+    self._embedder_process_name: Final[str] = embedder_process_name
+    self._embedder_push_files: Final[Sequence[str]] = embedder_push_files
+    self._embedder_setup_command_config: Final[
+        SetupCommandsConfig | None] = embedder_setup_command_config
+    self._embedder_teardown_command_config: Final[
+        SetupCommandsConfig | None] = embedder_teardown_command_config
+    self._embedder_drop_caches: Final[bool] = embedder_drop_caches
+    self._android_action: Final[str] = android_action
+    self._android_activity: Final[str] = android_activity
+    self._android_extras: Final[immutabledict[str, str]] = (
         self._parse_android_extras(android_extras))
 
   @property

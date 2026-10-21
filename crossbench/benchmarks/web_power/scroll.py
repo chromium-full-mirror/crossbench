@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import atexit
 import tempfile
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Final
 
 from typing_extensions import override
 
@@ -48,7 +48,7 @@ class WebPowerScrollStory(WebPowerStory):
                scroll_count: int | None = None,
                input_rate: int | None = None,
                stabilization_time: dt.timedelta | None = None) -> None:
-    self.config = GeneratorConfig(
+    self.config: Final[GeneratorConfig] = GeneratorConfig(
         input_rate=_value_or(input_rate, self.DEFAULT_INPUT_RATE),
         scroll_count=_value_or(scroll_count, self.DEFAULT_SCROLL_COUNT))
     stabilization_time = _value_or(stabilization_time,

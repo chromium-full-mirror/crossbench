@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Final, Iterable
 
 from typing_extensions import override
 
@@ -37,7 +37,7 @@ class LivePage(InteractivePage):
       about_blank_duration: dt.timedelta = dt.timedelta(),
       tags: Iterable[str] = (),
   ) -> None:
-    self.url: str = url
+    self.url: Final[str] = url
     blocks = (ActionBlock.from_url(url, duration),)
     super().__init__(
         name,

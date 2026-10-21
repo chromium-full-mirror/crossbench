@@ -183,8 +183,9 @@ class Benchmark(abc.ABC):
     assert self.NAME is not None, f"{self} has no .NAME property"
     assert self.DEFAULT_STORY_CLS != Story, (
         f"{self} has no .DEFAULT_STORY_CLS property")
-    self.stories: list[Story] = self._validate_stories(stories)
-    self._action_runner_config = action_runner_config or ActionRunnerConfig()
+    self.stories: Final[list[Story]] = self._validate_stories(stories)
+    self._action_runner_config: Final[
+        ActionRunnerConfig] = action_runner_config or ActionRunnerConfig()
 
   @property
   def action_runner_config(self) -> ActionRunnerConfig:
@@ -356,7 +357,7 @@ class StoryFilter(Generic[StoryT], metaclass=abc.ABCMeta):
       separate: bool = False,
       tags: Iterable[str] = (),
   ) -> None:
-    self._args = args
+    self._args: Final[argparse.Namespace] = args
     assert args, "Missing args"
     self.story_cls: Final[type[StoryT]] = story_cls
     assert issubclass(
@@ -489,9 +490,9 @@ class RangePatternError(argparse.ArgumentTypeError):
 class RegexFilter:
 
   def __init__(self, all_names: Sequence[str], default_names: Sequence[str]):
-    self._all_names: OrderedSet[str] = OrderedSet(all_names)
-    self._default_names: OrderedSet[str] = OrderedSet(default_names)
-    self._selected_names: OrderedSet[str] = OrderedSet()
+    self._all_names: Final[OrderedSet[str]] = OrderedSet(all_names)
+    self._default_names: Final[OrderedSet[str]] = OrderedSet(default_names)
+    self._selected_names: Final[OrderedSet[str]] = OrderedSet()
     for name in self._all_names:
       self.verify_story_name(name)
 
@@ -660,10 +661,10 @@ class TagsFilter:
 
   def __init__(self, story_tags: StoryTagLookupT,
                default_names: Sequence[str]) -> None:
-    self._story_tags: StoryTagLookupT = story_tags
-    self._available_tags: OrderedSet[str] = OrderedSet(
+    self._story_tags: Final[StoryTagLookupT] = story_tags
+    self._available_tags: Final[OrderedSet[str]] = OrderedSet(
         tag for tags in self._story_tags.values() for tag in tags)
-    self._default_names: OrderedSet[str] = OrderedSet(default_names)
+    self._default_names: Final[OrderedSet[str]] = OrderedSet(default_names)
 
   def process_all(self, tags: Sequence[str]) -> Sequence[str]:
     if not tags:
@@ -741,7 +742,7 @@ class PressBenchmarkStoryFilter(StoryFilter[PressBenchmarkStoryT],
       url: str | None = None,
       tags: Iterable[str] = (),
   ) -> None:
-    self.url: str | None = url
+    self.url: Final[str | None] = url
     super().__init__(story_cls, patterns, args, separate, tags)
     assert issubclass(self.story_cls, PressBenchmarkStory)
 
@@ -894,7 +895,7 @@ class PressBenchmark(SubStoryBenchmark):
                action_runner_config: ActionRunnerConfig | None = None,
                custom_url: str | None = None) -> None:
     super().__init__(stories, action_runner_config)
-    self.custom_url = custom_url
+    self.custom_url: Final[str | None] = custom_url
     if custom_url:
       for story in stories:
         assert isinstance(story, PressBenchmarkStory)

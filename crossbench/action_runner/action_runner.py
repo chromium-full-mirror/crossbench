@@ -98,8 +98,8 @@ class InputSourceNotImplementedError(NotImplementedError):
       input_source: InputSource,
       msg_context: str = "",
   ) -> None:
-    self.runner: ActionRunner = runner
-    self.action: i_action.Action = action
+    self.runner: Final[ActionRunner] = runner
+    self.action: Final[i_action.Action] = action
     if msg_context:
       msg_context = f", context: {msg_context}"
     message = (f"{action.TYPE!s}-action "
@@ -141,10 +141,10 @@ class ActionRunner:
                run: Run,
                virtual_devices: tuple[VirtualDeviceConfig, ...] = (),
                step_by_step_mode: bool = False) -> None:
-    self._run = run
+    self._run: Final[Run] = run
     self._listener = ActionRunnerListener()
     self._info_stack: exception.TInfoStack | None = None
-    self._step_by_step_mode = step_by_step_mode
+    self._step_by_step_mode: Final[bool] = step_by_step_mode
     self._failure_screenshot_annotations: list[ScreenshotAnnotation] = []
     self.browser_platform.setup_virtual_devices(virtual_devices)
 

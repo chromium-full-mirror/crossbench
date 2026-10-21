@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Final
 
 from typing_extensions import override
 
@@ -46,8 +46,9 @@ class WebPowerPageLoadStory(WebPowerStory):
     default_count = (
         self.DEFAULT_CNN_PAGE_LOAD_COUNT
         if name_suffix == "cnn" else self.DEFAULT_PAGE_LOAD_COUNT)
-    self.page_load_count = _value_or(page_load_count, default_count)
-    self.interval = _value_or(interval, self.DEFAULT_INTERVAL)
+    self.page_load_count: Final[int] = _value_or(page_load_count, default_count)
+    self.interval: Final[dt.timedelta] = _value_or(interval,
+                                                   self.DEFAULT_INTERVAL)
     stabilization_time = _value_or(stabilization_time,
                                    site_config.default_stabilization_time)
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 import contextlib
 import datetime as dt
 import logging
-from typing import TYPE_CHECKING, Iterable, Iterator
+from typing import TYPE_CHECKING, Final, Iterable, Iterator
 
 from typing_extensions import override
 
@@ -53,17 +53,17 @@ class InteractivePage(Page):
     self._name: str = name
     assert not any(block.is_login for block in blocks), (
         "No login blocks allowed as normal action block")
-    self._login_block: LoginBlock | None = login
-    self._setup_block: ActionBlock | None = setup
+    self._login_block: Final[LoginBlock | None] = login
+    self._setup_block: Final[ActionBlock | None] = setup
     assert isinstance(blocks, tuple)
-    self._blocks: tuple[ActionBlock, ...] = blocks
-    self._teardown_block: ActionBlock | None = teardown
+    self._blocks: Final[tuple[ActionBlock, ...]] = blocks
+    self._teardown_block: Final[ActionBlock | None] = teardown
     assert self.has_any_blocks, (
         "Must have at least 1 valid action in blocks, setup, or teardown")
 
-    self._run_login: bool = run_login
-    self._run_setup: bool = run_setup
-    self._run_teardown: bool = run_teardown
+    self._run_login: Final[bool] = run_login
+    self._run_setup: Final[bool] = run_setup
+    self._run_teardown: Final[bool] = run_teardown
 
     duration = self._get_duration()
     super().__init__(self._name, duration, playback, tabs, about_blank_duration,

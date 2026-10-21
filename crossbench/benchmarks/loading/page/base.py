@@ -49,7 +49,7 @@ class Page(Story, metaclass=abc.ABCMeta):
   ) -> None:
     self._playback: PlaybackController = playback
     self._tabs: TabController = tabs
-    self._about_blank_duration = about_blank_duration
+    self._about_blank_duration: Final[dt.timedelta] = about_blank_duration
     super().__init__(name, duration, secrets, tags=tags)
 
   @property

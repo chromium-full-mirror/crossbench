@@ -7,7 +7,7 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import math
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Final
 
 if TYPE_CHECKING:
   from crossbench.plt.display_info import DisplayResolution
@@ -67,8 +67,8 @@ class EvemuEvent:
   ABS_MT_PRESSURE: ClassVar[int] = 0x003a
 
   def __init__(self, timestamp: float) -> None:
-    self.time: float = timestamp
-    self.events: list[tuple[int, int, int]] = []
+    self.time: Final[float] = timestamp
+    self.events: Final[list[tuple[int, int, int]]] = []
 
   def _add(self, etype: int, code: int, value: int) -> None:
     self.events.append((etype, code, value))

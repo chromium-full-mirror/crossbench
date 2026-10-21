@@ -178,8 +178,8 @@ class WebPowerStory(Story):
   def __init__(self, name_suffix: str, site_config: WebPowerSiteConfig,
                total_duration: dt.timedelta,
                stabilization_time: dt.timedelta) -> None:
-    self.site_config = site_config
-    self.stabilization_time = stabilization_time
+    self.site_config: Final[WebPowerSiteConfig] = site_config
+    self.stabilization_time: Final[dt.timedelta] = stabilization_time
     super().__init__(f"web-power-{self.story_name}-{name_suffix}",
                      total_duration)
 
@@ -279,8 +279,8 @@ class WebPowerStoryFilter(StoryFilter[WebPowerStoryT], Generic[WebPowerStoryT]):
       url: str = "",
       **story_kwargs: object,
   ) -> None:
-    self._url: str = url
-    self._story_kwargs = story_kwargs
+    self._url: Final[str] = url
+    self._story_kwargs: Final[dict[str, Any]] = story_kwargs
     super().__init__(story_cls, patterns, args, separate, tags)
 
   @classmethod
@@ -398,8 +398,8 @@ class WebPowerBenchmarkBase(SubStoryBenchmark):
       bits_probe: BitsProbe | None = None,
       has_custom_network: bool = False,
   ) -> None:
-    self._bits_probe = bits_probe
-    self._has_custom_network = has_custom_network
+    self._bits_probe: Final[BitsProbe | None] = bits_probe
+    self._has_custom_network: Final[bool] = has_custom_network
     super().__init__(stories, action_runner_config)
 
   @property

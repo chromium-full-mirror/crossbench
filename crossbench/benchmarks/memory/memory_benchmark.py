@@ -7,8 +7,8 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
-from typing import TYPE_CHECKING, ClassVar, NotRequired, Sequence, TypedDict, \
-    cast
+from typing import TYPE_CHECKING, ClassVar, Final, NotRequired, Sequence, \
+    TypedDict, cast
 
 import selenium.common.exceptions
 import urllib3.exceptions
@@ -131,12 +131,12 @@ class MemoryProbeContext(ActionRunnerListener,
       raise TypeError("The probe only works for MemoryBenchmark")
     run.action_runner.set_listener(self)
     # Records the navigation_start_time time for each window handle.
-    self._playbacks_metrics: list[PlaybackMetrics] = []
-    self._navigation_time_ms: dict[str, float] = {}
+    self._playbacks_metrics: Final[list[PlaybackMetrics]] = []
+    self._navigation_time_ms: Final[dict[str, float]] = {}
     self._tab_count: int = 1
-    self._alive_tabs_by_tab_index: dict[str, int] = {}
-    self._page_load_duration_ms_by_tab_index: dict[str, float] = {}
-    self._allocation_duration_ms_by_tab_index: dict[str, float] = {}
+    self._alive_tabs_by_tab_index: Final[dict[str, int]] = {}
+    self._page_load_duration_ms_by_tab_index: Final[dict[str, float]] = {}
+    self._allocation_duration_ms_by_tab_index: Final[dict[str, float]] = {}
     self._tab_index_at_first_kill: int | None = None
 
   def start(self) -> None:
@@ -380,8 +380,8 @@ class MemoryPage(LivePage):
   def __init__(self, name: str, memory_percent: float,
                skip_liveness_checks_until: int, duration: dt.timedelta,
                tabs: TabController, playback: PlaybackController) -> None:
-    self.memory_percent = memory_percent
-    self.skip_liveness_checks_until = skip_liveness_checks_until
+    self.memory_percent: Final[float] = memory_percent
+    self.skip_liveness_checks_until: Final[int] = skip_liveness_checks_until
     self._current_tab_index = 0
     self._cached_blocksize: int | None = None
     super().__init__(

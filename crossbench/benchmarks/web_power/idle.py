@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Final
 
 from typing_extensions import override
 
@@ -44,7 +44,7 @@ class WebPowerIdleStory(WebPowerStory):
       total_duration = (
           duration + stabilization_time + WebPowerStory.DEFAULT_GRACE_PERIOD)
 
-    self._idle_duration = duration
+    self._idle_duration: Final[dt.timedelta] = duration
     super().__init__(name_suffix, site_config, total_duration,
                      stabilization_time)
 

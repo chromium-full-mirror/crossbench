@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from typing import Final
+
 from crossbench.action_runner.display_rectangle import DisplayRectangle
 from crossbench.benchmarks.loading.point import Point
 
@@ -114,10 +116,10 @@ class ViewportInfo:
     visible_height = min(window_inner_height_px,
                          screen_avail_height_px - window_offset_y_px)
 
-    self._native_screen: DisplayRectangle = DisplayRectangle(
+    self._native_screen: Final[DisplayRectangle] = DisplayRectangle(
         Point(0, 0), screen_width_pixels, screen_height_pixels)
 
-    self._browser_viewable: DisplayRectangle = DisplayRectangle(
+    self._browser_viewable: Final[DisplayRectangle] = DisplayRectangle(
         Point(window_offset_x_px, window_offset_y_px), visible_width,
         visible_height)
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import enum
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Final
 
 from typing_extensions import override
 
@@ -60,13 +60,16 @@ class WebPowerMediaPlaybackStory(WebPowerStory):
                volume: VolumeMode | None = None,
                ambient_mode: AmbientMode | None = None,
                fullscreen: bool | None = None) -> None:
-    self.playback_duration = _value_or(duration, self.DEFAULT_DURATION)
+    self.playback_duration: Final[dt.timedelta] = _value_or(
+        duration, self.DEFAULT_DURATION)
     stabilization_time = _value_or(stabilization_time,
                                    site_config.default_stabilization_time)
-    self.stats = _value_or(stats, self.DEFAULT_STATS)
-    self.volume = _value_or(volume, self.DEFAULT_VOLUME)
-    self.ambient_mode = _value_or(ambient_mode, self.DEFAULT_AMBIENT_MODE)
-    self.fullscreen = _value_or(fullscreen, self.DEFAULT_FULLSCREEN)
+    self.stats: Final[bool] = _value_or(stats, self.DEFAULT_STATS)
+    self.volume: Final[VolumeMode] = _value_or(volume, self.DEFAULT_VOLUME)
+    self.ambient_mode: Final[AmbientMode] = _value_or(ambient_mode,
+                                                      self.DEFAULT_AMBIENT_MODE)
+    self.fullscreen: Final[bool] = _value_or(fullscreen,
+                                             self.DEFAULT_FULLSCREEN)
 
     total_duration = (
         stabilization_time + self.setup_max_duration + self.playback_duration +

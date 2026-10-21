@@ -137,7 +137,7 @@ class PowerlineStoryFilter(StoryFilter[PowerlineStory]):
       tags: Sequence[str] = (),
   ) -> None:
     assert issubclass(story_cls, PowerlineStory)
-    self._run_for = run_for
+    self._run_for: Final[dt.timedelta | None] = run_for
     super().__init__(story_cls, patterns, args, separate, tags)
 
   @override

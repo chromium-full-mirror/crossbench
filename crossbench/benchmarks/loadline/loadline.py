@@ -8,7 +8,7 @@ import abc
 import argparse
 import logging
 import subprocess
-from typing import TYPE_CHECKING, ClassVar, Mapping
+from typing import TYPE_CHECKING, ClassVar, Final, Mapping
 
 import pandas as pd
 from tabulate import tabulate
@@ -45,7 +45,7 @@ class LoadLineProbe(BenchmarkProbeMixin, Probe):
     super().__init__(*args, **kwargs)
     self._scores_file: pth.LocalPath | None = None
     self._breakdown_file: pth.LocalPath | None = None
-    self._warnings: list[str] = []
+    self._warnings: Final[list[str]] = []
 
   def _is_device_online(self, platform: Platform) -> bool:
     # 8.8.8.8 is highly likely to be online, so using it to determine if the

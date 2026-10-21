@@ -11,8 +11,8 @@ import json
 import logging
 import re
 from collections import defaultdict
-from typing import TYPE_CHECKING, ClassVar, Generic, Iterable, Mapping, \
-    Sequence, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Final, Generic, Iterable, \
+    Mapping, Sequence, TypeVar
 
 from tabulate import tabulate
 from typing_extensions import override
@@ -120,7 +120,7 @@ class WebXPRT5ProbeContext(
 
   def __init__(self, probe: WebXPRTProbeT, run: Run) -> None:
     super().__init__(probe, run)
-    self._script: str = ObjectParser.str_or_file_contents(
+    self._script: Final[str] = ObjectParser.str_or_file_contents(
         pth.LocalPath(__file__).parent / "script.js",
         name=f"{self.probe.name} script",
     )

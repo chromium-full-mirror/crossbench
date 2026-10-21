@@ -8,7 +8,7 @@ import enum
 import logging
 import re
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
   from crossbench import plt
@@ -26,7 +26,7 @@ class AndroidVolumeController:
   """Helper to control and inspect Android music volume streams."""
 
   def __init__(self, platform: plt.Platform) -> None:
-    self._platform = platform
+    self._platform: Final[plt.Platform] = platform
 
   def configure_volume(self, target_volume: VolumeMode) -> None:
     """Configures device music stream volume."""
@@ -51,7 +51,7 @@ class CmdAudioController:
   _STREAM_MUSIC: str = "3"
 
   def __init__(self, platform: plt.Platform) -> None:
-    self._platform = platform
+    self._platform: Final[plt.Platform] = platform
 
   def _cmd_audio(self, *args: str) -> str:
     """Executes 'cmd audio' and returns the decoded stdout."""
@@ -107,7 +107,7 @@ class LegacyAudioController:
   KEYCODE_VOLUME_UP: str = "24"
 
   def __init__(self, platform: plt.Platform) -> None:
-    self._platform = platform
+    self._platform: Final[plt.Platform] = platform
 
   def _input_keyevent(self, keycode: str) -> None:
     """Sends an input keyevent command to the device."""

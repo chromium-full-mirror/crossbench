@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from crossbench.action_runner.action.enums import ReadyState
 from crossbench.action_runner.action.get import GetAction
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 class BondActionRunner:
 
   def __init__(self, action_runner: ActionRunner) -> None:
-    self._action_runner: ActionRunner = action_runner
+    self._action_runner: Final[ActionRunner] = action_runner
     self._bond_client: BondClient | None = None
 
   @property

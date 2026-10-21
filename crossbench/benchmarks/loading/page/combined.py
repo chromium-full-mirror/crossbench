@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Final, Iterable
 
 from typing_extensions import override
 
@@ -31,7 +31,7 @@ class CombinedPage(Page):
       tabs: TabController = TabController.default(),
       about_blank_duration: dt.timedelta = dt.timedelta(),
   ) -> None:
-    self._pages = tuple(pages)
+    self._pages: Final[tuple[Page, ...]] = tuple(pages)
     assert self._pages, "No sub-pages provided for CombinedPage"
     assert len(self._pages) >= 1, "Combined Page needs at least one page"
     self._tabs = tabs
@@ -47,7 +47,6 @@ class CombinedPage(Page):
         raise ValueError(f"{e}. Please use --separate.") from e
     super().__init__(
         name, duration, playback, tabs, about_blank_duration, secrets=secrets)
-    self.url = None
 
   @property
   @override

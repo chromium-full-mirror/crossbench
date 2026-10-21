@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Final
 
 if TYPE_CHECKING:
   from crossbench.benchmarks.base import Benchmark
@@ -15,7 +15,7 @@ class BenchmarkProbeMixin:
   IS_GENERAL_PURPOSE: ClassVar[bool] = False
 
   def __init__(self, *args, **kwargs) -> None:
-    self._benchmark: Benchmark = kwargs.pop("benchmark")
+    self._benchmark: Final[Benchmark] = kwargs.pop("benchmark")
     #assert isinstance(self._benchmark, Benchmark)
     super().__init__(*args, **kwargs)
 

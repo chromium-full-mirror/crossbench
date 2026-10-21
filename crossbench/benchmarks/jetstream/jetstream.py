@@ -10,7 +10,7 @@ import json
 import logging
 import statistics
 from collections import defaultdict
-from typing import TYPE_CHECKING, ClassVar, Mapping, Sequence
+from typing import TYPE_CHECKING, ClassVar, Final, Mapping, Sequence
 
 from typing_extensions import override
 
@@ -270,7 +270,7 @@ class JetStreamBenchmark(PressBenchmark, metaclass=abc.ABCMeta):
                action_runner_config: ActionRunnerConfig | None = None,
                custom_url: str | None = None,
                detailed_metrics: bool = False) -> None:
-    self._detailed_metrics = detailed_metrics
+    self._detailed_metrics: Final[bool] = detailed_metrics
     super().__init__(stories, action_runner_config, custom_url)
 
   @property
