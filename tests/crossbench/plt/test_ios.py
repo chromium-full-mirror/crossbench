@@ -519,8 +519,18 @@ class IOsMockPlatformTestCase(BaseMockPlatformTestCase):
       )
       payload = mock_request.call_args[0][2]
       actions = payload["actions"][0]["actions"]
-      self.assertEqual(len(actions), 6)
-      self.assertEqual(actions[-2], {"type": "pause", "duration": 150})
+      self.assertEqual(len(actions), 7)
+      self.assertEqual(
+          actions[-3],
+          {
+              "type": "pointerMove",
+              "duration": 140,
+              "x": 0,
+              "y": 4,
+              "origin": "pointer",
+          },
+      )
+      self.assertEqual(actions[-2], {"type": "pause", "duration": 10})
       self.assertEqual(actions[-1], {"type": "pointerUp", "button": 0})
 
     with mock.patch.object(wda, "_request") as mock_request:

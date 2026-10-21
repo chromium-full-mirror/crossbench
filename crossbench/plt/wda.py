@@ -54,6 +54,7 @@ class WDAClient:
   DEFAULT_PORT: Final[int] = 8100
   STARTUP_TIMEOUT: Final[dt.timedelta] = dt.timedelta(seconds=90)
   REQUEST_TIMEOUT: Final[dt.timedelta] = dt.timedelta(seconds=30)
+  SETTLE_MOVE_POINTS: Final[int] = 4
 
   def __init__(
       self,
@@ -461,6 +462,87 @@ class WDAClient:
         payload,
         timeout=self.REQUEST_TIMEOUT + duration)
 
+  def _build_swipe_actions(
+      self,
+      from_x: int,
+      from_y: int,
+      to_x: int,
+      to_y: int,
+      duration: dt.timedelta,
+      settle_duration: dt.timedelta,
+  ) -> list[dict[str, object]]:
+    duration_ms = max(50, int(duration.total_seconds() * 1000))
+    settle_ms = max(0, int(settle_duration.total_seconds() * 1000))
+    dx = to_x - from_x
+    dy = to_y - from_y
+    actions: list[dict[str, object]] = [
+        {
+            "type": "pointerMove",
+            "duration": 0,
+            "x": from_x,
+            "y": from_y,
+            "origin": "viewport",
+        },
+        {
+            "type": "pointerDown",
+            "button": 0,
+        },
+        {
+            "type": "pause",
+            "duration": 10,
+        },
+    ]
+    # WDA's FBPointerPauseItem does not emit UITouchPhaseMoved events, leaving
+    # UIScrollView with non-zero velocity at lift-up. Split the final points
+    # into a slow pointerMove over settle_duration to decay pan velocity to 0.
+    if settle_ms >= 20 and max(abs(dx), abs(dy)) >= self.SETTLE_MOVE_POINTS * 2:
+      if abs(dy) >= abs(dx):
+        settle_dx = 0
+        settle_dy = (
+            self.SETTLE_MOVE_POINTS if dy > 0 else -self.SETTLE_MOVE_POINTS)
+      else:
+        settle_dx = (
+            self.SETTLE_MOVE_POINTS if dx > 0 else -self.SETTLE_MOVE_POINTS)
+        settle_dy = 0
+      actions.extend([
+          {
+              "type": "pointerMove",
+              "duration": duration_ms,
+              "x": dx - settle_dx,
+              "y": dy - settle_dy,
+              "origin": "pointer",
+          },
+          {
+              "type": "pointerMove",
+              "duration": settle_ms - 10,
+              "x": settle_dx,
+              "y": settle_dy,
+              "origin": "pointer",
+          },
+          {
+              "type": "pause",
+              "duration": 10,
+          },
+      ])
+    else:
+      actions.append({
+          "type": "pointerMove",
+          "duration": duration_ms,
+          "x": dx,
+          "y": dy,
+          "origin": "pointer",
+      })
+      if settle_ms > 0:
+        actions.append({
+            "type": "pause",
+            "duration": settle_ms,
+        })
+    actions.append({
+        "type": "pointerUp",
+        "button": 0,
+    })
+    return actions
+
   def swipe(
       self,
       from_x: int,
@@ -472,39 +554,14 @@ class WDAClient:
   ) -> None:
     """Perform a coordinate-based touch swipe gesture in points."""
     session_id = self.ensure_session()
-    duration_ms = max(50, int(duration.total_seconds() * 1000))
-    settle_ms = max(0, int(settle_duration.total_seconds() * 1000))
-    actions: list[dict[str, Any]] = [
-        {
-            "type": "pointerMove",
-            "duration": 0,
-            "x": from_x,
-            "y": from_y,
-        },
-        {
-            "type": "pointerDown",
-            "button": 0,
-        },
-        {
-            "type": "pause",
-            "duration": 10,
-        },
-        {
-            "type": "pointerMove",
-            "duration": duration_ms,
-            "x": to_x,
-            "y": to_y,
-        },
-    ]
-    if settle_ms > 0:
-      actions.append({
-          "type": "pause",
-          "duration": settle_ms,
-      })
-    actions.append({
-        "type": "pointerUp",
-        "button": 0,
-    })
+    actions = self._build_swipe_actions(
+        from_x,
+        from_y,
+        to_x,
+        to_y,
+        duration,
+        settle_duration,
+    )
     payload = {
         "actions": [{
             "type": "pointer",
