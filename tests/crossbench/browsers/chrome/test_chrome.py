@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import argparse
-from typing import Final
 import unittest
+from typing import Final
 from unittest import mock
 
 import selenium.common.exceptions
@@ -169,6 +169,7 @@ class ChromeWebdriverTestCase(BaseCrossbenchTestCase):
       "--disable-search-engine-choice-screen",
       "--disable-optimization-guide-model-downloads-for-benchmarking",
       "--disable-crashpad-metrics",
+      "--disable-ntp-theme-promo-bottom-sheet",
       "--disable-translate-trigger",
   })
   EXPECTED_VERSION_FLAGS_BY_MILESTONE: Final[tuple[tuple[int, tuple[
@@ -195,9 +196,16 @@ class ChromeWebdriverTestCase(BaseCrossbenchTestCase):
               "--disable-crashpad-metrics",
           )),
           (148, ()),
-          (155, ()),
-          (156, ("--disable-translate-trigger",)),
-          (157, ("--disable-translate-trigger",)),
+          (154, ()),
+          (155, ("--disable-ntp-theme-promo-bottom-sheet",)),
+          (156, (
+              "--disable-ntp-theme-promo-bottom-sheet",
+              "--disable-translate-trigger",
+          )),
+          (157, (
+              "--disable-ntp-theme-promo-bottom-sheet",
+              "--disable-translate-trigger",
+          )),
           (158, ()),
       )
 

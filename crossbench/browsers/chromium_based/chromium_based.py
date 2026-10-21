@@ -114,6 +114,13 @@ VERSIONED_DEFAULT_FLAGS: Final[tuple[VersionedFlag, ...]] = (
         comment="We do not need crashpad metrics.",
     ),
     VersionedFlag(
+        min=155,
+        max=157,
+        flags="--disable-ntp-theme-promo-bottom-sheet",
+        comment="Disable the Android NTP customization pop up. The switch "
+        "is implied by --no-first-run from M158 onwards.",
+    ),
+    VersionedFlag(
         min=156,
         max=157,
         flags="--disable-translate-trigger",
