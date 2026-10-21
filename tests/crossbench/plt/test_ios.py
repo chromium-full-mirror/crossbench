@@ -456,6 +456,18 @@ class IOsMockPlatformTestCase(BaseMockPlatformTestCase):
     platform_physical = IOSPlatform(self.host_platform, "00001111-11AA22BB33DD")
     self.assertEqual(platform_physical.display_details(), ())
 
+  def test_display_resolution(self):
+    self.expect_startup_devices(
+        devices=DEVICES_SINGLE, simulators=SIMULATORS_SAMPLE)
+    platform_physical = IOSPlatform(self.host_platform, "00001111-11AA22BB33DD")
+    mock_wda = mock.MagicMock()
+    mock_wda.window_size.return_value = DisplayResolution(440, 956)
+    platform_physical._wda = mock_wda
+
+    res = platform_physical.display_resolution()
+    self.assertEqual(res, DisplayResolution(440, 956))
+    mock_wda.window_size.assert_called_once()
+
   def test_wda_window_size(self):
     self.expect_startup_devices(
         devices=DEVICES_SINGLE, simulators=SIMULATORS_SAMPLE)

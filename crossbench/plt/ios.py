@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
   from crossbench.plt.base import CPUFreqInfo
   from crossbench.plt.details import CpuDetails, OsDetails, PythonDetails
-  from crossbench.plt.display_info import DisplayInfo
+  from crossbench.plt.display_info import DisplayInfo, DisplayResolution
   from crossbench.plt.signals import AnySignals
   from crossbench.plt.types import ProcessInfo
 
@@ -340,6 +340,11 @@ class IOSPlatform(RemotePlatformMixin, Platform):
     if self._wda is None:
       self._wda = WDAClient(self)
     return self._wda
+
+  @override
+  def display_resolution(self) -> DisplayResolution:
+    """Return screen resolution in points."""
+    return self.wda.window_size()
 
   @override
   def display_details(self) -> tuple[DisplayInfo, ...]:
