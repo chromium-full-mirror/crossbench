@@ -317,21 +317,28 @@ class ChromiumBasedWebDriver(
   ) -> str:
     assert not (tab_index is not None and relative_tab_index is not None)
     driver = self._private_driver
-    original_handle = driver.current_window_handle
+    try:
+      original_handle: str | None = driver.current_window_handle
+    except selenium.common.exceptions.NoSuchWindowException:
+      original_handle = None
     for _ in wait.wait_with_backoff(timeout):
-      # Search through other handles starting from current_window_handle + 1
-      try:
-        i = driver.window_handles.index(original_handle)
-      except ValueError as e:
-        raise RuntimeError("Original starting tab no longer exists") from e
-
       if relative_tab_index is not None:
+        if original_handle is None:
+          raise RuntimeError("Original starting tab no longer exists")
+        try:
+          i = driver.window_handles.index(original_handle)
+        except ValueError as e:
+          raise RuntimeError("Original starting tab no longer exists") from e
         tab_index = (i + relative_tab_index) % len(driver.window_handles)
       if tab_index is not None:
         handles = [driver.window_handles[tab_index]]
-      else:
+      elif (original_handle is not None and
+            original_handle in driver.window_handles):
         # Start searching with the tab after the current tab.
+        i = driver.window_handles.index(original_handle)
         handles = driver.window_handles[i + 1:] + driver.window_handles[:i + 1]
+      else:
+        handles = driver.window_handles
 
       for handle in handles:
         driver.switch_to.window(handle)

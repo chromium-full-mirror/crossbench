@@ -10,14 +10,16 @@ import re
 import unittest
 from unittest import mock
 
+import selenium.common.exceptions
 import urllib3
 
 from crossbench import path as pth
 from crossbench.browsers.browser import Browser
 from crossbench.browsers.chromium.base import ChromiumBaseMixin
 from crossbench.browsers.chromium.driver_finder import ChromeDriverFinder
-from crossbench.browsers.chromium.webdriver import ChromeApkHelperPackageInfo, \
-    ChromiumWebDriver, LocalChromiumWebDriverAndroid
+from crossbench.browsers.chromium.webdriver import \
+    ChromeApkHelperPackageInfo, ChromiumWebDriver, \
+    LocalChromiumWebDriverAndroid
 from crossbench.browsers.chromium_based import helper
 from crossbench.browsers.chromium_based.webdriver import ChromiumBasedWebDriver
 from crossbench.browsers.settings import Settings
@@ -271,6 +273,27 @@ class ChromiumBasedWebDriverTestCase(unittest.TestCase):
     browser.switch_tab(relative_tab_index=-1, timeout=dt.timedelta(seconds=5))
     self.assertEqual(mock_driver.title, "3")
     self.assertEqual(mock_driver.current_url, "https://3.com")
+
+  def test_switch_tab_closed_current_window(self):
+    browser, mock_driver = self._make_tab_switch_mocks(["1", "2"], "2")
+    mock_driver.window_handles = ["1"]
+    type(mock_driver).current_window_handle = mock.PropertyMock(
+        side_effect=selenium.common.exceptions.NoSuchWindowException(
+            "no such window: target window already closed"))
+
+    def switch_to_window(handle):
+      type(mock_driver).current_window_handle = mock.PropertyMock(
+          return_value=handle)
+      mock_driver.title = handle
+      mock_driver.current_url = f"https://{handle}.com"
+
+    mock_driver.switch_to.window.side_effect = switch_to_window
+    with self.assertRaises(RuntimeError):
+      browser.switch_tab(relative_tab_index=-1, timeout=dt.timedelta(seconds=5))
+
+    matched = browser.switch_tab(tab_index=0, timeout=dt.timedelta(seconds=5))
+    self.assertEqual(matched, "1")
+    self.assertEqual(mock_driver.current_window_handle, "1")
 
   def test_get_renderer_pid(self):
     mock_driver = mock.MagicMock(name="Mock Driver")
