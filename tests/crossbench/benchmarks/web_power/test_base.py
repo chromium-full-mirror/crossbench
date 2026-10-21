@@ -249,6 +249,7 @@ class BaseWebPowerBenchmarkTestCase(BaseBenchmarkTestCase):
 
   def parse_args(self, *args: str | Sequence[str]) -> argparse.Namespace:
     parsed_args = super().parse_args(*args)
+    parsed_args.browser = ()
     parsed_args.network_config = NetworkConfig.default()
     parsed_args.probe_config = None
     parsed_args.probe = ()
@@ -542,6 +543,7 @@ class WebPowerBenchmarkBaseTestCase(BaseWebPowerBenchmarkTestCase):
         default=MockWebPowerBenchmark.default_probe_config_path(),
     )
     # Add necessary arguments that would have been added by parent CLI commands.
+    parser.add_argument("--browser", action="append", default=[])
     parser.add_argument("--probe", action="append", default=[])
     parser.add_argument("--no-probe", action="store_true", default=False)
     parser.add_argument(

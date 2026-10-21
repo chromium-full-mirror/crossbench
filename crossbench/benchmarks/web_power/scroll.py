@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import atexit
+import datetime as dt
+import logging
 import tempfile
 from typing import TYPE_CHECKING, ClassVar, Final
 
@@ -16,16 +18,16 @@ from crossbench.benchmarks.web_power.base import WebPowerBenchmarkBase, \
 from crossbench.benchmarks.web_power.scroll_gen import GeneratorConfig, \
     generate_scroll_commands
 from crossbench.parse import NumberParser
+from crossbench.plt.ios import IOSPlatform
 
 if TYPE_CHECKING:
-  import datetime as dt
-
   from crossbench.cli.parser import CBArgumentParser
   from crossbench.runner.run import Run
 
 
 class WebPowerScrollStory(WebPowerStory):
   IS_SCENARIO_CLASS = True
+  REQUIRES_IOS_WDA = True
   DEFAULT_SCROLL_COUNT: ClassVar[int] = 5
   DEFAULT_INPUT_RATE: ClassVar[int] = 240
 
@@ -65,12 +67,23 @@ class WebPowerScrollStory(WebPowerStory):
 
   @override
   def setup(self, run: Run) -> None:
+    if isinstance(run.browser_platform, IOSPlatform):
+      if self.config.input_rate != self.DEFAULT_INPUT_RATE:
+        logging.warning(
+            "--input-rate=%d is ignored on iOS; WebDriverAgent synthesizes "
+            "touches at a fixed rate.", self.config.input_rate)
+      with run.actions("Init_WDA", verbose=True):
+        run.browser_platform.wda.ensure_session()
+      super().setup(run)
+      return
+
     assert (self.local_file is None)
     assert (self.remote_file is None)
 
     if not run.browser_platform.is_android:
       raise RuntimeError(
-          "The web-power-scroll benchmark is only supported on Android.")
+          "The web-power-scroll benchmark is only supported on Android "
+          "and iOS.")
 
     # Register cleanup at exit, in case an exception is raised in between
     # setup() and run() being called.
@@ -97,6 +110,13 @@ class WebPowerScrollStory(WebPowerStory):
 
   @override
   def run(self, run: Run) -> None:
+    if isinstance(run.browser_platform, IOSPlatform):
+      with run.actions(
+          "Run", verbose=True, performance_mark=WebPowerStory.MEASUREMENT_MARK):
+        with run.actions("Scroll"):
+          self._run_ios_scroll(run.browser_platform)
+      return
+
     assert (self.local_file is not None)
     assert (self.remote_file is not None)
 
@@ -104,10 +124,53 @@ class WebPowerScrollStory(WebPowerStory):
       with run.actions(
           "Run", verbose=True, performance_mark=WebPowerStory.MEASUREMENT_MARK):
         with run.actions("Scroll"):
-          run.browser_platform.sh("uinput", f"{self.remote_file}")
+          run.browser_platform.sh("uinput", self.remote_file)
 
     finally:
       self.clear_files(run)
+
+  def _swipe_repeatedly(
+      self,
+      platform: IOSPlatform,
+      from_x: int,
+      from_y: int,
+      to_x: int,
+      to_y: int,
+  ) -> None:
+    for _ in range(self.config.swipes_per_direction):
+      platform.wda.swipe(
+          from_x,
+          from_y,
+          to_x,
+          to_y,
+          duration=self.config.swipe_duration,
+          settle_duration=self.config.settle_duration)
+      if self.config.lift_duration > dt.timedelta():
+        platform.sleep(self.config.lift_duration)
+
+  def _run_ios_scroll(self, platform: IOSPlatform) -> None:
+    res = platform.display_resolution()
+    fixed_x = int(0.5 * res.width)
+    y_top = int(0.2 * res.height)
+    y_bottom = int(0.8 * res.height)
+
+    for _ in range(self.config.scroll_count):
+      # Scroll Down (swipe up: bottom to top).
+      self._swipe_repeatedly(
+          platform,
+          fixed_x,
+          y_bottom,
+          fixed_x,
+          y_top,
+      )
+      # Scroll Up (swipe down: top to bottom).
+      self._swipe_repeatedly(
+          platform,
+          fixed_x,
+          y_top,
+          fixed_x,
+          y_bottom,
+      )
 
   def clear_files(self, run: Run) -> None:
     atexit.unregister(self.clear_files)

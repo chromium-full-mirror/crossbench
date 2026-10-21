@@ -99,6 +99,30 @@ For example, tweaking the interval between runs might affect the thermal
 state of the device, change the frequency of thermal throttling, and therefore
 impact the scores.
 
+### Running on iOS (Scroll Scenario)
+
+The scroll scenario (`web-power-scroll`) can also be run on iOS:
+
+```bash
+./cb.py web-power-scroll --browser=ios:safari
+```
+
+Or target a specific device using its UDID:
+
+```bash
+./cb.py web-power-scroll --browser=<UDID>:safari
+```
+
+**Prerequisite:** Touch scrolling on iOS requires
+[WebDriverAgent](https://github.com/appium/WebDriverAgent) (WDA) to simulate
+physical touch gestures. Crossbench will automatically launch
+`WebDriverAgentRunner` if its `.xctestrun` bundle has been built in Xcode or
+with `xcodebuild` (deposited in `~/Library/Developer/Xcode/DerivedData/`), or if
+the `CROSSBENCH_WDA_XCTESTRUN` environment variable points to it.
+Alternatively, launch `WebDriverAgentRunner` on the device beforehand so it
+listens on port 8100.
+
+
 ### Results
 
 Like any Crossbench benchmark, a results directory is produced at the end of

@@ -18,6 +18,7 @@ from crossbench.action_runner.action.enums import WindowTarget
 from crossbench.benchmarks.base import StoryFilter, SubStoryBenchmark
 from crossbench.benchmarks.web_power.probe import WebPowerProbe
 from crossbench.benchmarks.web_power.wpr_helpers import WprBannerDismisser
+from crossbench.cli.config.driver_type import BrowserDriverType
 from crossbench.cli.config.network import NetworkConfig, NetworkType
 from crossbench.cli.parser import CBArgumentParser
 from crossbench.helper.path_finder import WprGoFinder
@@ -35,6 +36,7 @@ if TYPE_CHECKING:
   from crossbench import path as pth
   from crossbench.action_runner.config import ActionRunnerConfig
   from crossbench.browsers.attributes import BrowserAttributes
+  from crossbench.cli.config.browser import BrowserConfig
   from crossbench.flags.base import Flags
   from crossbench.plt.base import Platform
   from crossbench.plt.types import ListCmdArgs
@@ -75,6 +77,7 @@ class WebPowerStory(Story):
 
   IS_SCENARIO_CLASS: ClassVar[bool] = False
   REQUIRES_AUTOPLAY: ClassVar[bool] = False
+  REQUIRES_IOS_WDA: ClassVar[bool] = False
   WINDOW_TARGET: ClassVar[WindowTarget] = WindowTarget.SELF
 
   _scenario_classes: ClassVar[list[type[WebPowerStory]]] = []
@@ -415,6 +418,14 @@ class WebPowerBenchmarkBase(SubStoryBenchmark):
   @override
   def setup(self, runner: Runner) -> None:
     super().setup(runner)
+    if any(b.platform.is_ios for b in runner.browsers):
+      wda_flags = [
+          story.REQUIRES_IOS_WDA
+          for story in self.stories
+          if isinstance(story, WebPowerStory)
+      ]
+      if any(wda_flags) and not all(wda_flags):
+        raise ValueError("Cannot mix WDA and non-WDA stories on iOS.")
     # TODO: Move JtProbe attachment to WebPowerProbe.get_extra_probes().
     if not runner.has_probe(JtProbe.NAME):
       runner.attach_probe(JtProbe(), matching_browser_only=True)
@@ -538,12 +549,34 @@ class WebPowerBenchmarkBase(SubStoryBenchmark):
   @override
   def kwargs_from_cli(cls, args: argparse.Namespace) -> dict[str, Any]:
     kwargs = super().kwargs_from_cli(args)
+    cls._configure_ios_browsers(args, kwargs["stories"])
     kwargs["has_custom_network"] = bool(args.network_config and
                                         not args.network_config.is_default())
     cls._select_network(args)
     if bits_probe := cls._parse_bits_probe(args):
       kwargs["bits_probe"] = bits_probe
     return kwargs
+
+  @classmethod
+  def _configure_ios_browsers(cls, args: argparse.Namespace,
+                              stories: Sequence[WebPowerStory]) -> None:
+    if not (browsers := args.browser):
+      return
+    if not any(b.driver.driver_type.is_ios for b in browsers):
+      return
+    wda_flags = [story.REQUIRES_IOS_WDA for story in stories]
+    if not any(wda_flags):
+      return
+    if not all(wda_flags):
+      raise ValueError("Cannot mix WDA and non-WDA stories on iOS.")
+    updated_browsers: list[BrowserConfig] = []
+    for b in browsers:
+      if b.driver.driver_type == BrowserDriverType.IOS:
+        wda_driver = dataclasses.replace(
+            b.driver, driver_type=BrowserDriverType.IOS_WDA)
+        b = dataclasses.replace(b, driver=wda_driver)
+      updated_browsers.append(b)
+    args.browser = updated_browsers
 
   @classmethod
   def _parse_bits_probe(cls, args: argparse.Namespace) -> BitsProbe | None:
