@@ -470,12 +470,16 @@ class WDAClient:
       to_y: int,
       duration: dt.timedelta,
       settle_duration: dt.timedelta,
+      start_delay_ms: int = 0,
   ) -> list[dict[str, object]]:
     duration_ms = max(50, int(duration.total_seconds() * 1000))
     settle_ms = max(0, int(settle_duration.total_seconds() * 1000))
     dx = to_x - from_x
     dy = to_y - from_y
-    actions: list[dict[str, object]] = [
+    actions: list[dict[str, object]] = []
+    if start_delay_ms > 0:
+      actions.append({"type": "pause", "duration": start_delay_ms})
+    actions.extend([
         {
             "type": "pointerMove",
             "duration": 0,
@@ -491,7 +495,7 @@ class WDAClient:
             "type": "pause",
             "duration": 10,
         },
-    ]
+    ])
     # WDA's FBPointerPauseItem does not emit UITouchPhaseMoved events, leaving
     # UIScrollView with non-zero velocity at lift-up. Split the final points
     # into a slow pointerMove over settle_duration to decay pan velocity to 0.
@@ -551,32 +555,62 @@ class WDAClient:
       to_y: int,
       duration: dt.timedelta = dt.timedelta(milliseconds=300),
       settle_duration: dt.timedelta = dt.timedelta(),
+      lift_duration: dt.timedelta = dt.timedelta(),
+      count: int = 1,
   ) -> None:
-    """Perform a coordinate-based touch swipe gesture in points."""
-    session_id = self.ensure_session()
-    actions = self._build_swipe_actions(
-        from_x,
-        from_y,
-        to_x,
-        to_y,
-        duration,
-        settle_duration,
+    """Perform one or more coordinate-based touch swipe gestures in points."""
+    if count <= 0:
+      return
+    self.swipe_sequence(
+        [(from_x, from_y, to_x, to_y)] * count,
+        duration=duration,
+        settle_duration=settle_duration,
+        lift_duration=lift_duration,
     )
-    payload = {
-        "actions": [{
-            "type": "pointer",
-            "id": "finger1",
-            "parameters": {
-                "pointerType": "touch",
-            },
-            "actions": actions,
-        }],
-    }
+
+  def swipe_sequence(
+      self,
+      swipes: Sequence[tuple[int, int, int, int]],
+      duration: dt.timedelta = dt.timedelta(milliseconds=300),
+      settle_duration: dt.timedelta = dt.timedelta(),
+      lift_duration: dt.timedelta = dt.timedelta(),
+  ) -> None:
+    """Perform a sequence of touch swipes in a single W3C action batch."""
+    if not swipes:
+      return
+    session_id = self.ensure_session()
+    duration_ms = max(50, int(duration.total_seconds() * 1000))
+    cycle_ms = (
+        duration_ms + max(0, int(settle_duration.total_seconds() * 1000)) +
+        max(0, int(lift_duration.total_seconds() * 1000)))
+    pointer_chains = []
+    for i, (from_x, from_y, to_x, to_y) in enumerate(swipes):
+      pointer_chains.append({
+          "type":
+              "pointer",
+          "id":
+              f"finger{i + 1}",
+          "parameters": {
+              "pointerType": "touch",
+          },
+          "actions":
+              self._build_swipe_actions(
+                  from_x,
+                  from_y,
+                  to_x,
+                  to_y,
+                  duration,
+                  settle_duration,
+                  start_delay_ms=i * cycle_ms,
+              ),
+      })
+    total_duration = len(swipes) * (duration + settle_duration + lift_duration)
     self._request(
         "POST",
         f"/session/{session_id}/actions",
-        payload,
-        timeout=self.REQUEST_TIMEOUT + duration + settle_duration)
+        {"actions": pointer_chains},
+        timeout=self.REQUEST_TIMEOUT + total_duration,
+    )
 
   def scroll(self, direction: str = "down") -> None:
     """Perform a native scroll gesture (down, up, left, right)."""

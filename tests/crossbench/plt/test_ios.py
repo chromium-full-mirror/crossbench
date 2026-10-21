@@ -534,6 +534,24 @@ class IOsMockPlatformTestCase(BaseMockPlatformTestCase):
       self.assertEqual(actions[-1], {"type": "pointerUp", "button": 0})
 
     with mock.patch.object(wda, "_request") as mock_request:
+      wda.swipe_sequence(
+          [(100, 400, 100, 200), (100, 200, 100, 400)],
+          duration=dt.timedelta(milliseconds=750),
+          settle_duration=dt.timedelta(milliseconds=150),
+          lift_duration=dt.timedelta(milliseconds=100),
+      )
+      mock_request.assert_called_once()
+      batch = mock_request.call_args[0][2]["actions"]
+      self.assertEqual(len(batch), 2)
+      self.assertEqual(
+          batch[1]["actions"][0],
+          {
+              "type": "pause",
+              "duration": 1000,
+          },
+      )
+
+    with mock.patch.object(wda, "_request") as mock_request:
       wda.scroll("down")
       mock_request.assert_called_once_with(
           "POST",

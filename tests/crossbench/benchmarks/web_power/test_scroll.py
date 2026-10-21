@@ -78,15 +78,12 @@ class WebPowerScrollStoryTestCase(BaseCrossbenchTestCase):
 
     story.run(mock_run)
     mock_ios_platform.display_resolution.assert_called_once()
-    self.assertTrue(mock_ios_platform.wda.swipe.called)
-    mock_ios_platform.sleep.assert_called_with(dt.timedelta(milliseconds=100))
-    mock_ios_platform.wda.swipe.assert_called_with(
-        200,
-        160,
-        200,
-        640,
+    expected_cycle = [(200, 640, 200, 160)] * 5 + [(200, 160, 200, 640)] * 5
+    mock_ios_platform.wda.swipe_sequence.assert_called_once_with(
+        expected_cycle * 5,
         duration=dt.timedelta(milliseconds=750),
         settle_duration=dt.timedelta(milliseconds=150),
+        lift_duration=dt.timedelta(milliseconds=100),
     )
 
   def test_setup_ios_warns_on_custom_input_rate(self) -> None:

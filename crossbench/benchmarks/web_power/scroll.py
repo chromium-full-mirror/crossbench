@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import atexit
-import datetime as dt
 import logging
 import tempfile
 from typing import TYPE_CHECKING, ClassVar, Final
@@ -21,6 +20,8 @@ from crossbench.parse import NumberParser
 from crossbench.plt.ios import IOSPlatform
 
 if TYPE_CHECKING:
+  import datetime as dt
+
   from crossbench.cli.parser import CBArgumentParser
   from crossbench.runner.run import Run
 
@@ -129,48 +130,23 @@ class WebPowerScrollStory(WebPowerStory):
     finally:
       self.clear_files(run)
 
-  def _swipe_repeatedly(
-      self,
-      platform: IOSPlatform,
-      from_x: int,
-      from_y: int,
-      to_x: int,
-      to_y: int,
-  ) -> None:
-    for _ in range(self.config.swipes_per_direction):
-      platform.wda.swipe(
-          from_x,
-          from_y,
-          to_x,
-          to_y,
-          duration=self.config.swipe_duration,
-          settle_duration=self.config.settle_duration)
-      if self.config.lift_duration > dt.timedelta():
-        platform.sleep(self.config.lift_duration)
-
   def _run_ios_scroll(self, platform: IOSPlatform) -> None:
     res = platform.display_resolution()
     fixed_x = int(0.5 * res.width)
     y_top = int(0.2 * res.height)
     y_bottom = int(0.8 * res.height)
 
-    for _ in range(self.config.scroll_count):
-      # Scroll Down (swipe up: bottom to top).
-      self._swipe_repeatedly(
-          platform,
-          fixed_x,
-          y_bottom,
-          fixed_x,
-          y_top,
-      )
-      # Scroll Up (swipe down: top to bottom).
-      self._swipe_repeatedly(
-          platform,
-          fixed_x,
-          y_top,
-          fixed_x,
-          y_bottom,
-      )
+    swipe_down = (fixed_x, y_bottom, fixed_x, y_top)
+    swipe_up = (fixed_x, y_top, fixed_x, y_bottom)
+    cycle_swipes = ([swipe_down] * self.config.swipes_per_direction +
+                    [swipe_up] * self.config.swipes_per_direction)
+    all_swipes = cycle_swipes * self.config.scroll_count
+    platform.wda.swipe_sequence(
+        all_swipes,
+        duration=self.config.swipe_duration,
+        settle_duration=self.config.settle_duration,
+        lift_duration=self.config.lift_duration,
+    )
 
   def clear_files(self, run: Run) -> None:
     atexit.unregister(self.clear_files)
