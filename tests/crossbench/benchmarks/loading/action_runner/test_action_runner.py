@@ -16,6 +16,7 @@ from crossbench.action_runner.action.click import ClickAction
 from crossbench.action_runner.action.enums import ButtonClick
 from crossbench.action_runner.action.position import PositionConfig
 from crossbench.action_runner.action.probe import ProbeAction
+from crossbench.action_runner.action.raw_input import RawInputAction
 from crossbench.action_runner.action.scroll import ScrollAction
 from crossbench.action_runner.action.swipe import SwipeAction
 from crossbench.action_runner.action.text_input import TextInputAction
@@ -959,6 +960,30 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
     self.inject_events_mock.assert_called_once()
     device_name, _ = self.inject_events_mock.call_args[0]
     self.assertEqual(device_name, "custom_ts")
+
+  def test_raw_input_keyboard(self) -> None:
+    events = (
+        KeyEvent("ControlLeft", is_down=True),
+        KeyEvent("KeyW", is_down=True),
+        KeyEvent("KeyW", is_down=False),
+        KeyEvent("ControlLeft", is_down=False),
+    )
+    raw_input_action = RawInputAction.create(events=events)
+    self.run_action(raw_input_action)
+
+    self.assert_input_events_injected(list(events))
+
+  def test_raw_input_custom_source_device(self) -> None:
+    events = (
+        TouchEvent(Point(10, 20), is_down=True),
+        TouchEvent(Point(10, 20), is_down=False),
+    )
+    raw_input_action = RawInputAction.create(
+        events=events, source_device="custom_ts")
+    self.run_action(raw_input_action)
+
+    self.assert_input_events_injected(
+        list(events), expected_device_name="custom_ts")
 
   def test_click_js_selector_success(self) -> None:
     click_action = ClickAction.create(

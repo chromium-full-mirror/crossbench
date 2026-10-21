@@ -19,6 +19,7 @@ class ActionType(ConfigEnum):
   SWIPE = ("swipe", "Swipe on screen")
   TEXT_INPUT = ("text_input", "Type printable characters at a "
                 "specified speed.")
+  RAW_INPUT = ("raw_input", "Inject a sequence of raw input events")
   WAIT_FOR_CONDITION = ("wait_for_condition",
                         "Wait until JS condition becomes true")
   WAIT_FOR_ELEMENT = ("wait_for_element",

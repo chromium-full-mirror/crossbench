@@ -662,6 +662,11 @@ class ActionRunner:
           duration=action.duration,
           source_device=action.source_device)
 
+  def raw_input(self, action: i_action.RawInputAction) -> None:
+    with self.actions("RawInputAction", measure=False):
+      self.browser_platform.inject_input_events(action.source_device,
+                                                action.events)
+
   def _inject_swipe(self, start_x: int, start_y: int, end_x: int, end_y: int,
                     duration: dt.timedelta, source_device: str) -> None:
     polling_rate_hz = self._get_polling_rate_hz(source_device)

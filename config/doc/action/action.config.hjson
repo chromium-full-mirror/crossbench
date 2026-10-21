@@ -81,6 +81,37 @@
         "duration": "100ms"
       }
     ]
+    "raw_input": [
+      {
+        "action": "raw_input"
+        "events": [
+          {
+            "type": "key"
+            "key_code": "ControlLeft"
+            "is_down": true
+          }
+          {
+            "type": "key"
+            "key_code": "KeyW"
+            "is_down": true
+          }
+          {
+            "type": "wait"
+            "duration": "50ms"
+          }
+          {
+            "type": "key"
+            "key_code": "KeyW"
+            "is_down": false
+          }
+          {
+            "type": "key"
+            "key_code": "ControlLeft"
+            "is_down": false
+          }
+        ]
+      }
+    ]
     "wait_for_condition": [
       {
         "action": "wait_for_condition"

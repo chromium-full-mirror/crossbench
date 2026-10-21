@@ -19,7 +19,8 @@ from crossbench.action_runner.action.click import ClickAction
 from crossbench.action_runner.action.close_all_tabs import CloseAllTabsAction
 from crossbench.action_runner.action.close_tab import CloseTabAction
 from crossbench.action_runner.action.dump_html import DumpHtmlAction
-from crossbench.action_runner.action.enums import ReadyState, WindowTarget
+from crossbench.action_runner.action.enums import ButtonClick, ReadyState, \
+    WindowTarget
 from crossbench.action_runner.action.get import GetAction
 from crossbench.action_runner.action.inject_new_document_script import \
     InjectNewDocumentScriptAction
@@ -28,6 +29,7 @@ from crossbench.action_runner.action.meminfo import MeminfoAction
 from crossbench.action_runner.action.position import CoordinatesConfig, \
     PositionConfig, SelectorConfig
 from crossbench.action_runner.action.probe import ProbeAction
+from crossbench.action_runner.action.raw_input import RawInputAction
 from crossbench.action_runner.action.screenshot import ScreenshotAction
 from crossbench.action_runner.action.scroll import ScrollAction
 from crossbench.action_runner.action.swipe import SwipeAction
@@ -43,8 +45,12 @@ from crossbench.action_runner.action.wait_for_ready_state import \
     WaitForReadyStateAction
 from crossbench.action_runner.action.wait_for_url_matches import \
     WaitForUrlMatchesAction
+from crossbench.action_runner.input_events import INPUT_EVENTS, \
+    INPUT_EVENTS_TUPLE, InputEvent, InputEventType, KeyEvent, \
+    MouseButtonEvent, MouseMoveEvent, TouchEvent, WaitEvent
 from crossbench.benchmarks.loading.config.pages import PagesConfig
 from crossbench.benchmarks.loading.input_source import InputSource
+from crossbench.benchmarks.loading.point import Point
 from crossbench.config import config_dir
 from crossbench.probes.dump_html import DumpHtmlProbe
 from crossbench.probes.js import JSProbe
@@ -130,6 +136,32 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
   def test_all_actions_registered_in_actions_tuple(self):
     action_classes = set(self._get_concrete_action_classes())
     self.assertEqual(action_classes, set(ACTIONS_TUPLE))
+
+  def test_input_event_type_lookup(self) -> None:
+    for event_type in InputEventType:
+      event_cls = INPUT_EVENTS[event_type]
+      self.assertTrue(issubclass(event_cls, InputEvent))
+      self.assertIs(event_cls.config_parser().cls, event_cls)
+      self.assertIs(
+          event_cls.config_parser(), event_cls.config_parser(),
+          f"{event_cls}: missing "
+          "@functools.lru_cache decorator on config_parser() method")
+      self.assertIs(event_cls.TYPE, event_type)
+    self.assertEqual(set(InputEvent.__subclasses__()), set(INPUT_EVENTS_TUPLE))
+
+  def test_parse_point(self) -> None:
+    self.assertEqual(Point.parse("10,20"), Point(10, 20))
+    self.assertEqual(Point.parse(" -5, 15 "), Point(-5, 15))
+    self.assertEqual(Point.parse({"x": 10, "y": 20}), Point(10, 20))
+    self.assertEqual(Point(10, 20).to_json(), {"x": 10, "y": 20})
+    with self.assertRaises(ValueError):
+      Point.parse("")
+    with self.assertRaises(ValueError):
+      Point.parse("10")
+    with self.assertRaises(ValueError):
+      Point.parse("10,20,30")
+    with self.assertRaises(ValueError):
+      Point.parse("a,b")
 
   def test_parse_get_default(self):
     config_dict = {"action": "get", "url": "http://crossben.ch"}
@@ -713,6 +745,193 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
     }
     with self.assertRaisesRegex(ValueError, "keyevent"):
       TextInputAction.parse_dict(config_dict)
+
+  def test_parse_raw_input_keyboard(self) -> None:
+    config_dict: dict[str, object] = {
+        "action":
+            "raw_input",
+        "events": [
+            {
+                "type": "key",
+                "key_code": "ControlLeft",
+                "is_down": True,
+            },
+            {
+                "type": "key",
+                "key_code": "KeyW",
+                "is_down": True,
+            },
+            {
+                "type": "wait",
+                "duration": "50ms",
+            },
+            {
+                "type": "key",
+                "key_code": "KeyW",
+                "is_down": False,
+            },
+            {
+                "type": "key",
+                "key_code": "ControlLeft",
+                "is_down": False,
+            },
+        ],
+    }
+    action = RawInputAction.parse_dict(config_dict)
+
+    self.assertEqual(action.TYPE, ActionType.RAW_INPUT)
+    self.assertEqual(action.timeout, ACTION_TIMEOUT)
+    self.assertEqual(action.input_source, InputSource.KEYBOARD)
+    self.assertEqual(action.source_device, "default_keyboard")
+    self.assertEqual(action.duration, dt.timedelta(milliseconds=50))
+    self.assertEqual(
+        action.events,
+        (
+            KeyEvent("ControlLeft", is_down=True),
+            KeyEvent("KeyW", is_down=True),
+            WaitEvent(dt.timedelta(milliseconds=50)),
+            KeyEvent("KeyW", is_down=False),
+            KeyEvent("ControlLeft", is_down=False),
+        ),
+    )
+    action.validate()
+
+    action_2 = RawInputAction.parse_dict(dict(action.to_json()))
+    self.assertEqual(action, action_2)
+    action_2.validate()
+
+  def test_parse_raw_input_touch(self) -> None:
+    config_dict: dict[str, object] = {
+        "action":
+            "raw_input",
+        "events": [
+            {
+                "type": "touch",
+                "position": {
+                    "x": 10,
+                    "y": 20,
+                },
+                "is_down": True,
+                "slot": 1,
+            },
+            {
+                "type": "touch",
+                "position": {
+                    "x": 10,
+                    "y": 20,
+                },
+                "is_down": False,
+                "slot": 1,
+            },
+        ],
+    }
+    action = RawInputAction.parse_dict(config_dict)
+
+    self.assertEqual(action.input_source, InputSource.TOUCH)
+    self.assertEqual(action.source_device, "default_touchscreen")
+    self.assertEqual(
+        action.events,
+        (
+            TouchEvent(Point(10, 20), is_down=True, slot=1),
+            TouchEvent(Point(10, 20), is_down=False, slot=1),
+        ),
+    )
+    action.validate()
+
+    action_2 = RawInputAction.parse_dict(dict(action.to_json()))
+    self.assertEqual(action, action_2)
+    action_2.validate()
+
+  def test_parse_raw_input_mouse(self) -> None:
+    config_dict: dict[str, object] = {
+        "action":
+            "raw_input",
+        "source_device":
+            "custom_mouse",
+        "events": [
+            {
+                "type": "mouse_move",
+                "position": {
+                    "x": 100,
+                    "y": 200,
+                },
+            },
+            {
+                "type": "mouse_button",
+                "button": "left",
+                "is_down": True,
+            },
+            {
+                "type": "mouse_button",
+                "button": "left",
+                "is_down": False,
+            },
+        ],
+    }
+    action = RawInputAction.parse_dict(config_dict)
+
+    self.assertEqual(action.input_source, InputSource.MOUSE)
+    self.assertEqual(action.source_device, "custom_mouse")
+    self.assertEqual(
+        action.events,
+        (
+            MouseMoveEvent(Point(100, 200)),
+            MouseButtonEvent(ButtonClick.LEFT, is_down=True),
+            MouseButtonEvent(ButtonClick.LEFT, is_down=False),
+        ),
+    )
+    action.validate()
+
+    action_2 = RawInputAction.parse_dict(dict(action.to_json()))
+    self.assertEqual(action, action_2)
+    action_2.validate()
+
+  def test_parse_raw_input_invalid(self) -> None:
+    with self.assertRaises(ValueError):
+      RawInputAction.parse_dict({"action": "raw_input", "events": []})
+
+    with self.assertRaises(ValueError):
+      RawInputAction.parse_dict({
+          "action": "raw_input",
+          "source": "js",
+          "events": [{
+              "type": "key",
+              "key_code": "KeyA",
+              "is_down": True,
+          }],
+      })
+
+    with self.assertRaises(ValueError):
+      RawInputAction.parse_dict({
+          "action": "raw_input",
+          "source": "touch",
+          "events": [{
+              "type": "key",
+              "key_code": "KeyA",
+              "is_down": True,
+          }],
+      })
+
+    with self.assertRaises(ValueError):
+      RawInputAction.parse_dict({
+          "action":
+              "raw_input",
+          "events": [
+              {
+                  "type": "key",
+                  "key_code": "KeyA",
+                  "is_down": True,
+              },
+              {
+                  "type": "touch",
+                  "position": {
+                      "x": 10,
+                      "y": 20,
+                  },
+                  "is_down": True,
+              },
+          ],
+      })
 
   def test_parse_wait_for_condition(self):
     config_dict = {
