@@ -83,6 +83,35 @@ class EnvVarPath(BinaryPath):
     return None
 
 
+class XcodeXctestrunPath(BinaryPath):
+  """Look up the newest WebDriverAgentRunner .xctestrun built by Xcode.
+
+  Xcode deposits e.g. WebDriverAgentRunner_iphoneos26.5-arm64.xctestrun or
+  WebDriverAgentRunner_iphonesimulator26.5-arm64.xctestrun under DerivedData.
+  """
+
+  DERIVED_DATA: ClassVar[pth.AnyPath] = pth.AnyPath(
+      "Library/Developer/Xcode/DerivedData")
+  GLOB: ClassVar[str] = "WebDriverAgent-*/Build/Products/*.xctestrun"
+
+  def __init__(self, sdk: str) -> None:
+    assert sdk, "SDK must be a non-empty string"
+    self.sdk: Final[str] = sdk
+
+  @override
+  def resolve(self, platform: Platform) -> pth.AnyPath | None:
+    derived_data = platform.home() / self.DERIVED_DATA
+    if not platform.is_dir(derived_data):
+      return None
+    candidates = [
+        path for path in platform.glob(derived_data, self.GLOB)
+        if self.sdk in path.name
+    ]
+    if not candidates:
+      return None
+    return max(candidates, key=platform.last_modified)
+
+
 @functools.cache
 def _find_chromium_checkout(platform: Platform) -> pth.AnyPath | None:
   return ChromiumCheckoutFinder(platform).path
@@ -322,6 +351,8 @@ class Binary:
 
   def search(self, platform: Platform) -> pth.AnyPath | None:
     self._validate_platform(platform)
+    if override := platform.lookup_binary_override(self._name):
+      return override
     for element in self.platform_path(platform):
       if result := element.resolve(platform):
         return result
@@ -479,6 +510,10 @@ class Binaries:
   WMIC: ClassVar = Binary("wmic", win="wmic.exe")
   XCODEBUILD: ClassVar = MacOsBinary("xcodebuild")
   XCTRACE: ClassVar = MacOsBinary("xctrace")
+  WDA_XCTESTRUN: ClassVar[Binary] = Binary(
+      "wda-xctestrun", macos=XcodeXctestrunPath("iphoneos"))
+  WDA_XCTESTRUN_SIMULATOR: ClassVar[Binary] = Binary(
+      "wda-xctestrun-simulator", macos=XcodeXctestrunPath("iphonesimulator"))
   CHROMEDRIVER: ClassVar = Binary(
       "chromedriver",
       chromeos="/usr/local/chromedriver/chromedriver",

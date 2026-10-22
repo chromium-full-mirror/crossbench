@@ -20,6 +20,7 @@ from pyfakefs.fake_filesystem import OSType
 from typing_extensions import override
 
 from crossbench import path as pth
+from crossbench.plt.bin import Binaries
 from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.ios import IOSDeviceInfo, IOSPlatform, ios_devices
 from crossbench.plt.version import PlatformVersion
@@ -699,15 +700,15 @@ class IOsWdaTestCase(BaseIOsMockPlatformTestCase):
           ),
       ])
 
-  def test_wda_find_xctestrun_env(self):
+  def test_wda_find_xctestrun_bin_override(self):
     self.expect_startup_devices(
         devices=DEVICES_SINGLE, simulators=SIMULATORS_SAMPLE)
     platform = IOSPlatform(self.host_platform, "00001111-11AA22BB33DD")
     wda = WDAClient(platform)
     custom_path = pth.LocalPath("/custom/test.xctestrun")
     self.fs.create_file(str(custom_path))
-    env = {"CROSSBENCH_WDA_XCTESTRUN": str(custom_path)}
-    with mock.patch.dict(os.environ, env):
+    with self.host_platform.override_binary(Binaries.WDA_XCTESTRUN,
+                                            custom_path):
       self.assertEqual(wda._find_xctestrun(), custom_path)
 
   def test_wda_find_xctestrun_derived_data(self):
@@ -728,15 +729,11 @@ class IOsWdaTestCase(BaseIOsMockPlatformTestCase):
     os.utime(str(newer), (200, 200))
     self.assertEqual(wda._find_xctestrun(), newer)
 
-  def test_wda_find_xctestrun_env_missing_file_raises(self):
-    self.expect_startup_devices(
-        devices=DEVICES_SINGLE, simulators=SIMULATORS_SAMPLE)
-    platform = IOSPlatform(self.host_platform, "00001111-11AA22BB33DD")
-    wda = WDAClient(platform)
-    env = {"CROSSBENCH_WDA_XCTESTRUN": "/custom/missing.xctestrun"}
-    with mock.patch.dict(os.environ, env):
-      with self.assertRaisesRegex(WDAError, "CROSSBENCH_WDA_XCTESTRUN"):
-        wda._find_xctestrun()
+  def test_wda_find_xctestrun_bin_override_missing_file_raises(self):
+    missing = pth.LocalPath("/custom/missing.xctestrun")
+    with self.assertRaisesRegex(ValueError, "does not exist"):
+      self.host_platform.set_binary_lookup_override(Binaries.WDA_XCTESTRUN.name,
+                                                    missing)
 
   def test_wda_find_xctestrun_prefers_matching_sdk(self):
     self.expect_startup_devices(
@@ -795,7 +792,7 @@ class IOsWdaTestCase(BaseIOsMockPlatformTestCase):
       wda._start_runner()
     self.assertIn("WebDriverAgent is not running", str(cm.exception))
     self.assertIn("https://github.com/appium/WebDriverAgent", str(cm.exception))
-    self.assertIn("CROSSBENCH_WDA_XCTESTRUN", str(cm.exception))
+    self.assertIn("--bin-override wda-xctestrun=", str(cm.exception))
 
   def test_wda_devtools_security_disabled_error(self):
     self.expect_startup_devices(

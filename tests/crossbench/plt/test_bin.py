@@ -17,7 +17,8 @@ from crossbench.plt import PLATFORM
 from crossbench.plt.bin import AndroidBinary, AndroidBuildToolPath, Binaries, \
     Binary, BinaryNotFoundError, BinaryPath, ChromeBuildPath, ChromeOSBinary, \
     ChromePath, EnvVarPath, LinuxBinary, MacOsBinary, PerfettoChromePath, \
-    PosixBinary, SystemPath, WinBinary, _find_chromium_checkout
+    PosixBinary, SystemPath, WinBinary, XcodeXctestrunPath, \
+    _find_chromium_checkout
 from tests import test_helper
 from tests.crossbench.base import CrossbenchFakeFsTestCase
 from tests.crossbench.mock_helper import AndroidAdbMockPlatform, \
@@ -741,6 +742,63 @@ class BinaryPathTestCase(CrossbenchFakeFsTestCase):
     self.fs.create_file(sys_v37 / "aapt")
 
     self.assertEqual(tool_path_fallback.resolve(linux_plt), sys_v37 / "aapt")
+
+  def test_xcode_xctestrun_path(self) -> None:
+    macos_plt = MacOsMockPlatform()
+    with self.assertRaises(AssertionError):
+      XcodeXctestrunPath("")
+
+    ios_path = XcodeXctestrunPath("iphoneos")
+    sim_path = XcodeXctestrunPath("iphonesimulator")
+
+    products = (
+        macos_plt.home() /
+        "Library/Developer/Xcode/DerivedData/WebDriverAgent-x/Build/Products")
+    stale = products / "WebDriverAgentRunner_iphoneos26.5-arm64.xctestrun"
+    fresh = products / "WebDriverAgentRunner_iphoneos26.0-arm64.xctestrun"
+    sim = products / "WebDriverAgentRunner_iphonesimulator26.5-arm64.xctestrun"
+
+    # No DerivedData directory at all.
+    self.assertIsNone(ios_path.resolve(macos_plt))
+    # DerivedData exists but contains no matching .xctestrun.
+    self.fs.create_dir(products)
+    self.assertIsNone(ios_path.resolve(macos_plt))
+
+    for path in (stale, fresh, sim):
+      self.fs.create_file(path)
+    # The higher SDK version string is the *older* build: selection must be
+    # by modification time, not by name.
+    os.utime(stale, (100, 100))
+    os.utime(fresh, (200, 200))
+    # The simulator build is newest, but must not win for a real device.
+    os.utime(sim, (300, 300))
+
+    self.assertEqual(ios_path.resolve(macos_plt), fresh)
+    self.assertEqual(sim_path.resolve(macos_plt), sim)
+
+  def test_xcode_xctestrun_path_for_windows(self) -> None:
+    ios_path = XcodeXctestrunPath("iphoneos")
+    self.assertIs(ios_path.for_windows(), ios_path)
+    self.assertEqual(ios_path.sdk, "iphoneos")
+
+  def test_wda_xctestrun_paths(self) -> None:
+    macos_plt = MacOsMockPlatform()
+    products = (
+        macos_plt.home() /
+        "Library/Developer/Xcode/DerivedData/WebDriverAgent-x/Build/Products")
+    fresh = products / "WebDriverAgentRunner_iphoneos26.0-arm64.xctestrun"
+    sim = products / "WebDriverAgentRunner_iphonesimulator26.5-arm64.xctestrun"
+    self.fs.create_file(fresh)
+    self.fs.create_file(sim)
+
+    self.assertEqual(Binaries.WDA_XCTESTRUN.resolve(macos_plt), fresh)
+    self.assertEqual(Binaries.WDA_XCTESTRUN_SIMULATOR.resolve(macos_plt), sim)
+
+    override = macos_plt.local_path("/custom/wda.xctestrun")
+    self.fs.create_file(override)
+    with macos_plt.override_binary(Binaries.WDA_XCTESTRUN, override):
+      self.assertEqual(Binaries.WDA_XCTESTRUN.resolve(macos_plt), override)
+    self.assertEqual(Binaries.WDA_XCTESTRUN.resolve(macos_plt), fresh)
 
   def test_binaries_names(self):
     for prop_name, binary_instance in vars(Binaries).items():

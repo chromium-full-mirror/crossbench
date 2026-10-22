@@ -118,7 +118,8 @@ Or target a specific device using its UDID:
 physical touch gestures. Crossbench will automatically launch
 `WebDriverAgentRunner` if its `.xctestrun` bundle has been built in Xcode or
 with `xcodebuild` (deposited in `~/Library/Developer/Xcode/DerivedData/`), or if
-the `CROSSBENCH_WDA_XCTESTRUN` environment variable points to it.
+`--bin-override wda-xctestrun=/path/to/WebDriverAgentRunner*.xctestrun` is
+passed.
 Alternatively, launch `WebDriverAgentRunner` on the device beforehand so it
 listens on port 8100.
 

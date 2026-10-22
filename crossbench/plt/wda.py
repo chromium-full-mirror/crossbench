@@ -14,8 +14,9 @@ automation on iOS. To use WDA:
      -scheme WebDriverAgentRunner -destination "id=<UDID>"
    This deposits a .xctestrun file in ~/Library/Developer/Xcode/DerivedData,
    which Crossbench automatically discovers.
-2. Alternatively, set CROSSBENCH_WDA_XCTESTRUN to the path of your
-   built WebDriverAgentRunner*.xctestrun file.
+2. Alternatively, point crossbench at a built .xctestrun file with
+   --bin-override wda-xctestrun=/path/to/WebDriverAgentRunner*.xctestrun
+   (or wda-xctestrun-simulator for simulators).
 3. Or launch WebDriverAgentRunner on the device beforehand so it listens
    on port 8100.
 """
@@ -133,8 +134,8 @@ class WDAClient:
           "(https://github.com/appium/WebDriverAgent)\n"
           "   in Xcode or with xcodebuild so its .xctestrun file is in\n"
           "   ~/Library/Developer/Xcode/DerivedData, or\n"
-          "2. Set the CROSSBENCH_WDA_XCTESTRUN environment variable to the\n"
-          "   path of your built .xctestrun file, or\n"
+          "2. Pass --bin-override wda-xctestrun=/path/to/your.xctestrun\n"
+          "   (or wda-xctestrun-simulator for simulators), or\n"
           "3. Start WebDriverAgentRunner on the device beforehand.")
 
     logging.info("Starting WebDriverAgentRunner on %s...", self._platform.udid)
@@ -303,33 +304,11 @@ class WDAClient:
         f"xcodebuild process terminated unexpectedly with code {returncode}.")
 
   def _find_xctestrun(self) -> pth.AnyPath | None:
-    """Find a candidate .xctestrun file on the host platform."""
+    """Find a WebDriverAgentRunner .xctestrun file on the host platform."""
     host = self._platform.host_platform
-    if env_path := host.environ.get("CROSSBENCH_WDA_XCTESTRUN"):
-      candidate = host.path(env_path)
-      if not host.is_file(candidate):
-        raise WDAError(
-            f"CROSSBENCH_WDA_XCTESTRUN points to a missing file: {candidate}")
-      return candidate
-
-    home = host.home()
-    derived_data = home / "Library/Developer/Xcode/DerivedData"
-    if not host.is_dir(derived_data):
-      return None
-
-    candidates = list(
-        host.glob(derived_data, "WebDriverAgent-*/Build/Products/*.xctestrun"))
-    if not candidates:
-      return None
-
-    # Xcode names builds e.g. WebDriverAgentRunner_iphoneos26.5-arm64.xctestrun
-    # or WebDriverAgentRunner_iphonesimulator26.5-arm64.xctestrun.
-    sdk_name = "iphonesimulator" if self._platform.is_simulator else "iphoneos"
-    if matching := [c for c in candidates if sdk_name in c.name]:
-      candidates = matching
-    # Prefer the most recently modified .xctestrun build.
-    candidates.sort(key=host.last_modified, reverse=True)
-    return candidates[0]
+    if self._platform.is_simulator:
+      return Binaries.WDA_XCTESTRUN_SIMULATOR.search(host)
+    return Binaries.WDA_XCTESTRUN.search(host)
 
   def _find_xcodeproj_for_hint(self) -> pth.AnyPath:
     """Resolve the path to WebDriverAgent.xcodeproj for error messages."""
