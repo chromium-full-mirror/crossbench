@@ -539,6 +539,8 @@ class ActionRunner:
     mid_x = scroll_area.mid_x
     total_distance = abs(total_scroll_distance)
     remaining_distance = total_distance
+    polling_rate_hz = self._get_polling_rate_hz(source_device)
+    events: list[InputEvent] = []
 
     while remaining_distance > 0:
       current_distance = min(max_swipe_distance, remaining_distance)
@@ -547,14 +549,17 @@ class ActionRunner:
                                                       current_distance,
                                                       scrollable_top,
                                                       scrollable_bottom)
-      self._inject_swipe(
-          start_x=mid_x,
-          start_y=y_start,
-          end_x=mid_x,
-          end_y=y_end,
-          duration=current_duration,
-          source_device=source_device)
+      events.extend(
+          self._get_swipe_events(
+              start_x=mid_x,
+              start_y=y_start,
+              end_x=mid_x,
+              end_y=y_end,
+              duration=current_duration,
+              polling_rate_hz=polling_rate_hz))
       remaining_distance -= current_distance
+
+    self.browser_platform.inject_input_events(source_device, events)
 
   def _get_scroll_swipe_y_range(self, total_scroll_distance: float,
                                 current_distance: float, scrollable_top: int,

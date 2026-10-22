@@ -938,12 +938,14 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
     self.browser.expect_js(expected_js=self._NO_ELEMENT_JS_RESULT)
     self.run_action(scroll_action)
 
-    self.assertEqual(self.inject_events_mock.call_count, 2)
-    first_events = self.inject_events_mock.call_args_list[0][0][1]
+    self.inject_events_mock.assert_called_once()
+    _, events = self.inject_events_mock.call_args[0]
+    first_swipe_end = events.index(TouchEvent(Point(960, 108), is_down=False))
+    first_events = events[:first_swipe_end + 1]
+    second_events = events[first_swipe_end + 1:]
     self.assertEqual(first_events[0], TouchEvent(Point(960, 972), is_down=True))
     self.assertEqual(first_events[-1],
                      TouchEvent(Point(960, 108), is_down=False))
-    second_events = self.inject_events_mock.call_args_list[1][0][1]
     self.assertEqual(second_events[0],
                      TouchEvent(Point(960, 972), is_down=True))
     self.assertEqual(second_events[-1],
