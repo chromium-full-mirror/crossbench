@@ -7,6 +7,7 @@ from __future__ import annotations
 import abc
 import atexit
 import contextlib
+import datetime as dt
 import logging
 from typing import TYPE_CHECKING, Final, Iterator, Self
 
@@ -16,6 +17,8 @@ from crossbench import exception
 from crossbench.parse import NumberParser
 
 if TYPE_CHECKING:
+  import subprocess
+
   from crossbench.plt.base import Platform
 
 
@@ -309,3 +312,83 @@ class LocalPortManager(PortManager):
   @override
   def stop_reverse_forward(self, remote_port: int) -> None:
     del remote_port
+
+
+class SubprocessPortManager(PortManager):
+  """PortManager for remote platforms where every forwarded port is kept alive
+  by a dedicated host subprocess (e.g. `ssh -NL` or `iproxy`).
+
+  Subclasses only spawn these processes. This class validates and allocates
+  ports, tracks the spawned processes, waits until a forwarded port is
+  reachable and terminates the processes again when forwarding stops.
+  """
+
+  PORT_FORWARDING_TIMEOUT: Final[dt.timedelta] = dt.timedelta(seconds=10)
+
+  def __init__(self, platform: Platform, throw: bool = False) -> None:
+    super().__init__(platform, throw)
+    self._forward_popens: Final[dict[int, subprocess.Popen]] = {}
+    self._reverse_forward_popens: Final[dict[int, subprocess.Popen]] = {}
+
+  @property
+  def host_platform(self) -> Platform:
+    return self._platform.host_platform
+
+  @abc.abstractmethod
+  def _popen_forward(self, local_port: int,
+                     remote_port: int) -> subprocess.Popen:
+    """Spawn the host process that forwards local_port to remote_port."""
+
+  def _popen_reverse_forward(self, remote_port: int,
+                             local_port: int) -> subprocess.Popen:
+    """Spawn the host process that forwards remote_port to local_port."""
+    del remote_port, local_port
+    raise NotImplementedError(f"reverse_forward not implemented for {self}")
+
+  @override
+  def forward(self, local_port: int, remote_port: int) -> int:
+    local_port = NumberParser.positive_zero_int(local_port, "local_port")
+    remote_port = NumberParser.port_number(remote_port, "remote_port")
+    if not local_port:
+      local_port = self.host_platform.get_free_port()
+    if local_port in self._forward_popens:
+      raise PortForwardException(
+          f"Cannot forward local port {local_port} twice.")
+    self._forward_popens[local_port] = self._popen_forward(
+        local_port, remote_port)
+    try:
+      self.host_platform.wait_for_port(local_port, self.PORT_FORWARDING_TIMEOUT)
+    except BaseException:
+      self.stop_forward(local_port)
+      raise
+    logging.debug("Forwarded Remote Port: %s:%s <= %s:%s", self.host_platform,
+                  local_port, self.platform, remote_port)
+    return local_port
+
+  @override
+  def stop_forward(self, local_port: int) -> None:
+    self._forward_popens.pop(local_port).terminate()
+
+  @override
+  def reverse_forward(self, remote_port: int, local_port: int) -> int:
+    remote_port = NumberParser.port_number(remote_port, "remote_port")
+    local_port = NumberParser.positive_zero_int(local_port, "local_port")
+    if not local_port:
+      local_port = self.host_platform.get_free_port()
+    if remote_port in self._reverse_forward_popens:
+      raise PortForwardException(
+          f"Cannot forward remote port {remote_port} twice.")
+    self._reverse_forward_popens[remote_port] = self._popen_reverse_forward(
+        remote_port, local_port)
+    try:
+      self.platform.wait_for_port(remote_port, self.PORT_FORWARDING_TIMEOUT)
+    except BaseException:
+      self.stop_reverse_forward(remote_port)
+      raise
+    logging.debug("Forwarded Local Port: %s:%s => %s:%s", self.host_platform,
+                  local_port, self.platform, remote_port)
+    return remote_port
+
+  @override
+  def stop_reverse_forward(self, remote_port: int) -> None:
+    self._reverse_forward_popens.pop(remote_port).terminate()

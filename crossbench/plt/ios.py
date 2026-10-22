@@ -8,10 +8,9 @@ import dataclasses
 import datetime as dt
 import functools
 import json
-import logging
 import re
 import subprocess
-from typing import TYPE_CHECKING, Any, Final, cast
+from typing import TYPE_CHECKING, Final, cast
 
 from typing_extensions import override
 
@@ -20,7 +19,7 @@ from crossbench.parse import NumberParser
 from crossbench.plt.base import Platform
 from crossbench.plt.bin import Binaries
 from crossbench.plt.device_info import DeviceInfo
-from crossbench.plt.port_manager import PortManager
+from crossbench.plt.port_manager import PortManager, SubprocessPortManager
 from crossbench.plt.remote import RemotePlatformMixin
 from crossbench.plt.version import PlatformVersion
 from crossbench.plt.wda import WDAClient
@@ -102,86 +101,49 @@ def _simctl_devices(platform: Platform) -> dict[str, IOSDeviceInfo]:
   return results
 
 
-class IOSPortManager(PortManager):
-  PORT_FORWARDING_TIMEOUT: Final[dt.timedelta] = dt.timedelta(seconds=10)
+class IOSSimulatorPortManager(PortManager):
 
-  def __init__(self, platform: IOSPlatform) -> None:
-    super().__init__(platform)
-    self._forward_popens: dict[int, subprocess.Popen[Any]] = {}
+  @override
+  def forward(self, local_port: int, remote_port: int) -> int:
+    # Simulators share the host's network stack, so nothing is forwarded.
+    local_port = NumberParser.positive_zero_int(local_port, "local_port")
+    remote_port = NumberParser.port_number(remote_port, "remote_port")
+    if local_port and local_port != remote_port:
+      raise ValueError(f"Cannot remap port {remote_port} on iOS simulator.")
+    return remote_port
+
+  @override
+  def stop_forward(self, local_port: int) -> None:
+    del local_port
+
+  @override
+  def reverse_forward(self, remote_port: int, local_port: int) -> int:
+    del remote_port, local_port
+    raise NotImplementedError(f"reverse_forward not implemented for {self}")
+
+  @override
+  def stop_reverse_forward(self, remote_port: int) -> None:
+    del remote_port
+
+
+class IOSPortManager(SubprocessPortManager):
 
   @property
   def _ios_platform(self) -> IOSPlatform:
     return cast("IOSPlatform", self.platform)
 
-  @property
-  def _host_platform(self) -> Platform:
-    return self._ios_platform.host_platform
-
   @override
-  def forward(self, local_port: int, remote_port: int) -> int:
-    local_port = NumberParser.positive_zero_int(local_port, "local_port")
-    remote_port = NumberParser.port_number(remote_port, "remote_port")
-
-    if self._ios_platform.is_simulator:
-      if local_port and local_port != remote_port:
-        raise ValueError(f"Cannot remap port {remote_port} on iOS simulator.")
-      return remote_port
-
-    if not local_port:
-      local_port = self._host_platform.get_free_port()
-    if local_port in self._forward_popens:
-      raise RuntimeError(f"Cannot forward local port {local_port} twice.")
-
-    iproxy_bin = Binaries.IPROXY.resolve(self._host_platform)
-    cmd = (
-        iproxy_bin,
+  def _popen_forward(self, local_port: int,
+                     remote_port: int) -> subprocess.Popen:
+    return self.host_platform.popen(
+        Binaries.IPROXY.resolve(self.host_platform),
         str(local_port),
         str(remote_port),
         "-u",
         self._ios_platform.udid,
-    )
-    proc = self._host_platform.popen(
-        *cmd,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    self._forward_popens[local_port] = proc
-    try:
-      self._host_platform.wait_for_port(local_port,
-                                        self.PORT_FORWARDING_TIMEOUT)
-    except Exception:
-      self.stop_forward(local_port)
-      raise
-    logging.debug(
-        "Forwarded Remote Port: %s:%s <= %s:%s",
-        self._host_platform,
-        local_port,
-        self._ios_platform,
-        remote_port,
-    )
-    return local_port
-
-  @override
-  def stop_forward(self, local_port: int) -> None:
-    if proc := self._forward_popens.pop(local_port, None):
-      try:
-        proc.terminate()
-      except OSError as e:
-        logging.warning("Failed to stop iproxy on port %s: %s", local_port, e)
-
-  @override
-  def reverse_forward(self, remote_port: int, local_port: int) -> int:
-    raise NotImplementedError
-
-  @override
-  def stop_reverse_forward(self, remote_port: int) -> None:
-    raise NotImplementedError
-
-  @override
-  def _stop_all(self) -> None:
-    super()._stop_all()
-    for local_port in list(self._forward_popens):
-      self.stop_forward(local_port)
 
 
 # TODO: consider using some abstract MacOS base class.
@@ -196,14 +158,15 @@ class IOSPlatform(RemotePlatformMixin, Platform):
                device_identifier: str | None = None) -> None:
     assert not host_platform.is_remote, (
         "ios on remote platform is not supported yet")
-    super().__init__(host_platform)
     self._device: Final[IOSDeviceInfo] = self._find_ios_device(
-        device_identifier)
+        host_platform, device_identifier)
+    super().__init__(host_platform)
     self._wda: WDAClient | None = None
 
   def _find_ios_device(self,
+                       host_platform: Platform,
                        device_identifier: str | None = None) -> IOSDeviceInfo:
-    devices: dict[str, IOSDeviceInfo] = ios_devices(self._host_platform)
+    devices: dict[str, IOSDeviceInfo] = ios_devices(host_platform)
     if not devices:
       raise ValueError("No devices attached.")
     if not device_identifier:
@@ -228,7 +191,9 @@ class IOSPlatform(RemotePlatformMixin, Platform):
     return matches[0]
 
   @override
-  def _create_port_manager(self) -> IOSPortManager:
+  def _create_port_manager(self) -> PortManager:
+    if self.is_simulator:
+      return IOSSimulatorPortManager(self)
     return IOSPortManager(self)
 
   @override

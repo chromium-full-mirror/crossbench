@@ -22,7 +22,8 @@ from typing_extensions import override
 from crossbench import path as pth
 from crossbench.plt.bin import Binaries
 from crossbench.plt.display_info import DisplayResolution
-from crossbench.plt.ios import IOSDeviceInfo, IOSPlatform, ios_devices
+from crossbench.plt.ios import IOSDeviceInfo, IOSPlatform, IOSPortManager, \
+    IOSSimulatorPortManager, ios_devices
 from crossbench.plt.version import PlatformVersion
 from crossbench.plt.wda import WDAClient, WDAError
 from tests import test_helper
@@ -392,6 +393,8 @@ class IOsMockPlatformTestCase(BaseIOsMockPlatformTestCase):
     self.expect_startup_devices(
         devices=DEVICES_SINGLE, simulators=SIMULATORS_SAMPLE)
     platform_sim = IOSPlatform(self.host_platform, IPHONE_SIMULATOR["udid"])
+    self.assertIsInstance(platform_sim._default_port_manager,
+                          IOSSimulatorPortManager)
     port = platform_sim.ports.forward(8100, 8100)
     self.assertEqual(port, 8100)
     platform_sim.ports.stop_forward(8100)
@@ -407,6 +410,8 @@ class IOsMockPlatformTestCase(BaseIOsMockPlatformTestCase):
     self.expect_startup_devices(
         devices=DEVICES_SINGLE, simulators=SIMULATORS_SAMPLE)
     platform_physical = IOSPlatform(self.host_platform, "00001111-11AA22BB33DD")
+    self.assertIsInstance(platform_physical._default_port_manager,
+                          IOSPortManager)
     self.fs.create_file("/usr/local/bin/iproxy")
     self.host_platform.which = mock.MagicMock(
         return_value=pth.LocalPath("/usr/local/bin/iproxy"))
@@ -452,8 +457,8 @@ class IOsMockPlatformTestCase(BaseIOsMockPlatformTestCase):
     platform_physical = IOSPlatform(self.host_platform, "00001111-11AA22BB33DD")
     with self.assertRaises(NotImplementedError):
       platform_physical.ports.reverse_forward(8100, 8100)
-    with self.assertRaises(NotImplementedError):
-      platform_physical._default_port_manager.stop_reverse_forward(8100)
+    self.assertFalse(
+        platform_physical.ports.is_reverse_forwarded_port_used(8100))
 
   def test_display_details(self):
     self.expect_startup_devices(
