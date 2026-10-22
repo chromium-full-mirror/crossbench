@@ -234,6 +234,7 @@ ignore-missing-imports = [
     # Built-in Pyodide WebAssembly FFI module (not a PyPI package).
     "js",
     # Provided at runtime by depot_tools when running PRESUBMIT.py.
+    "presubmit_support",
     "presubmit_thread_pool",
 ]
 infer-return-types = "never"

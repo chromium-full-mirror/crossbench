@@ -6,17 +6,23 @@ from __future__ import annotations
 
 import abc
 import ast
+import dataclasses
 import enum
+import pathlib
 import unittest
-from typing import Any, Callable, ClassVar, Final, Iterable, TypeAlias
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Final, Iterable, \
+    TypeAlias
 from unittest import mock
 
 from typing_extensions import override
 
 from tests import test_helper
 from tools.presubmit import ast_checks, banned_builtins, constant_final, \
-    toplevel_files
+    pyrefly_check, toplevel_files
 from tools.presubmit.toplevel_files import FileAction
+
+if TYPE_CHECKING:
+  from collections.abc import Sequence
 
 ChangedLines: TypeAlias = set[int] | None
 ChangedLinesMap: TypeAlias = dict[str, set[int]] | None
@@ -548,6 +554,110 @@ class CheckNoNewToplevelFilesTestCase(_PresubmitTestCase):
     self._assert_error(
         files={"tests/crossbench/test_new_module.py": ""},
         description="Add core module\n\nALLOW_TOPLEVEL_FILE=TODO",
+    )
+
+
+@dataclasses.dataclass(frozen=True)
+class MockPresubmitLocation:
+  file_path: str
+  start_line: int
+  end_line: int
+
+
+@dataclasses.dataclass(frozen=True)
+class MockPresubmitError:
+  message: str
+  locations: Sequence[object] = ()
+
+
+class MockPyreflyOutputApi:
+
+  def PresubmitResultLocation(  # noqa: N802
+      self,
+      file_path: str,
+      start_line: int,
+      end_line: int,
+  ) -> MockPresubmitLocation:
+    return MockPresubmitLocation(
+        file_path=file_path,
+        start_line=start_line,
+        end_line=end_line,
+    )
+
+  def PresubmitError(  # noqa: N802
+      self,
+      message: str,
+      locations: Sequence[object] = (),
+  ) -> MockPresubmitError:
+    return MockPresubmitError(message=message, locations=tuple(locations))
+
+
+class PyreflyPresubmitTestCase(unittest.TestCase):
+
+  def test_zero_returncode_returns_none(self) -> None:
+    output_api = MockPyreflyOutputApi()
+    self.assertIsNone(
+        pyrefly_check.ParsePyreflyOutput(output_api, pathlib.Path("/repo"), 0,
+                                         "", ""))
+
+  def test_parse_errors_and_locations(self) -> None:
+    stdout = """
+    {
+      "errors": [
+        {
+          "line": 175,
+          "column": 54,
+          "stop_line": 175,
+          "stop_column": 63,
+          "path": "/repo/crossbench/benchmarks/jetstream/jetstream.py",
+          "name": "bad-argument-type",
+          "concise_description": "Argument `dict[str, Json]` is not assignable"
+        },
+        {
+          "line": 75,
+          "column": 22,
+          "stop_line": 77,
+          "stop_column": 36,
+          "path": "crossbench/benchmarks/speedometer/speedometer_3.py",
+          "name": "unsupported-operation",
+          "concise_description": "Cannot set item in `dict[str, float]`"
+        }
+      ]
+    }
+    """
+    output_api = MockPyreflyOutputApi()
+    results = pyrefly_check.ParsePyreflyOutput(output_api,
+                                               pathlib.Path("/repo"), 1, stdout,
+                                               "WARN PYTHONPATH...")
+    assert results is not None
+    self.assertEqual(len(results), 2)
+    self.assertEqual(
+        results[0],
+        MockPresubmitError(
+            message=("pyrefly [bad-argument-type] "
+                     "crossbench/benchmarks/jetstream/jetstream.py:175:54: "
+                     "Argument `dict[str, Json]` is not assignable"),
+            locations=(MockPresubmitLocation(
+                file_path="crossbench/benchmarks/jetstream/jetstream.py",
+                start_line=175,
+                end_line=175,
+            ),),
+        ),
+    )
+    self.assertEqual(
+        results[1],
+        MockPresubmitError(
+            message=(
+                "pyrefly [unsupported-operation] "
+                "crossbench/benchmarks/speedometer/speedometer_3.py:75:22: "
+                "Cannot set item in `dict[str, float]`"),
+            locations=(MockPresubmitLocation(
+                file_path=(
+                    "crossbench/benchmarks/speedometer/speedometer_3.py"),
+                start_line=75,
+                end_line=77,
+            ),),
+        ),
     )
 
 

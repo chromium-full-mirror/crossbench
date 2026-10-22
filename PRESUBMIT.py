@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import functools
 import pathlib
 import platform
 import re
@@ -123,6 +124,7 @@ def CheckChange(input_api: Any, output_api: Any, on_commit: bool) -> Any:
             python3=True,
         ))
     if platform.system() != "Linux" or platform.machine() == "x86_64":
+      from tools.presubmit.pyrefly_check import ParsePyreflyOutput
       tests.append(
           input_api.Command(
               name="pyrefly",
@@ -131,12 +133,15 @@ def CheckChange(input_api: Any, output_api: Any, on_commit: bool) -> Any:
                   "-m",
                   "pyrefly",
                   "check",
+                  "--output-format=json",
                   "-c",
                   str(root_path / "pyproject.toml"),
               ] + mypy_files_to_check,
               message=output_api.PresubmitError,
               kwargs={},
               python3=True,
+              output_parser=functools.partial(ParsePyreflyOutput, output_api,
+                                              root_path),
           ))
 
   # ---------------------------------------------------------------------------
