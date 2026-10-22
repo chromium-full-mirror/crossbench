@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Final
 from typing_extensions import override
 
 from crossbench import path as pth
+from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.browsers.browser import Browser
 from crossbench.browsers.browser_helper import convert_flags_to_label
 from crossbench.browsers.chromium.version import ChromiumVersionRange
@@ -149,6 +150,11 @@ class ChromiumBased(Browser):
   @abc.abstractmethod
   def version_cls(cls) -> type[ChromiumVersion]:
     pass
+
+  @classmethod
+  @override
+  def attributes(cls) -> BrowserAttributes:
+    return super().attributes() | BrowserAttributes.CHROMIUM_BASED
 
   @classmethod
   @override

@@ -16,6 +16,7 @@ from ordered_set import OrderedSet
 from crossbench import path as pth
 from crossbench import plt
 from crossbench.action_runner.action.enums import WindowTarget
+from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.browsers.settings import Settings
 from crossbench.browsers.version import BrowserVersion, UnknownBrowserVersion
 from crossbench.flags.base import Flags, FlagsData, FlagsT
@@ -23,7 +24,6 @@ from crossbench.flags.base import Flags, FlagsData, FlagsT
 if TYPE_CHECKING:
   import re
 
-  from crossbench.browsers.attributes import BrowserAttributes
   from crossbench.browsers.viewport import Viewport
   from crossbench.cli.config.secrets import Secrets, UsernamePassword
   from crossbench.env.runner_env import RunnerEnv
@@ -53,7 +53,7 @@ class Browser(abc.ABC):
   @classmethod
   @abc.abstractmethod
   def attributes(cls) -> BrowserAttributes:
-    pass
+    return BrowserAttributes(0)
 
   def __init__(self,
                label: str,

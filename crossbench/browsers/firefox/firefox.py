@@ -55,7 +55,9 @@ class Firefox(Browser):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.FIREFOX
+    return (super().attributes()
+            | BrowserAttributes.FIREFOX
+            | BrowserAttributes.DESKTOP)
 
   @override
   def _setup_cache_dir(self) -> pth.AnyPath | None:

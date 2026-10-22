@@ -42,7 +42,9 @@ class D8(ShellBrowser):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.D8 | BrowserAttributes.CHROMIUM_BASED
+    return (super().attributes()
+            | BrowserAttributes.D8
+            | BrowserAttributes.CHROMIUM_BASED)
 
   @override
   def __init__(self,

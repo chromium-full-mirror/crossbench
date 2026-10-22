@@ -20,6 +20,7 @@ from typing_extensions import override
 from crossbench import exception
 from crossbench import hjson as cb_hjson
 from crossbench import path as pth
+from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.browsers.chromium.base import ChromiumBaseMixin
 from crossbench.browsers.chromium.version import ChromiumVersion
 from crossbench.browsers.chromium_based.webdriver import ChromiumBasedWebDriver
@@ -107,6 +108,13 @@ def install_apk(platform: AndroidAdbPlatform, apk_config: ApkConfig | None,
 class ChromiumWebDriverAndroid(ChromiumBasedWebDriver):
   MIN_SET_WINDOW_RECT_VERSION: Final[ChromiumVersion] = ChromiumVersion(
       (153, 0, 7994, 0))
+
+  @classmethod
+  @override
+  def attributes(cls) -> BrowserAttributes:
+    return ((super().attributes() & ~BrowserAttributes.DESKTOP)
+            | BrowserAttributes.MOBILE
+            | BrowserAttributes.REMOTE)
 
   def __init__(self,
                label: str,
@@ -503,6 +511,11 @@ class AutoForwardingRemoteWebDriver(RemoteWebDriver):
 
 class ChromiumWebDriverSsh(ChromiumBasedWebDriver):
 
+  @classmethod
+  @override
+  def attributes(cls) -> BrowserAttributes:
+    return super().attributes() | BrowserAttributes.REMOTE
+
   @property
   @override
   def platform(self) -> LinuxSshPlatform:
@@ -527,6 +540,11 @@ class ChromiumWebDriverSsh(ChromiumBasedWebDriver):
 
 
 class ChromiumWebDriverChromeOsSsh(ChromiumBasedWebDriver):
+
+  @classmethod
+  @override
+  def attributes(cls) -> BrowserAttributes:
+    return super().attributes() | BrowserAttributes.REMOTE
 
   @property
   @override

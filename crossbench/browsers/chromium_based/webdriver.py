@@ -66,8 +66,9 @@ class ChromiumBasedWebDriver(
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return (BrowserAttributes.CHROMIUM | BrowserAttributes.CHROMIUM_BASED
-            | BrowserAttributes.WEBDRIVER)
+    return (super().attributes()
+            | BrowserAttributes.CHROMIUM
+            | BrowserAttributes.DESKTOP)
 
   def use_local_chromedriver(self) -> bool:
     return self.version.major == 0 or self.is_locally_compiled()

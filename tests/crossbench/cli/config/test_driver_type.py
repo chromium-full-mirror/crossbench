@@ -85,6 +85,7 @@ class BrowserDriverTypeTestCase(unittest.TestCase):
         BrowserDriverType.ANDROID,
         BrowserDriverType.ANDROID_CDP,
         BrowserDriverType.CHROMEOS_SSH,
+        BrowserDriverType.IOS,
         BrowserDriverType.LINUX_SSH,
     }
     for driver_type in BrowserDriverType:

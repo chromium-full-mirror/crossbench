@@ -56,8 +56,8 @@ class EdgeWebDriver(EdgeBaseMixin, ChromiumBasedWebDriver):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return (BrowserAttributes.EDGE | BrowserAttributes.CHROMIUM_BASED
-            | BrowserAttributes.WEBDRIVER)
+    return ((super().attributes() & ~BrowserAttributes.CHROMIUM)
+            | BrowserAttributes.EDGE)
 
 
 class EdgeWebDriverDownloader:

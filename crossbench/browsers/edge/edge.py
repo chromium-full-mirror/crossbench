@@ -21,4 +21,6 @@ class Edge(EdgeBaseMixin, ChromiumBased):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.EDGE | BrowserAttributes.CHROMIUM_BASED
+    return (super().attributes()
+            | BrowserAttributes.EDGE
+            | BrowserAttributes.DESKTOP)

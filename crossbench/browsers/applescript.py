@@ -15,6 +15,7 @@ from typing_extensions import override
 
 from crossbench import plt
 from crossbench.action_runner.action.enums import WindowTarget
+from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.browsers.browser import Browser
 from crossbench.env.base import ValidationError
 
@@ -111,6 +112,13 @@ class AppleScriptBrowser(Browser, metaclass=abc.ABCMeta):
   APPLE_SCRIPT_SET_URL: ClassVar[str] = ""
 
   _browser_process: subprocess.Popen
+
+  @classmethod
+  @override
+  def attributes(cls) -> BrowserAttributes:
+    return (super().attributes()
+            | BrowserAttributes.APPLESCRIPT
+            | BrowserAttributes.DESKTOP)
 
   def _exec_apple_script(self, apple_script: str, **kwargs) -> str:
     assert self.platform.is_macos, (

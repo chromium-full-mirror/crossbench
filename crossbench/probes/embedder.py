@@ -8,17 +8,18 @@ from typing import TYPE_CHECKING, ClassVar, Final
 
 from typing_extensions import override
 
+from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.browsers.webview.embedder import WebviewEmbedder
 from crossbench.parse import ObjectParser
 from crossbench.plt.android_adb import AndroidAdbPlatform
 from crossbench.probes.js import parse_javascript
 from crossbench.probes.json import JsonResultProbe, JsonResultProbeContext
 from crossbench.probes.metric import MetricsMerger
-from crossbench.probes.probe import ProbeConfigParser, ProbeIncompatibleBrowser
 
 if TYPE_CHECKING:
   from crossbench.browsers.browser import Browser
   from crossbench.env.runner_env import RunnerEnv
+  from crossbench.probes.probe import ProbeConfigParser
   from crossbench.probes.results import ProbeResult
   from crossbench.runner.actions import Actions
   from crossbench.runner.groups.browsers import BrowsersRunGroup
@@ -54,9 +55,8 @@ class WebviewEmbedderProbe(JsonResultProbe):
 
   def validate_browser(self, env: RunnerEnv, browser: Browser) -> None:
     del env
-    if not isinstance(browser, WebviewEmbedder):
-      raise ProbeIncompatibleBrowser(self, browser,
-                                     "Only supported for WV embedders")
+    self.expect_browser(browser, BrowserAttributes.WEBVIEW_EMBEDDER,
+                        "Only supported for WV embedders")
 
   def get_context_cls(self) -> type[WebviewEmbedderProbeContext]:
     return WebviewEmbedderProbeContext

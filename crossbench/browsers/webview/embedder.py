@@ -18,6 +18,7 @@ from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.chromium.webdriver import ChromiumDriver
 from typing_extensions import override
 
+from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.browsers.webview.webview import Webview
 from crossbench.cli.ui import ui
 
@@ -47,6 +48,11 @@ class WebviewEmbedder(Webview):
 
   _INSTALLED_APK_PATHS: Final[MutableMapping[str, MutableSet[pth.AnyPath]]] = (
       collections.defaultdict(set))
+
+  @classmethod
+  @override
+  def attributes(cls) -> BrowserAttributes:
+    return super().attributes() | BrowserAttributes.WEBVIEW_EMBEDDER
 
   def __init__(self,
                label: str,

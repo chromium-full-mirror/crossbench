@@ -27,8 +27,8 @@ class ChromeAppleScript(ChromeBaseMixin, ChromiumAppleScript):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return (BrowserAttributes.CHROME | BrowserAttributes.CHROMIUM_BASED
-            | BrowserAttributes.APPLESCRIPT)
+    return ((super().attributes() & ~BrowserAttributes.CHROMIUM)
+            | BrowserAttributes.CHROME)
 
   def _create_driver(self, options: ChromeOptions,
                      service: ChromeService) -> ChromiumDriver:

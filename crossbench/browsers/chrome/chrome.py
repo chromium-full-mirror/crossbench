@@ -16,4 +16,6 @@ class Chrome(ChromeBaseMixin, ChromiumBased):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.CHROME | BrowserAttributes.CHROMIUM_BASED
+    return (super().attributes()
+            | BrowserAttributes.CHROME
+            | BrowserAttributes.DESKTOP)

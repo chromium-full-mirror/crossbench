@@ -98,6 +98,7 @@ class CdpAndroidBrowserTest(CrossbenchFakeFsTestCase):
     self.assertIn(BrowserAttributes.CHROME, attrs)
     self.assertIn(BrowserAttributes.CHROMIUM_BASED, attrs)
     self.assertIn(BrowserAttributes.MOBILE, attrs)
+    self.assertIn(BrowserAttributes.REMOTE, attrs)
     self.assertEqual(CdpAndroidBrowser.type_name(), "cdp-android")
     self.assertEqual(CdpAndroidBrowser.version_cls(), ChromiumVersion)
 

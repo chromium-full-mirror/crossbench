@@ -56,7 +56,9 @@ class Safari(Browser):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.SAFARI
+    return (super().attributes()
+            | BrowserAttributes.SAFARI
+            | BrowserAttributes.DESKTOP)
 
   def __init__(self,
                label: str,

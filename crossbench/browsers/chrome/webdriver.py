@@ -32,8 +32,8 @@ class ChromeWebDriver(ChromeBaseMixin, ChromiumBasedWebDriver):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return (BrowserAttributes.CHROME | BrowserAttributes.CHROMIUM_BASED
-            | BrowserAttributes.WEBDRIVER)
+    return ((super().attributes() & ~BrowserAttributes.CHROMIUM)
+            | BrowserAttributes.CHROME)
 
   @override
   def _create_driver(self, options: ChromiumOptions,

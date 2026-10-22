@@ -19,7 +19,6 @@ from typing_extensions import override
 
 from crossbench import exception
 from crossbench import path as pth
-from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.browsers.firefox.firefox import Firefox
 from crossbench.browsers.webdriver import WebDriverBrowser
 from crossbench.helper import url_helper
@@ -29,11 +28,6 @@ if TYPE_CHECKING:
 
 
 class FirefoxWebDriver(WebDriverBrowser, Firefox):
-
-  @classmethod
-  @override
-  def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.FIREFOX | BrowserAttributes.WEBDRIVER
 
   @override
   def _find_driver(self) -> pth.AnyPath:

@@ -80,6 +80,7 @@ class BrowserDriverType(StrEnumWithHelp):
         BrowserDriverType.ANDROID,
         BrowserDriverType.ANDROID_CDP,
         BrowserDriverType.CHROMEOS_SSH,
+        BrowserDriverType.IOS,
         BrowserDriverType.LINUX_SSH,
     )
 

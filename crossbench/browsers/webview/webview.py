@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
+from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.browsers.chrome.webdriver import ChromeWebDriverAndroid
 from crossbench.browsers.chromium.webdriver import FLAGS_WEBVIEW
 
@@ -25,6 +26,12 @@ _WEBVIEW_SYSUPDATE_CURRENT_PKG_RE = re.compile(
 # TODO: crbug.com/393058910 - Replace this Webview class stub placeholder
 # once Webview class is properly created.
 class Webview(ChromeWebDriverAndroid, metaclass=abc.ABCMeta):
+
+  @classmethod
+  @override
+  def attributes(cls) -> BrowserAttributes:
+    return ((super().attributes() & ~BrowserAttributes.CHROME)
+            | BrowserAttributes.WEBVIEW)
 
   def __init__(self,
                label: str,

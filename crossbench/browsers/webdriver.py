@@ -135,7 +135,7 @@ class WebDriverBrowser(Browser, metaclass=abc.ABCMeta):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.WEBDRIVER
+    return super().attributes() | BrowserAttributes.WEBDRIVER
 
   @property
   def driver_log_file(self) -> pth.LocalPath | None:
@@ -473,7 +473,7 @@ class RemoteWebDriver(WebDriverBrowser):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.WEBDRIVER | BrowserAttributes.REMOTE
+    return super().attributes() | BrowserAttributes.REMOTE
 
   def __init__(self, label: str, driver: webdriver.Remote) -> None:
     self._private_driver = driver

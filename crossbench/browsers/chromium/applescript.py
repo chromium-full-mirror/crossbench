@@ -32,5 +32,4 @@ class ChromiumAppleScript(ChromiumBaseMixin, ChromiumBased, AppleScriptBrowser):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return (BrowserAttributes.CHROMIUM | BrowserAttributes.CHROMIUM_BASED
-            | BrowserAttributes.APPLESCRIPT)
+    return super().attributes() | BrowserAttributes.CHROMIUM

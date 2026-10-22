@@ -469,8 +469,7 @@ class TsProxyTrafficShaper(TrafficShaper):
 
   @override
   def extra_flags(self, browser_attributes: BrowserAttributes) -> Flags:
-    # TODO: support port forwarding to remote device
-    browser_attributes.assert_is_local()
+    browser_attributes.assert_chromium_based()
     assert self.is_running, "TrafficShaper is not running."
     assert self._ts_proxy.socks_proxy_port, "ts_proxy is not running"
     return Flags({

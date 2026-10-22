@@ -326,7 +326,9 @@ class MockChromiumBasedBrowser(
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.CHROMIUM | BrowserAttributes.CHROMIUM_BASED
+    return (super().attributes()
+            | BrowserAttributes.CHROMIUM
+            | BrowserAttributes.DESKTOP)
 
 
 class MockChromium(MockChromiumBasedBrowser):
@@ -354,7 +356,7 @@ class MockChromium(MockChromiumBasedBrowser):
   @classmethod
   # TODO: enable @override again
   def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.CHROMIUM | BrowserAttributes.CHROMIUM_BASED
+    return super().attributes()
 
 
 class MockChromeBrowser(MockChromiumBasedBrowser, metaclass=abc.ABCMeta):
@@ -367,7 +369,8 @@ class MockChromeBrowser(MockChromiumBasedBrowser, metaclass=abc.ABCMeta):
   @classmethod
   # TODO: enable @override again
   def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.CHROME | BrowserAttributes.CHROMIUM_BASED
+    return ((super().attributes() & ~BrowserAttributes.CHROMIUM)
+            | BrowserAttributes.CHROME)
 
 
 class MockChromeStable(MockChromeBrowser):
@@ -400,8 +403,9 @@ class MockChromeAndroidStable(MockChromeStable):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return (BrowserAttributes.CHROME | BrowserAttributes.CHROMIUM_BASED
-            | BrowserAttributes.MOBILE)
+    return ((super().attributes() & ~BrowserAttributes.DESKTOP)
+            | BrowserAttributes.MOBILE
+            | BrowserAttributes.REMOTE)
 
 
 class MockChromeBeta(MockChromeBrowser):
@@ -453,7 +457,8 @@ class MockEdgeBrowser(MockChromiumBasedBrowser, metaclass=abc.ABCMeta):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.EDGE | BrowserAttributes.CHROMIUM_BASED
+    return ((super().attributes() & ~BrowserAttributes.CHROMIUM)
+            | BrowserAttributes.EDGE)
 
 
 class MockEdgeStable(MockEdgeBrowser):
@@ -517,7 +522,9 @@ class MockSafariBrowser(MockBrowser, metaclass=abc.ABCMeta):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.SAFARI
+    return (super().attributes()
+            | BrowserAttributes.SAFARI
+            | BrowserAttributes.DESKTOP)
 
   @property
   @override
@@ -559,7 +566,9 @@ class MockFirefoxBrowser(MockBrowser, metaclass=abc.ABCMeta):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.FIREFOX
+    return (super().attributes()
+            | BrowserAttributes.FIREFOX
+            | BrowserAttributes.DESKTOP)
 
 
 class MockFirefox(MockFirefoxBrowser):

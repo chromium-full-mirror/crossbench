@@ -55,11 +55,6 @@ class SafariWebDriver(WebDriverBrowser, Safari):
     assert self.platform.is_apple, f"Unsupported platform: {self.platform}"
     self._service: SafariService | None = None
 
-  @classmethod
-  @override
-  def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.SAFARI | BrowserAttributes.WEBDRIVER
-
   @override
   def _find_driver(self) -> pth.AnyPath:
     # TODO: support remote platform
@@ -245,6 +240,13 @@ class SafariWebdriverIOS(SafariWebDriver):
   # (CoreDevice) ones. Without this delay safaridriver only considers the
   # Wi-Fi devices for the first session request and fails for USB devices.
   DRIVER_WARMUP_DELAY: ClassVar[dt.timedelta] = dt.timedelta(seconds=1)
+
+  @classmethod
+  @override
+  def attributes(cls) -> BrowserAttributes:
+    return ((super().attributes() & ~BrowserAttributes.DESKTOP)
+            | BrowserAttributes.MOBILE
+            | BrowserAttributes.REMOTE)
 
   @override
   def _get_driver_options(self,

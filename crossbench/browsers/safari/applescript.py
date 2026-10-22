@@ -9,7 +9,6 @@ from typing import ClassVar
 from typing_extensions import override
 
 from crossbench.browsers.applescript import AppleScriptBrowser
-from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.browsers.safari.safari import Safari
 
 
@@ -56,8 +55,3 @@ class SafariAppleScript(Safari, AppleScriptBrowser):
         tell application "{self.bundle_name}"
           quit
         end tell""")
-
-  @classmethod
-  @override
-  def attributes(cls) -> BrowserAttributes:
-    return BrowserAttributes.SAFARI | BrowserAttributes.APPLESCRIPT

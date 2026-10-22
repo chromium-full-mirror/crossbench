@@ -70,9 +70,10 @@ class CdpAndroidBrowser(ChromiumBased):
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
-    return (BrowserAttributes.CHROME
-            | BrowserAttributes.CHROMIUM_BASED
-            | BrowserAttributes.MOBILE)
+    return (super().attributes()
+            | BrowserAttributes.CHROME
+            | BrowserAttributes.MOBILE
+            | BrowserAttributes.REMOTE)
 
   @classmethod
   @override
