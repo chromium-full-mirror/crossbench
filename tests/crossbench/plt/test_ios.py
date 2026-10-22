@@ -13,6 +13,8 @@ import pathlib
 import subprocess
 import unittest.mock as mock
 import urllib.error
+import urllib.parse
+import urllib.request
 
 from pyfakefs.fake_filesystem import OSType
 from typing_extensions import override
@@ -130,9 +132,7 @@ SIMULATORS_SAMPLE = {
 }
 
 
-class IOsMockPlatformTestCase(BaseMockPlatformTestCase):
-  __test__ = True
-
+class BaseIOsMockPlatformTestCase(BaseMockPlatformTestCase):
   SAFARI_PATH = "/Applications/Safari.app"
 
   @override
@@ -192,6 +192,10 @@ class IOsMockPlatformTestCase(BaseMockPlatformTestCase):
 
   def test_is_apple(self):
     self.assertTrue(self.platform.is_apple)
+
+
+class IOsMockPlatformTestCase(BaseIOsMockPlatformTestCase):
+  __test__ = True
 
   def test_create_device_udid(self):
     self.expect_startup_devices()
@@ -467,6 +471,35 @@ class IOsMockPlatformTestCase(BaseMockPlatformTestCase):
     res = platform_physical.display_resolution()
     self.assertEqual(res, DisplayResolution(440, 956))
     mock_wda.window_size.assert_called_once()
+
+
+class IOsWdaTestCase(BaseIOsMockPlatformTestCase):
+  __test__ = True
+
+  @override
+  def setUp(self) -> None:
+    super().setUp()
+    self.fs.create_file("/usr/bin/iproxy", st_mode=0o755)
+    self.host_platform.is_port_used = mock.MagicMock(return_value=True)
+    self.host_platform.get_free_port = mock.MagicMock(
+        side_effect=range(54321, 54400))
+    self.host_platform.popen = mock.MagicMock(
+        side_effect=lambda *args, **kwargs: mock.MagicMock())
+
+  @contextlib.contextmanager
+  def mock_wda_server(self, platform: IOSPlatform | None = None):
+    target_platform = platform or self.platform
+
+    def fake_urlopen(req: urllib.request.Request, timeout: float = 0):
+      del timeout
+      parsed = urllib.parse.urlparse(req.full_url)
+      self.assertTrue(
+          target_platform.ports.is_forwarded_port_used(parsed.port or 0))
+      payload = {"value": {"ready": True, "sessionId": "session-1"}}
+      return io.BytesIO(json.dumps(payload).encode("utf-8"))
+
+    with mock.patch("urllib.request.urlopen", side_effect=fake_urlopen):
+      yield
 
   def test_wda_window_size(self):
     self.expect_startup_devices(
@@ -957,6 +990,62 @@ class IOsMockPlatformTestCase(BaseMockPlatformTestCase):
       mock_request.reset_mock()
       wda.terminate_app("com.apple.mobilesafari")
       mock_request.assert_not_called()
+
+  def test_wda_ensure_session_reuses_port_forward(self):
+    wda = WDAClient(self.platform)
+    with self.mock_wda_server(), self.platform.ports.nested():
+      self.assertEqual(wda.ensure_session(), "session-1")
+      self.assertEqual(wda.base_url, "http://localhost:54321")
+      self.assertTrue(self.platform.ports.is_forwarded_port_used(54321))
+      self.assertEqual(self.host_platform.popen.call_count, 1)
+
+      self.assertEqual(wda.ensure_session(), "session-1")
+      self.assertEqual(self.host_platform.popen.call_count, 1)
+      wda.stop()
+
+  def test_wda_port_forward_on_nested_scope_exit(self):
+    wda = WDAClient(self.platform)
+    with self.mock_wda_server():
+      with self.platform.ports.nested():
+        self.assertEqual(wda.ensure_session(), "session-1")
+        self.assertTrue(self.platform.ports.is_forwarded_port_used(54321))
+
+      self.assertFalse(self.platform.ports.is_forwarded_port_used(54321))
+
+  def test_wda_port_forward_across_nested_scopes(self):
+    wda = WDAClient(self.platform)
+    with self.mock_wda_server():
+      with self.platform.ports.nested():
+        self.assertEqual(wda.ensure_session(), "session-1")
+        self.assertEqual(wda.base_url, "http://localhost:54321")
+        self.assertTrue(self.platform.ports.is_forwarded_port_used(54321))
+        self.assertEqual(self.host_platform.popen.call_count, 1)
+
+      with self.platform.ports.nested():
+        self.assertEqual(wda.ensure_session(), "session-1")
+        self.assertEqual(wda.base_url, "http://localhost:54322")
+        self.assertTrue(self.platform.ports.is_forwarded_port_used(54322))
+        self.assertEqual(self.host_platform.popen.call_count, 2)
+        wda.stop()
+
+  def test_wda_stop_stops_port_forward_in_nested_scope(self):
+    wda = WDAClient(self.platform)
+    with self.mock_wda_server(), self.platform.ports.nested():
+      wda.start()
+      self.assertTrue(self.platform.ports.is_forwarded_port_used(54321))
+      wda.stop()
+      self.assertFalse(self.platform.ports.is_forwarded_port_used(54321))
+
+  def test_wda_simulator_start_forwards_without_iproxy(self):
+    self.expect_startup_devices(
+        devices=DEVICES_SINGLE, simulators=SIMULATORS_SAMPLE)
+    platform = IOSPlatform(self.host_platform, IPHONE_SIMULATOR["udid"])
+    wda = WDAClient(platform)
+    with self.mock_wda_server(platform):
+      wda.start()
+    self.assertEqual(wda.base_url, "http://localhost:8100")
+    self.assertTrue(platform.ports.is_forwarded_port_used(8100))
+    self.host_platform.popen.assert_not_called()
 
 
 if __name__ == "__main__":

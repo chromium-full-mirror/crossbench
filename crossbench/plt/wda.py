@@ -51,7 +51,7 @@ class WDAError(RuntimeError):
 class WDAClient:
   """Client for interacting with WebDriverAgent running on an iOS device."""
 
-  DEFAULT_PORT: Final[int] = 8100
+  DEFAULT_REMOTE_PORT: Final[int] = 8100
   STARTUP_TIMEOUT: Final[dt.timedelta] = dt.timedelta(seconds=90)
   REQUEST_TIMEOUT: Final[dt.timedelta] = dt.timedelta(seconds=30)
   SETTLE_MOVE_POINTS: Final[int] = 4
@@ -59,13 +59,13 @@ class WDAClient:
   def __init__(
       self,
       platform: IOSPlatform,
-      port: int = DEFAULT_PORT,
+      remote_port: int = DEFAULT_REMOTE_PORT,
   ) -> None:
     self._platform: Final[IOSPlatform] = platform
-    self._port: Final[int] = port
+    self._local_port: int = 0
+    self._remote_port: Final[int] = remote_port
     self._session_id: str | None = None
     self._xcodebuild_proc: subprocess.Popen[Any] | None = None
-    self._is_forwarded: bool = False
     atexit.register(self.stop)
 
   @property
@@ -73,12 +73,8 @@ class WDAClient:
     return self._platform
 
   @property
-  def port(self) -> int:
-    return self._port
-
-  @property
   def base_url(self) -> str:
-    return f"http://localhost:{self._port}"
+    return f"http://localhost:{self._local_port}"
 
   def _request(
       self,
@@ -115,17 +111,14 @@ class WDAClient:
 
   def start(self) -> None:
     """Ensure WebDriverAgent is forwarded and running."""
-    if self.is_connected():
+    self._ensure_forwarded()
+    if not self.is_connected():
+      self._start_runner()
+
+  def _ensure_forwarded(self) -> None:
+    if self._platform.ports.is_forwarded_port_used(self._local_port):
       return
-
-    if not self._platform.is_simulator and not self._is_forwarded:
-      self._platform.ports.forward(self._port, self._port)
-      self._is_forwarded = True
-
-    if self.is_connected():
-      return
-
-    self._start_runner()
+    self._local_port = self._platform.ports.forward(0, self._remote_port)
 
   def _start_runner(self) -> None:
     """Launch WebDriverAgent via xcodebuild if available."""
@@ -364,6 +357,7 @@ class WDAClient:
   def ensure_session(self) -> str:
     """Return active session ID or create a new session if needed."""
     if self._session_id:
+      self._ensure_forwarded()
       return self._session_id
 
     self.start()
@@ -692,10 +686,11 @@ class WDAClient:
     """Terminate an application on the device by bundle identifier."""
     if not self._session_id:
       return
+    session_id = self.ensure_session()
     try:
       self._request(
           "POST",
-          f"/session/{self._session_id}/wda/apps/terminate",
+          f"/session/{session_id}/wda/apps/terminate",
           {"bundleId": bundle_id},
           timeout=dt.timedelta(seconds=5),
       )
@@ -721,11 +716,9 @@ class WDAClient:
         proc.terminate()
       except OSError as e:
         logging.warning("Failed to terminate xcodebuild process: %s", e)
-    if self._is_forwarded:
-      if self._platform.ports.is_own_forwarded_port_used(self._port):
-        try:
-          self._platform.ports.stop_forward(self._port)
-        except (PortForwardException, OSError) as e:
-          logging.warning("Failed to stop forwarding port %s: %s", self._port,
-                          e)
-      self._is_forwarded = False
+    if scope := self._platform.ports.lookup_forwarded_port(self._local_port):
+      try:
+        scope.stop_forward(self._local_port)
+      except (PortForwardException, OSError) as e:
+        logging.warning("Failed to unforward port %s: %s", self._local_port, e)
+    self._local_port = 0
