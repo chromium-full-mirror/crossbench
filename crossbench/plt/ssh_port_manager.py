@@ -44,7 +44,11 @@ class SshPortManager(PortManager):
         local_port, remote_port)
     self._forward_popens[local_port] = self.host_platform.popen(
         *self._build_ssh_cmd("-NL", f"{local_port}:localhost:{remote_port}"))
-    self.host_platform.wait_for_port(local_port, self.PORT_FORWARDING_TIMEOUT)
+    try:
+      self.host_platform.wait_for_port(local_port, self.PORT_FORWARDING_TIMEOUT)
+    except BaseException:
+      self.stop_forward(local_port)
+      raise
     logging.debug("Forwarded Remote Port: %s:%s <= %s:%s", self.host_platform,
                   local_port, self, remote_port)
     return local_port
@@ -71,7 +75,11 @@ class SshPortManager(PortManager):
         remote_port, local_port)
     self._reverse_forward_popens[remote_port] = self.host_platform.popen(
         *self._build_ssh_cmd("-NR", f"{remote_port}:localhost:{local_port}"))
-    self.platform.wait_for_port(remote_port, self.PORT_FORWARDING_TIMEOUT)
+    try:
+      self.platform.wait_for_port(remote_port, self.PORT_FORWARDING_TIMEOUT)
+    except BaseException:
+      self.stop_reverse_forward(remote_port)
+      raise
     logging.debug("Forwarded Local Port: %s:%s => %s:%s", self.host_platform,
                   local_port, self, remote_port)
     return remote_port

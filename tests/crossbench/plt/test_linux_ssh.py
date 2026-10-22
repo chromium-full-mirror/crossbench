@@ -196,6 +196,56 @@ class LinuxSshMockPlatformTestCase(BasePosixMockPlatformTestCase):
       self.assertEqual(port, 666)
       ports.stop_reverse_forward(port)
 
+  def test_port_forward_wait_failure_terminates_process(self):
+    mock_popen = self.enterContext(self.mock_popen(self.host_platform))
+    mock_wait_for_port = self.enterContext(
+        self.mock_wait_for_port(self.host_platform))
+    mock_wait_for_port.side_effect = TimeoutError("not bound")
+    with self.platform.ports.nested() as ports:
+      with self.assertRaisesRegex(TimeoutError, "not bound"):
+        ports.forward(666, 33221)
+      mock_popen.return_value.terminate.assert_called_once_with()
+      self.assertFalse(ports.is_forwarded_port_used(666))
+      # The port can be forwarded again after a failed attempt.
+      mock_wait_for_port.side_effect = None
+      self.assertEqual(ports.forward(666, 33221), 666)
+
+  def test_reverse_port_forward_wait_failure_terminates_process(self):
+    mock_popen = self.enterContext(self.mock_popen(self.host_platform))
+    mock_wait_for_port = self.enterContext(
+        self.mock_wait_for_port(self.platform))
+    mock_wait_for_port.side_effect = TimeoutError("not bound")
+    with self.platform.ports.nested() as ports:
+      with self.assertRaisesRegex(TimeoutError, "not bound"):
+        ports.reverse_forward(666, 33221)
+      mock_popen.return_value.terminate.assert_called_once_with()
+      self.assertFalse(ports.is_reverse_forwarded_port_used(666))
+      # The port can be reverse forwarded again after a failed attempt.
+      mock_wait_for_port.side_effect = None
+      self.assertEqual(ports.reverse_forward(666, 33221), 666)
+
+  def test_port_forward_interrupt_terminates_process(self):
+    mock_popen = self.enterContext(self.mock_popen(self.host_platform))
+    mock_wait_for_port = self.enterContext(
+        self.mock_wait_for_port(self.host_platform))
+    mock_wait_for_port.side_effect = KeyboardInterrupt()
+    with self.platform.ports.nested() as ports:
+      with self.assertRaises(KeyboardInterrupt):
+        ports.forward(666, 33221)
+      mock_popen.return_value.terminate.assert_called_once_with()
+      self.assertFalse(ports.is_forwarded_port_used(666))
+
+  def test_reverse_port_forward_interrupt_terminates_process(self):
+    mock_popen = self.enterContext(self.mock_popen(self.host_platform))
+    mock_wait_for_port = self.enterContext(
+        self.mock_wait_for_port(self.platform))
+    mock_wait_for_port.side_effect = KeyboardInterrupt()
+    with self.platform.ports.nested() as ports:
+      with self.assertRaises(KeyboardInterrupt):
+        ports.reverse_forward(666, 33221)
+      mock_popen.return_value.terminate.assert_called_once_with()
+      self.assertFalse(ports.is_reverse_forwarded_port_used(666))
+
   def test_push_creates_dest_dir(self):
     self._expect_sh_ssh("mkdir -p remote/dest/path")
     self.host_platform.expect_sh(
