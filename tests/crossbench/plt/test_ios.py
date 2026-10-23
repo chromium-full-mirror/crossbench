@@ -1012,7 +1012,8 @@ class IOsWdaTestCase(BaseIOsMockPlatformTestCase):
         self.assertEqual(wda.ensure_session(), "session-1")
         self.assertTrue(self.platform.ports.is_forwarded_port_used(54321))
 
-      self.assertFalse(self.platform.ports.is_forwarded_port_used(54321))
+      self.assertTrue(self.platform.ports.is_forwarded_port_used(54321))
+      wda.stop()
 
   def test_wda_port_forward_across_nested_scopes(self):
     wda = WDAClient(self.platform)
@@ -1025,10 +1026,23 @@ class IOsWdaTestCase(BaseIOsMockPlatformTestCase):
 
       with self.platform.ports.nested():
         self.assertEqual(wda.ensure_session(), "session-1")
-        self.assertEqual(wda.base_url, "http://localhost:54322")
-        self.assertTrue(self.platform.ports.is_forwarded_port_used(54322))
-        self.assertEqual(self.host_platform.popen.call_count, 2)
+        self.assertEqual(wda.base_url, "http://localhost:54321")
+        self.assertTrue(self.platform.ports.is_forwarded_port_used(54321))
+        self.assertEqual(self.host_platform.popen.call_count, 1)
         wda.stop()
+
+  def test_wda_terminate_app_after_nested_scope_reuses_port_forward(self):
+    wda = WDAClient(self.platform)
+    with self.mock_wda_server():
+      with self.platform.ports.nested():
+        self.assertEqual(wda.ensure_session(), "session-1")
+        self.assertEqual(self.host_platform.popen.call_count, 1)
+
+      wda.terminate_app("com.apple.mobilesafari")
+      self.assertEqual(wda.base_url, "http://localhost:54321")
+      self.assertTrue(self.platform.ports.is_forwarded_port_used(54321))
+      self.assertEqual(self.host_platform.popen.call_count, 1)
+      wda.stop()
 
   def test_wda_stop_stops_port_forward_in_nested_scope(self):
     wda = WDAClient(self.platform)

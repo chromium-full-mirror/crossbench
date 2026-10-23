@@ -156,6 +156,24 @@ class PortManagerTestCase(unittest.TestCase):
         port_scope.stop_reverse_forward(1111)
     self.port_scope.stop_reverse_forward(1111)
 
+  def test_root_scope(self):
+    self.assertIs(self.port_scope.root_scope, self.port_scope)
+    with self.port_scope.nested() as scope_1:
+      self.assertIs(scope_1.root_scope, self.port_scope)
+      with scope_1.nested() as scope_2:
+        self.assertIs(scope_2.root_scope, self.port_scope)
+
+  def test_root_scope_forward_persists_across_nested_scopes(self):
+    with self.port_scope.nested() as scope_1:
+      local_port = scope_1.root_scope.forward(1111, 2222)
+      self.assertEqual(local_port, 1111)
+      self.assertTrue(scope_1.is_forwarded_port_used(1111))
+      self.assertFalse(scope_1.is_own_forwarded_port_used(1111))
+      self.assertTrue(self.port_scope.is_own_forwarded_port_used(1111))
+    self.assertTrue(self.port_scope.is_own_forwarded_port_used(1111))
+    self.assertIn(1111, self.port_manager.forwarded_ports)
+    self.port_scope.stop_forward(1111)
+
 
 class ForwardOnlySubprocessPortManager(SubprocessPortManager):
   """Only supports forwarding, like iproxy on iOS."""

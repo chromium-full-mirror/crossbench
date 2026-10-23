@@ -47,6 +47,10 @@ class PortScope:
     return self._parent_scope
 
   @property
+  def root_scope(self) -> Self:
+    return self._parent_scope.root_scope if self._parent_scope else self
+
+  @property
   def platform(self) -> Platform:
     return self._manager.platform
 
