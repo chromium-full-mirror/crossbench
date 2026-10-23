@@ -44,7 +44,8 @@ from crossbench.plt.axml import RES_STRING_POOL_TYPE, \
     RES_XML_START_ELEMENT_TYPE, RES_XML_TYPE, \
     parse_binary_manifest_package_name
 from crossbench.plt.display_info import DisplayResolution
-from crossbench.plt.evemu_platform_mixin import VirtualDeviceState
+from crossbench.plt.evemu_platform_mixin import W3C_TO_LINUX, \
+    VirtualDeviceState
 from crossbench.plt.port_manager import PortForwardException
 from crossbench.plt.process_meminfo import ProcessMeminfo
 from crossbench.plt.remote import RemotePopen
@@ -534,6 +535,33 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
       mock_proc.stdin.write.assert_called_once_with(
           b"E: 0.000000 0001 001e 0001\n")
       mock_proc.stdin.flush.assert_called_once()
+
+  def test_inject_input_events_uinput_android_keycodes(self) -> None:
+    self.assertTrue(
+        set(W3C_TO_LINUX.values()).isdisjoint(
+            AndroidAdbPlatform.ANDROID_KEYCODE_TO_LINUX.values()))
+    mock_proc = mock.MagicMock()
+    mock_proc.poll.return_value = None
+    mock_proc.stdin = mock.MagicMock()
+    self.platform._virtual_devices["kb1"] = VirtualDeviceState(mock_proc)
+
+    with (
+        self.patch_getprop(AndroidAdbPlatform.MIN_UINPUT_SDK_VERSION),
+        mock.patch.object(self.platform, "sleep"),
+    ):
+      self.platform.inject_input_events(
+          "kb1",
+          (
+              KeyEvent("KEYCODE_APP_SWITCH", is_down=True),
+              KeyEvent("KEYCODE_APP_SWITCH", is_down=False),
+          ),
+      )
+      mock_proc.stdin.write.assert_called_once_with(
+          b"E: 1.000000 0001 0244 0001\n"
+          b"E: 1.000000 0000 0000 0000\n"
+          b"E: 1.000000 0001 0244 0000\n"
+          b"E: 1.000000 0000 0000 0000\n"
+          b"E: 1.000000 0000 0000 0000\n")
 
   def test_execute_evemu_script_uninitialized(self) -> None:
     with self.patch_getprop(AndroidAdbPlatform.MIN_UINPUT_SDK_VERSION):

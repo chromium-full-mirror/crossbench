@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import urllib.parse
 from typing import TYPE_CHECKING
 
 import pytest
@@ -44,6 +45,106 @@ class TestAndroidInputInjection(BaseInputInjectionTest):
                         },
                         "verify": "button[id='clicked-button']",
                         "source": str(input_source),
+                    },
+                ],
+            },
+        },
+    }
+
+    self.run_loading_test(browser_config, page_config, test_env)
+
+  def test_android_keycodes(self, browser_config: str,
+                            test_env: TestEnv) -> None:
+    self.check_input_source_supported(browser_config, InputSource.KEYBOARD)
+    second_page = urllib.parse.quote("""
+<!DOCTYPE html>
+<html>
+<body>
+  <div id="page-2">Page 2</div>
+</body>
+</html>
+""")
+    page_config = {
+        "pages": {
+            "AndroidKeycodesTest": {
+                "actions": [
+                    {
+                        "action":
+                            "get",
+                        "url":
+                            f"data:text/html;charset=utf-8,{CLICK_TEST_PAGE}",
+                        "ready_state":
+                            "complete",
+                    },
+                    {
+                        "action": "click",
+                        "position": {
+                            "selector": "button[id='button']",
+                            "required": True,
+                            "scroll_into_view": True,
+                            "wait": True,
+                        },
+                        "verify": "button[id='clicked-button']",
+                        "source": str(InputSource.TOUCH),
+                    },
+                    {
+                        "action": "get",
+                        "url": f"data:text/html;charset=utf-8,{second_page}",
+                        "ready_state": "complete",
+                    },
+                    {
+                        "action": "wait_for_element",
+                        "selector": "div[id='page-2']",
+                        "timeout": "5s",
+                    },
+                    # Open Android Overview with KEYCODE_APP_SWITCH. The first
+                    # KEYCODE_BACK dismisses Overview and returns to Chrome on
+                    # page-2 (whereas if Overview had not opened, Chrome would
+                    # have navigated back to the first page immediately).
+                    {
+                        "action": "text_input",
+                        "keyevent": "KEYCODE_APP_SWITCH",
+                        "source": str(InputSource.KEYBOARD),
+                    },
+                    {
+                        "action": "wait",
+                        "duration": "1s",
+                    },
+                    {
+                        "action": "text_input",
+                        "keyevent": "KEYCODE_BACK",
+                        "source": str(InputSource.KEYBOARD),
+                    },
+                    {
+                        "action": "wait",
+                        "duration": "1s",
+                    },
+                    {
+                        "action": "wait_for_element",
+                        "selector": "div[id='page-2']",
+                        "timeout": "5s",
+                    },
+                    # Now that Chrome is focused again, the second KEYCODE_BACK
+                    # navigates back to the first page.
+                    {
+                        "action": "text_input",
+                        "keyevent": "KEYCODE_BACK",
+                        "source": str(InputSource.KEYBOARD),
+                    },
+                    {
+                        "action": "wait_for_element",
+                        "selector": "button",
+                        "timeout": "5s",
+                    },
+                    {
+                        "action": "text_input",
+                        "keyevent": "KEYCODE_HOME",
+                        "source": str(InputSource.KEYBOARD),
+                    },
+                    {
+                        "action": "wait_for_condition",
+                        "condition": "return !document.hasFocus();",
+                        "timeout": "5s",
                     },
                 ],
             },

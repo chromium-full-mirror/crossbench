@@ -138,7 +138,8 @@ class KeyEvent(InputEvent):
 
   Attributes:
     key_code: Physical key using the W3C KeyboardEvent.code specification
-      (e.g. "KeyA", "Space", "ShiftLeft").
+      (e.g. "KeyA", "Space", "ShiftLeft") or a platform-specific keycode
+      supported by the target platform (e.g. "KEYCODE_HOME" on Android).
     is_down: True for a key press, False for a key release.
   """
 

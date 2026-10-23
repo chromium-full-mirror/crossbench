@@ -16,9 +16,10 @@ import re
 import shlex
 import subprocess
 import time
-from typing import TYPE_CHECKING, Final, Iterable, Iterator, Mapping, \
-    Sequence, cast
+from typing import TYPE_CHECKING, ClassVar, Final, Iterable, Iterator, \
+    Mapping, Sequence, cast
 
+from immutabledict import immutabledict
 from mobly.controllers import android_device
 from snippet_uiautomator import uiautomator
 from typing_extensions import override
@@ -47,7 +48,7 @@ from crossbench.plt.device_info import DeviceInfo
 from crossbench.plt.display_info import DisplayRefreshRateResult, \
     DisplayResolution
 from crossbench.plt.evemu_platform_mixin import DEVICE_SETTLE_DELAY, \
-    EvemuPlatformMixin, VirtualDeviceState
+    W3C_TO_LINUX, EvemuPlatformMixin, VirtualDeviceState
 from crossbench.plt.port_manager import PortManager
 from crossbench.plt.posix import PosixVersion, RemotePosixPlatform
 from crossbench.plt.process_meminfo import ProcessMeminfo
@@ -830,6 +831,20 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
 
   MIN_UINPUT_SDK_VERSION: Final[int] = 37
   MIN_DROP_CACHES_SDK_VERSION: Final[int] = 31
+  # Android-specific KeyEvent names (KEYCODE_*) not present in W3C_TO_LINUX,
+  # mapped to Linux EV_KEY codes matching Android's Generic.kl.
+  ANDROID_KEYCODE_TO_LINUX: Final[immutabledict[str, int]] = immutabledict({
+      "KEYCODE_VOLUME_MUTE": 113,
+      "KEYCODE_VOLUME_DOWN": 114,
+      "KEYCODE_VOLUME_UP": 115,
+      "KEYCODE_BACK": 158,
+      "KEYCODE_HOME": 172,
+      "KEYCODE_APP_SWITCH": 580,
+  })
+  _SUPPORTED_KEY_CODES: ClassVar[immutabledict[str, int]] = immutabledict({
+      **W3C_TO_LINUX,
+      **ANDROID_KEYCODE_TO_LINUX,
+  })
   _SHIFT_KEYS: Final[frozenset[str]] = frozenset(("ShiftLeft", "ShiftRight"))
   # Android's uinput (EvemuParser) remains in its header parsing state and does
   # not register the virtual device with /dev/uinput until it receives the

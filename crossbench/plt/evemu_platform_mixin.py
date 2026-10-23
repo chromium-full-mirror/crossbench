@@ -89,6 +89,15 @@ W3C_TO_LINUX: Final[immutabledict[str, int]] = immutabledict({
     "ControlRight": 97,
     "AltLeft": 56,
     "AltRight": 100,
+    "Home": 102,
+    "ArrowUp": 103,
+    "PageUp": 104,
+    "ArrowLeft": 105,
+    "ArrowRight": 106,
+    "End": 107,
+    "ArrowDown": 108,
+    "PageDown": 109,
+    "Delete": 111,
     "MetaLeft": 125,
     "MetaRight": 126,
 })
@@ -138,7 +147,7 @@ B: 01 00 00 00 00 00 00 10 00
 B: 01 00 00 00 00 00 00 00 00
 B: 01 00 00 01 00 00 00 00 00
 B: 01 00 00 00 00 00 00 00 00
-B: 01 80 04 20 00 00 00 00 00
+B: 01 90 04 20 00 00 00 00 00
 B: 01 00 00 00 00 00 00 00 00
 B: 01 00 00 00 00 00 00 00 00
 B: 02 00 00 00 00 00 00 00 00
@@ -235,6 +244,8 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
   Mixin for Platforms that support executing standard
   Linux (evemu) strings.
   """
+
+  _SUPPORTED_KEY_CODES: ClassVar[immutabledict[str, int]] = W3C_TO_LINUX
 
   def __init__(self, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
@@ -430,9 +441,9 @@ class EvemuPlatformMixin(Platform, metaclass=abc.ABCMeta):
 
   def _generate_key_event(self, lines: list[str], event: KeyEvent,
                           current_time: dt.timedelta) -> None:
-    linux_code = W3C_TO_LINUX.get(event.key_code)
+    linux_code = self._SUPPORTED_KEY_CODES.get(event.key_code)
     if linux_code is None:
-      raise ValueError(f"W3C key code '{event.key_code}' is not supported.")
+      raise ValueError(f"Key code '{event.key_code}' is not supported.")
 
     value = 1 if event.is_down else 0
     self._add_line(lines, current_time, EV_KEY, linux_code, value)

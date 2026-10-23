@@ -435,6 +435,10 @@ class EvemuPlatformMixinTestCase(unittest.TestCase):
       self.platform.inject_input_events("test_kb", [
           KeyEvent("UnsupportedKey", is_down=True),
       ])
+    with self.assertRaises(ValueError):
+      self.platform.inject_input_events("test_kb", [
+          KeyEvent("KEYCODE_APP_SWITCH", is_down=True),
+      ])
 
   def test_unsupported_mouse_button(self) -> None:
     with self.assertRaises(ValueError):
