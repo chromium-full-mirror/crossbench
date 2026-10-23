@@ -65,6 +65,7 @@ class Speedometer31TestCase(Speedometer3BaseTestCase):
     local_dir = self._create_local_checkout()
     args = self._namespace()
     config = self.benchmark_cls.default_network_config(args)
+    self.assertTrue(config.is_default())
     self.assertEqual(config.type, NetworkType.LOCAL)
     self.assertEqual(pth.LocalPath(config.path), local_dir)
     self.assertEqual(config.url, self.benchmark_cls.LOCAL_FILE_SERVER_URL)
@@ -81,8 +82,9 @@ class Speedometer31TestCase(Speedometer3BaseTestCase):
     for url in (self.story_cls.URL, self.story_cls.URL_OFFICIAL,
                 "http://custom.example.com/"):
       args = self._namespace(custom_benchmark_url=url)
-      self.assertTrue(
-          self.benchmark_cls.default_network_config(args).is_default())
+      self.assertIs(
+          self.benchmark_cls.default_network_config(args),
+          NetworkConfig.default())
 
 
 #  Don't expose abstract BaseTestCase to test runner

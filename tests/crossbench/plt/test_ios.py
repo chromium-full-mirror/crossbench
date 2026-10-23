@@ -195,9 +195,13 @@ class BaseIOsMockPlatformTestCase(BaseMockPlatformTestCase):
   def test_is_apple(self):
     self.assertTrue(self.platform.is_apple)
 
-
 class IOsMockPlatformTestCase(BaseIOsMockPlatformTestCase):
   __test__ = True
+
+  def test_supports_reverse_port_forwarding(self):
+    self.assertTrue(self.platform.is_remote)
+    self.assertFalse(self.platform.supports_reverse_port_forwarding)
+    self.assertTrue(self.host_platform.supports_reverse_port_forwarding)
 
   def test_create_device_udid(self):
     self.expect_startup_devices()

@@ -19,6 +19,7 @@ from typing_extensions import override
 from crossbench import exception
 from crossbench.network.base import Network
 from crossbench.parse import ObjectParser
+from crossbench.plt.port_manager import PortForwardException
 
 if TYPE_CHECKING:
   from crossbench import path as pth
@@ -212,6 +213,11 @@ class LocalFileNetwork(Network):
     if not browser_platform.is_remote:
       yield
       return
+    if not browser_platform.supports_reverse_port_forwarding:
+      raise PortForwardException(
+          f"{browser_platform} does not support reverse port forwarding, "
+          f"the local file server on {self.host_platform} is not reachable "
+          "from the browser. Use a live network / hosted URL instead.")
     ports = browser_platform.ports
     logging.info("REMOTE PORT FORWARDING: %s <= %s", self.host_platform,
                  browser_platform)

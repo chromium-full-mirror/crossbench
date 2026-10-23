@@ -72,11 +72,17 @@ class NetworkConfig(ConfigObject):
   http_port: int | None = None
   https_port: int | None = None
   expected_md5_hash: bytes = b""
+  _is_default: bool = dataclasses.field(
+      default=False, compare=False, repr=False, kw_only=True)
 
   @classmethod
   @functools.cache
   def default(cls) -> Self:
-    return cls(type=NetworkType.LIVE)
+    return cls(type=NetworkType.LIVE, _is_default=True)
+
+  @classmethod
+  def default_local(cls, path: pth.LocalPath, url: str | None = None) -> Self:
+    return cls(type=NetworkType.LOCAL, path=path, url=url, _is_default=True)
 
   @classmethod
   @override
@@ -333,7 +339,7 @@ class NetworkConfig(ConfigObject):
     raise ValueError(f"Unknown network type {self.type}")
 
   def is_default(self) -> bool:
-    return self is NetworkConfig.default()
+    return self._is_default
 
   def _create_traffic_shaper(self, browser_platform: Platform) -> TrafficShaper:
     if self.speed.is_live:

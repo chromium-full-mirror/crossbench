@@ -151,6 +151,11 @@ class NetworkConfigTestCase(BaseConfigTestCase):
     self.assertFalse(
         NetworkConfig(type=NetworkType.LOCAL,
                       path=pth.LocalPath(".")).is_default())
+    default_local = NetworkConfig.default_local(pth.LocalPath("."))
+    self.assertTrue(default_local.is_default())
+    self.assertEqual(
+        default_local,
+        NetworkConfig(type=NetworkType.LOCAL, path=pth.LocalPath(".")))
 
   def test_help(self):
     help_text = NetworkConfig.help()

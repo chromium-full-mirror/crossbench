@@ -31,7 +31,7 @@ from crossbench.cli.config.driver_type import BrowserDriverType
 from crossbench.cli.config.env import EnvConfig
 from crossbench.cli.config.flags import DEFAULT_LABEL, FlagsConfig, \
     FlagsGroupConfig, FlagsVariantConfig
-from crossbench.cli.config.network import NetworkConfig
+from crossbench.cli.config.network import NetworkConfig, NetworkType
 from crossbench.config import ConfigError
 from crossbench.flags.base import Flags
 from crossbench.helper.cwd import change_cwd
@@ -409,11 +409,33 @@ class BaseBrowserVariantsConfig(abc.ABC):
                            browser_config: BrowserConfig,
                            browser_platform: plt.Platform) -> Network:
     with exception.annotate_argparsing("Creating network config"):
-      network_config = browser_config.network or args.network_config
-      assert isinstance(network_config,
-                        NetworkConfig), ("Invalid network_config type")
+      network_config = self._get_browser_network_config(args, browser_config,
+                                                        browser_platform)
       return network_config.create_network(browser_platform)
     raise exception.UnreachableError
+
+  def _get_browser_network_config(
+      self, args: argparse.Namespace, browser_config: BrowserConfig,
+      browser_platform: plt.Platform) -> NetworkConfig:
+    network_config = browser_config.network or args.network_config
+    assert isinstance(network_config,
+                      NetworkConfig), ("Invalid network_config type")
+    if network_config.type is not NetworkType.LOCAL:
+      return network_config
+    if browser_platform.supports_reverse_port_forwarding:
+      return network_config
+    # A local file server on the host is unreachable from a remote platform
+    # without reverse port forwarding (e.g. iOS).
+    if not network_config.is_default():
+      raise ConfigError(
+          f"Cannot use a local file server with {browser_platform}: "
+          "the platform does not support reverse port forwarding. "
+          "Use a live network or a hosted URL (e.g. --live) instead.")
+    logging.warning(
+        "%s does not support reverse port forwarding, "
+        "falling back from the default local file server to the live network.",
+        browser_platform)
+    return NetworkConfig.default()
 
   def _get_browser_env_config(self, args: argparse.Namespace,
                               browser_config: BrowserConfig) -> EnvConfig:

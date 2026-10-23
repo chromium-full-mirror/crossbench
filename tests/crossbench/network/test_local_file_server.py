@@ -9,8 +9,9 @@ from unittest import mock
 from typing_extensions import override
 
 from crossbench import path as pth
-from crossbench.network.local_file_server import \
-    CustomHeadersRequestHandler, LocalFileNetwork, LocalThreadingHTTPServer
+from crossbench.network.local_file_server import CustomHeadersRequestHandler, \
+    LocalFileNetwork, LocalThreadingHTTPServer
+from crossbench.plt.port_manager import PortForwardException
 from crossbench.runner.groups.session import BrowserSessionRunGroup
 from tests import test_helper
 from tests.crossbench.base import BaseCrossbenchTestCase
@@ -24,9 +25,13 @@ class LocalFileNetworkTestCase(BaseCrossbenchTestCase):
     self.server_dir = pth.LocalPath("/foo/bar")
     self.fs.create_dir(self.server_dir)
 
-  def create_session(self, is_remote: bool = False):
+  def create_session(self,
+                     is_remote: bool = False,
+                     supports_reverse_port_forwarding: bool = True):
     browser_platform = mock.Mock()
     browser_platform.is_remote = is_remote
+    browser_platform.supports_reverse_port_forwarding = (
+        supports_reverse_port_forwarding)
     return mock.Mock(
         spec=BrowserSessionRunGroup, browser_platform=browser_platform)
 
@@ -186,6 +191,26 @@ class LocalFileNetworkTestCase(BaseCrossbenchTestCase):
     self.assertFalse(network.is_running)
     session.browser_platform.ports.stop_reverse_forward.assert_called_once_with(
         8123)
+
+  @mock.patch("crossbench.network.local_file_server.LocalThreadingHTTPServer")
+  def test_open_remote_without_port_forwarding(self, mock_server_cls):
+    mock_server = mock_server_cls.return_value
+    mock_server.__enter__.return_value = mock_server
+    mock_server.server_port = 8123
+    network = LocalFileNetwork(
+        self.server_dir,
+        "http://localhost:8123",
+        browser_platform=self.platform)
+    session = self.create_session(
+        is_remote=True, supports_reverse_port_forwarding=False)
+
+    with self.assertRaisesRegex(PortForwardException,
+                                "reverse port forwarding"):
+      with network.open(session):
+        pass
+    self.assertFalse(network.is_running)
+    session.browser_platform.ports.reverse_forward.assert_not_called()
+    mock_server.shutdown.assert_called_once_with()
 
 
 if __name__ == "__main__":

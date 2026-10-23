@@ -800,6 +800,14 @@ class Platform(abc.ABC):
   def ports(self) -> PortScope:
     return self._default_port_manager.scope
 
+  @property
+  def supports_reverse_port_forwarding(self) -> bool:
+    """Whether host ports can be exposed on this platform (e.g. adb reverse).
+    Always True for local platforms since no forwarding is needed."""
+    if not self.is_remote:
+      return True
+    return self._default_port_manager.supports_reverse_forwarding
+
   def is_port_used(self, port: int) -> bool:
     self.assert_is_local()
     for conn in psutil.net_connections(kind="inet"):

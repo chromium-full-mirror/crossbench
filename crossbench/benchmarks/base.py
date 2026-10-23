@@ -17,7 +17,7 @@ from typing_extensions import Self, override
 
 from crossbench import path as pth
 from crossbench.action_runner.config import ActionRunnerConfig
-from crossbench.cli.config.network import NetworkConfig, NetworkType
+from crossbench.cli.config.network import NetworkConfig
 from crossbench.flags.base import Flags
 from crossbench.helper import txt_helper
 from crossbench.helper.collection_helper import close_matches_message
@@ -874,10 +874,8 @@ class PressBenchmark(SubStoryBenchmark):
     explicit url was requested via --live/--official/--url."""
     if args.custom_benchmark_url or not cls.LOCAL_DIR:
       return super().default_network_config(args)
-    return NetworkConfig(
-        type=NetworkType.LOCAL,
-        path=pth.ROOT_DIR / cls.LOCAL_DIR,
-        url=cls.LOCAL_FILE_SERVER_URL)
+    return NetworkConfig.default_local(
+        path=pth.ROOT_DIR / cls.LOCAL_DIR, url=cls.LOCAL_FILE_SERVER_URL)
 
   @classmethod
   @override

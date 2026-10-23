@@ -132,6 +132,12 @@ class IOSPortManager(SubprocessPortManager):
   def _ios_platform(self) -> IOSPlatform:
     return cast("IOSPlatform", self.platform)
 
+  @property
+  @override
+  def supports_reverse_forwarding(self) -> bool:
+    # TODO: There is no `adb reverse` equivalent for iOS yet.
+    return False
+
   @override
   def _popen_forward(self, local_port: int,
                      remote_port: int) -> subprocess.Popen:

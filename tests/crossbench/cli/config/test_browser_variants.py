@@ -39,7 +39,7 @@ from crossbench.cli.config.browser_variants import BaseBrowserVariantsConfig, \
 from crossbench.cli.config.driver import DriverConfig
 from crossbench.cli.config.driver_type import BrowserDriverType
 from crossbench.cli.config.env import ENV_CONFIG_PRESETS, EnvConfig
-from crossbench.cli.config.network import NetworkConfig
+from crossbench.cli.config.network import NetworkConfig, NetworkType
 from crossbench.config import ConfigError
 from crossbench.helper.cwd import change_cwd
 from tests import test_helper
@@ -1359,6 +1359,78 @@ class TestBrowserVariantsConfig(BaseConfigTestCase):
     self.assertFalse(browser_3.network.traffic_shaper.is_live)
     self.assertEqual(browser_3.network.traffic_shaper.ts_proxy.in_kbps,
                      network_4g.speed.in_kbps)
+
+  def _local_file_server_config(self,
+                                is_default: bool = False) -> NetworkConfig:
+    local_dir = pth.LocalPath("/benchmark")
+    self.fs.create_file(local_dir / "index.html")
+    if is_default:
+      return NetworkConfig.default_local(local_dir)
+    return NetworkConfig(type=NetworkType.LOCAL, path=local_dir)
+
+  @contextlib.contextmanager
+  def _patch_no_reverse_port_forwarding(self):
+    with mock.patch.object(
+        type(self.platform),
+        "supports_reverse_port_forwarding",
+        new_callable=mock.PropertyMock,
+        return_value=False):
+      yield
+
+  def test_local_file_server_with_reverse_port_forwarding(self):
+    args = self.mock_args(
+        browser=[BrowserConfig(mock_browser.MockChromeStable.mock_app_path())],
+        network_config=self._local_file_server_config(is_default=True))
+    with self._patch_get_browser_cls(mock_browser.MockChromeStable):
+      browsers = BrowserVariantsConfig.parse_args(args).browsers
+    self.assertEqual(len(browsers), 1)
+    self.assertTrue(browsers[0].network.is_local_file_server)
+
+  def test_local_file_server_default_fallback_without_port_forwarding(self):
+    args = self.mock_args(
+        browser=[BrowserConfig(mock_browser.MockChromeStable.mock_app_path())],
+        network_config=self._local_file_server_config(is_default=True))
+    with self._patch_get_browser_cls(
+        mock_browser.MockChromeStable), self._patch_no_reverse_port_forwarding(
+        ), self.assertLogs(level="WARNING") as logs:
+      browsers = BrowserVariantsConfig.parse_args(args).browsers
+    self.assertEqual(len(browsers), 1)
+    self.assertTrue(browsers[0].network.is_live)
+    self.assertIn("reverse port forwarding", "\n".join(logs.output))
+
+  def test_local_file_server_explicit_without_port_forwarding(self):
+    args = self.mock_args(
+        browser=[BrowserConfig(mock_browser.MockChromeStable.mock_app_path())],
+        network_config=self._local_file_server_config(is_default=False))
+    with self._patch_get_browser_cls(
+        mock_browser.MockChromeStable), self._patch_no_reverse_port_forwarding(
+        ), self.assertRaises(argparse.ArgumentTypeError) as cm:
+      BrowserVariantsConfig.parse_args(args)
+    self.assertIn("reverse port forwarding", str(cm.exception))
+
+  def test_local_file_server_browser_config_without_port_forwarding(self):
+    local_config = self._local_file_server_config(is_default=True)
+    browser_config_dict = {
+        "browsers": {
+            "local": {
+                "path": "chrome-stable",
+                "network": {
+                    "type": str(NetworkType.LOCAL),
+                    "path": str(local_config.path),
+                },
+            },
+        },
+    }
+    config_file = pth.LocalPath("browsers.config.json")
+    with config_file.open("w", encoding="utf-8") as f:
+      json.dump(browser_config_dict, f)
+    args = self.mock_args(
+        browser_config=config_file, network_config=local_config)
+    with self._patch_get_browser_cls(
+        mock_browser.MockChromeStable), self._patch_no_reverse_port_forwarding(
+        ), self.assertRaises(argparse.ArgumentTypeError) as cm:
+      BrowserVariantsConfig.parse_args(args)
+    self.assertIn("reverse port forwarding", str(cm.exception))
 
   def test_from_cli_args_browser_config_env_override(self):
     browser_config_dict = {

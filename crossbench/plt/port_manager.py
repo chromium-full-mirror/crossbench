@@ -206,6 +206,13 @@ class PortManager(abc.ABC):
   def platform(self) -> Platform:
     return self._platform
 
+  @property
+  def supports_reverse_forwarding(self) -> bool:
+    """Whether host ports can be exposed on the (remote) platform, e.g. via
+    `adb reverse`. Platforms without this capability cannot reach services
+    running on the host, like the local file server."""
+    return True
+
   @contextlib.contextmanager
   def nested(self) -> Iterator[PortScope]:
     """Open a nested port scope, all forwarded ports that were opened
