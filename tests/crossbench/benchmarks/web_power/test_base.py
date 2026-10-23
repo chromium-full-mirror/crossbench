@@ -747,10 +747,12 @@ class WebPowerSetupProbesTestCase(WebPowerBenchmarkBaseTestCase):
   def _setup_runner(
       self,
       with_bits: bool = False,
+      is_ios: bool = False,
       probes: Sequence[Probe] = (),
       disabled_probes: Sequence[str] = (),
   ) -> Runner:
     self.mock_browser.platform.is_android = with_bits
+    self.mock_browser.platform.is_ios = is_ios
     if with_bits and not self.fs.exists(self.bits_path):
       self.fs.create_file(self.bits_path)
     bits_probe = (
@@ -812,6 +814,33 @@ class WebPowerSetupProbesTestCase(WebPowerBenchmarkBaseTestCase):
     self.assertNotIn("trace_processor", probe_names)
     self.assertNotIn("bits", probe_names)
     self.assertTrue(runner.is_probe_disabled("perfetto"))
+
+  def test_setup_probes_skips_perfetto_on_ios(self) -> None:
+    runner = self._setup_runner(is_ios=True)
+    probe_names = [p.name for p in runner.probes]
+    self.assertNotIn("perfetto", probe_names)
+    self.assertNotIn("trace_processor", probe_names)
+    self.assertNotIn("bits", probe_names)
+
+  def test_setup_probes_rejects_mixed_ios_and_non_ios_browsers(self) -> None:
+    ios_browser = mock.Mock()
+    ios_browser.unique_name = "ios_browser"
+    ios_browser.driver_logging = False
+    ios_browser.label = "ios_label"
+    ios_browser.platform.is_ios = True
+    self.mock_browser.platform.is_ios = False
+    story = MockWebPowerStory.from_site(
+        "cnn", total_duration=dt.timedelta(seconds=1))
+    benchmark = MockWebPowerBenchmark(stories=[story])
+    with self.assertRaisesRegex(ValueError,
+                                "Cannot mix iOS and non-iOS browsers"):
+      Runner(
+          out_dir=self.out_dir,
+          browsers=[self.mock_browser, ios_browser],
+          benchmark=benchmark,
+          env_validation_mode=ValidationMode.SKIP,
+          in_memory_result_db=True,
+      )
 
 
 class FakeWprReplayNetwork(WprReplayNetwork):

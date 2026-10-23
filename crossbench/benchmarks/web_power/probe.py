@@ -102,11 +102,15 @@ class WebPowerProbe(BenchmarkProbeMixin, Probe):
     if self.benchmark.bits_probe and not runner.has_probe("bits"):
       extra_probes.append(self.benchmark.bits_probe)
     is_bits_active = runner.has_probe("bits") or bool(self.benchmark.bits_probe)
+    ios_flags = [b.platform.is_ios for b in runner.browsers]
+    if any(ios_flags) and not all(ios_flags):
+      raise ValueError("Cannot mix iOS and non-iOS browsers.")
 
     # Perfetto: By default (when BITS is not explicitly added), Web Power
     # measures power rails via Perfetto, unless the user provided a custom
-    # Perfetto probe or explicitly disabled Perfetto via --no-probe=perfetto.
-    if adding_perfetto := (not is_bits_active and
+    # Perfetto probe, explicitly disabled Perfetto via --no-probe=perfetto,
+    # or is running on iOS (where Perfetto is unsupported).
+    if adding_perfetto := (not is_bits_active and not any(ios_flags) and
                            not runner.has_probe("perfetto") and
                            not runner.is_probe_disabled("perfetto")):
       extra_probes.append(self._default_perfetto_probe())
@@ -143,7 +147,7 @@ class WebPowerProbe(BenchmarkProbeMixin, Probe):
     scores_file = result.csv
     version_str = ".".join(map(str, self.benchmark.version()))
     scores_table = tabulate(
-        pd.read_csv(scores_file),
+        pd.read_csv(scores_file).to_dict(orient="list"),
         headers="keys",
         tablefmt="plain",
         showindex=False)
