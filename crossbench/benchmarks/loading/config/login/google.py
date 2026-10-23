@@ -6,12 +6,13 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from typing_extensions import override
 
 from crossbench.action_runner.action.click import ClickAction
 from crossbench.action_runner.action.enums import ReadyState
+from crossbench.action_runner.action.text_input import TextInputAction
 from crossbench.benchmarks.loading.config.login.base import PresetLoginBlock
 
 if TYPE_CHECKING:
@@ -81,13 +82,27 @@ CLICK_YES_IT_WAS_ME: ClickAction = ClickAction.parse({
     "verify": "xpath///body[not(./button[./span[text()='Yes, it was me']])]",
 })
 
+DISMISS_CHROME_SIGNIN: Final[TextInputAction] = TextInputAction.parse({
+    "action": "text_input",
+    "keyevent": "Escape",
+    "source": "keyboard",
+})
+
 
 class GoogleLogin(PresetLoginBlock):
   """Google-specific login steps."""
 
-  def _submit_login_field(self, action: Actions, secret: UsernamePassword,
-                          aria_label: str, input_val: str,
-                          button_name: str) -> None:
+  def _dismiss_chrome_signin_prompt(self, action: Actions,
+                                    runner: ActionRunner) -> None:
+    action.wait(1)
+    try:
+      runner.text_input(DISMISS_CHROME_SIGNIN)
+    except NotImplementedError as e:
+      logging.debug("Could not dismiss Chrome sign-in prompt: %s", e)
+
+  def _submit_login_field(self, action: Actions, runner: ActionRunner,
+                          secret: UsernamePassword, aria_label: str,
+                          input_val: str, button_name: str) -> None:
     if secret.is_interactive:
       return
     action.wait_js_condition(
@@ -96,6 +111,7 @@ class GoogleLogin(PresetLoginBlock):
          f"document.getElementById({button_name!r}) != null;"),
         0.2,
         timeout=20)
+    self._dismiss_chrome_signin_prompt(action, runner)
     action.js("const inputField ="
               f" document.querySelector(\"[aria-label='{aria_label}']\");"
               f"inputField.value = {input_val!r};"
@@ -122,9 +138,9 @@ class GoogleLogin(PresetLoginBlock):
           GOOGLE_LOGIN_URL,
           ready_state=ReadyState.INTERACTIVE,
           timeout=self.timeout(secret))
-      self._submit_login_field(action, secret, "Email or phone",
+      self._submit_login_field(action, runner, secret, "Email or phone",
                                secret.username, "identifierNext")
-      self._submit_login_field(action, secret, "Enter your password",
+      self._submit_login_field(action, runner, secret, "Enter your password",
                                secret.password, "passwordNext")
 
       action.wait_js_condition(
