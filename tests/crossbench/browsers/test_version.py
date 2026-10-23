@@ -1103,6 +1103,8 @@ class SafariBrowserVersionTestCase(_BrowserVersionTestCase):
       self.parse("16.6 XXX (18615.3)")
     with self.assertRaises(VersionParseError):
       self.parse("Safari 16.6 XXX (18615.3)")
+    with self.assertRaises(VersionParseError):
+      self.parse("Safari 26")
 
   def test_parse_stable_safari(self):
     version: BrowserVersion = self._parse_helper(self.STABLE_VERSION_STR)
@@ -1117,6 +1119,10 @@ class SafariBrowserVersionTestCase(_BrowserVersionTestCase):
     version: BrowserVersion = self._parse_helper("Safari 18.1.1")
     self.assertTrue(version.is_stable)
     self.assertSequenceEqual(version.parts, (18, 1, 1, 0))
+    self.assertTrue(version.is_complete)
+    version = self._parse_helper("Safari 26.5")
+    self.assertTrue(version.is_stable)
+    self.assertSequenceEqual(version.parts, (26, 5, 0, 0))
     self.assertTrue(version.is_complete)
 
   def test_parse_beta_safari(self):

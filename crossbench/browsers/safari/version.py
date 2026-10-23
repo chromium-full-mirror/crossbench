@@ -27,6 +27,7 @@ _COMPLEX_VERSION_RE: Final[re.Pattern] = re.compile(
 class SafariVersion(BrowserVersion):
   _MIN_MAJOR_PARTS_LEN: Final[int] = 3
   _MIN_PARTS_LEN: Final[int] = 3
+  _MIN_SIMPLE_PARTS_LEN: Final[int] = 2
 
   @classmethod
   @override
@@ -55,7 +56,8 @@ class SafariVersion(BrowserVersion):
     release = 0
     if release_str := matches["release"]:
       release = int(release_str)
-    parts = cls._parse_parts(full_version, parts_str)
+    parts = cls._parse_parts(
+        full_version, parts_str, min_parts_len=cls._MIN_PARTS_LEN)
     parts = (*major_parts, release, *parts)
     return VersionParseResult(parts, channel,
                               f"{major_parts_str} ({version_str})")
@@ -64,18 +66,22 @@ class SafariVersion(BrowserVersion):
   def _parse_simple_version(cls, full_version: str,
                             matches: re.Match[str]) -> VersionParseResult:
     channel: BrowserVersionChannel = cls._parse_channel(full_version)
-    parts = cls._parse_parts(full_version, matches["parts"])
-    parts += (0,)
+    parts = cls._parse_parts(
+        full_version, matches["parts"], min_parts_len=cls._MIN_SIMPLE_PARTS_LEN)
+    # Pad omitted trailing version parts up to _MIN_MAJOR_PARTS_LEN.
+    # Then append release=0 at index _MIN_MAJOR_PARTS_LEN (see self.release).
+    parts += (0,) * (cls._MIN_MAJOR_PARTS_LEN - len(parts) + 1)
     return VersionParseResult(parts, channel, full_version)
 
   @classmethod
-  def _parse_parts(cls, full_version: str, parts_str: str) -> tuple[int, ...]:
+  def _parse_parts(cls, full_version: str, parts_str: str,
+                   min_parts_len: int) -> tuple[int, ...]:
     try:
       parts = tuple(map(int, parts_str.split(".")))
     except ValueError as e:
       raise cls.parse_error("Could not parse version number parts.",
                             full_version) from e
-    if len(parts) < cls._MIN_PARTS_LEN:
+    if len(parts) < min_parts_len:
       raise cls.parse_error("Invalid number of version number parts",
                             full_version)
     return parts
