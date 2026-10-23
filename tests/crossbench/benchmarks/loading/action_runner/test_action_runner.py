@@ -13,7 +13,7 @@ from unittest import mock
 from unittest.mock import MagicMock, call
 
 from crossbench.action_runner.action.click import ClickAction
-from crossbench.action_runner.action.enums import ButtonClick
+from crossbench.action_runner.action.enums import ButtonClick, ScrollMode
 from crossbench.action_runner.action.position import PositionConfig
 from crossbench.action_runner.action.probe import ProbeAction
 from crossbench.action_runner.action.raw_input import RawInputAction
@@ -986,6 +986,27 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
 
     self.assert_input_events_injected(
         list(events), expected_device_name="custom_ts")
+
+  def test_scroll_touch_settle_duration_and_scroll_mode(self) -> None:
+    scroll_action = ScrollAction.create(
+        InputSource.TOUCH,
+        distance=100,
+        duration=dt.timedelta(milliseconds=50),
+        settle_duration=dt.timedelta(milliseconds=150),
+        scroll_mode=ScrollMode.COSINE_EASING)
+    self.browser.expect_js(expected_js=self._NO_ELEMENT_JS_RESULT)
+    self.run_action(scroll_action)
+
+    self.inject_events_mock.assert_called_once()
+    _, events = self.inject_events_mock.call_args[0]
+    self.assertEqual(events[0], TouchEvent(Point(960, 972), is_down=True))
+    # With 120Hz over 50ms (6 steps), step 1 is at fraction 1/6.
+    # Linear would be round(972 - 100 * (1/6)) = 955; cosine easing is
+    # round(972 - 100 * (1 - cos(pi/6)) / 2) = round(972 - 6.6987) = 965.
+    self.assertEqual(events[2], TouchEvent(Point(960, 965), is_down=True))
+    self.assertEqual(events[-2],
+                     WaitEvent(duration=dt.timedelta(milliseconds=150)))
+    self.assertEqual(events[-1], TouchEvent(Point(960, 872), is_down=False))
 
   def test_click_js_selector_success(self) -> None:
     click_action = ClickAction.create(

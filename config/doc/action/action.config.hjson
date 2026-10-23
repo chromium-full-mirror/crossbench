@@ -34,6 +34,14 @@
         "selector": "#my-scrolling-element"
         "required": true
       }
+      {
+        "action": "scroll"
+        "source": "touch"
+        "distance": 1000
+        "duration": "750ms"
+        "settle_duration": "150ms"
+        "scroll_mode": "cosine_easing"
+      }
     ]
     "click": [
       {

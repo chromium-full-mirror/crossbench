@@ -17,6 +17,12 @@ class ButtonClick(ConfigEnum):
 
 
 @enum.unique
+class ScrollMode(ConfigEnum):
+  LINEAR = ("linear", "Constant velocity interpolation (Default).")
+  COSINE_EASING = ("cosine_easing", "Smooth cosine ease-in-out interpolation.")
+
+
+@enum.unique
 class ReadyState(ConfigEnum):
   """See https://developer.mozilla.org/en-US/docs/Web/API/Document/readyState"""
   # Non-blocking:

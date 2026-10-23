@@ -8,6 +8,7 @@ import contextlib
 import datetime as dt
 import functools
 import logging
+import math
 import sys
 import time
 from typing import TYPE_CHECKING, Callable, Final, Iterable, Iterator, \
@@ -15,7 +16,7 @@ from typing import TYPE_CHECKING, Callable, Final, Iterable, Iterator, \
 
 from crossbench import exception
 from crossbench import path as pth
-from crossbench.action_runner.action.enums import ButtonClick
+from crossbench.action_runner.action.enums import ButtonClick, ScrollMode
 from crossbench.action_runner.action_runner_listener import \
     ActionRunnerListener
 from crossbench.action_runner.bond_action_runner import BondActionRunner
@@ -525,13 +526,23 @@ class ActionRunner:
       assert action.source_device
       total_scroll_distance = viewport_info.css_to_native_distance(
           action.distance)
-      self._inject_scroll_swipes(scroll_area, total_scroll_distance,
-                                 action.duration, action.source_device)
+      self._inject_scroll_swipes(
+          scroll_area,
+          total_scroll_distance,
+          action.duration,
+          action.source_device,
+          settle_duration=action.settle_duration,
+          scroll_mode=action.scroll_mode)
 
-  def _inject_scroll_swipes(self, scroll_area: DisplayRectangle,
-                            total_scroll_distance: float,
-                            total_duration: dt.timedelta,
-                            source_device: str) -> None:
+  def _inject_scroll_swipes(
+      self,
+      scroll_area: DisplayRectangle,
+      total_scroll_distance: float,
+      total_duration: dt.timedelta,
+      source_device: str,
+      settle_duration: dt.timedelta = dt.timedelta(),
+      scroll_mode: ScrollMode = ScrollMode.LINEAR,
+  ) -> None:
     # get_scrollable_area will apply a non-scrollable border around the
     # rectangle to avoid issues with swiping on the very edge of windows.
     (scrollable_top, scrollable_bottom,
@@ -556,7 +567,9 @@ class ActionRunner:
               end_x=mid_x,
               end_y=y_end,
               duration=current_duration,
-              polling_rate_hz=polling_rate_hz))
+              polling_rate_hz=polling_rate_hz,
+              settle_duration=settle_duration,
+              scroll_mode=scroll_mode))
       remaining_distance -= current_distance
 
     self.browser_platform.inject_input_events(source_device, events)
@@ -685,9 +698,17 @@ class ActionRunner:
       return device.polling_rate_hz
     return DEFAULT_TOUCH_POLLING_RATE_HZ
 
-  def _get_swipe_events(self, start_x: int, start_y: int, end_x: int,
-                        end_y: int, duration: dt.timedelta,
-                        polling_rate_hz: int) -> list[InputEvent]:
+  def _get_swipe_events(
+      self,
+      start_x: int,
+      start_y: int,
+      end_x: int,
+      end_y: int,
+      duration: dt.timedelta,
+      polling_rate_hz: int,
+      settle_duration: dt.timedelta = dt.timedelta(),
+      scroll_mode: ScrollMode = ScrollMode.LINEAR,
+  ) -> list[InputEvent]:
     start_point = Point(start_x, start_y)
     end_point = Point(end_x, end_y)
     num_steps = max(1, round(duration.total_seconds() * polling_rate_hz))
@@ -702,14 +723,26 @@ class ActionRunner:
       previous_cumulative_us = target_cumulative_us
 
       fraction = step / num_steps
-      cur_x = self._interpolate(start_x, end_x, fraction)
-      cur_y = self._interpolate(start_y, end_y, fraction)
+      cur_x = self._interpolate(
+          start_x, end_x, fraction, scroll_mode=scroll_mode)
+      cur_y = self._interpolate(
+          start_y, end_y, fraction, scroll_mode=scroll_mode)
       events.append(TouchEvent(position=Point(cur_x, cur_y), is_down=True))
 
+    if settle_duration:
+      events.append(WaitEvent(duration=settle_duration))
     events.append(TouchEvent(position=end_point, is_down=False))
     return events
 
-  def _interpolate(self, start: int, end: int, fraction: float) -> int:
+  def _interpolate(
+      self,
+      start: int,
+      end: int,
+      fraction: float,
+      scroll_mode: ScrollMode = ScrollMode.LINEAR,
+  ) -> int:
+    if scroll_mode is ScrollMode.COSINE_EASING:
+      fraction = (1 - math.cos(math.pi * fraction)) / 2
     return round(start + (end - start) * fraction)
 
   def wait_for_condition(self, action: i_action.WaitForConditionAction) -> None:

@@ -20,7 +20,7 @@ from crossbench.action_runner.action.close_all_tabs import CloseAllTabsAction
 from crossbench.action_runner.action.close_tab import CloseTabAction
 from crossbench.action_runner.action.dump_html import DumpHtmlAction
 from crossbench.action_runner.action.enums import ButtonClick, ReadyState, \
-    WindowTarget
+    ScrollMode, WindowTarget
 from crossbench.action_runner.action.get import GetAction
 from crossbench.action_runner.action.inject_new_document_script import \
     InjectNewDocumentScriptAction
@@ -366,6 +366,41 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
     with self.assertRaises(ValueError) as cm:
       ScrollAction.parse_dict({"action": "scroll", "distance": "0"})
     self.assertIn("distance", str(cm.exception))
+
+  def test_parse_scroll_touch_settle_duration_and_scroll_mode(self):
+    config_dict = {
+        "action": "scroll",
+        "source": "touch",
+        "distance": 500,
+        "duration": "750ms",
+        "settle_duration": "150ms",
+        "scroll_mode": "cosine_easing",
+    }
+    action = ScrollAction.parse_dict(config_dict)
+    self.assertEqual(action.input_source, InputSource.TOUCH)
+    self.assertEqual(action.settle_duration, dt.timedelta(milliseconds=150))
+    self.assertEqual(action.scroll_mode, ScrollMode.COSINE_EASING)
+    action.validate()
+
+    action_2 = ScrollAction.parse_dict(action.to_json())
+    self.assertEqual(action, action_2)
+    action_2.validate()
+
+  def test_parse_scroll_js_rejects_settle_duration_and_scroll_mode(self):
+    with self.assertRaisesRegex(
+        ValueError, "settle_duration cannot be used with JS scroll source"):
+      ScrollAction.parse_dict({
+          "action": "scroll",
+          "source": "js",
+          "settle_duration": "150ms",
+      })
+    with self.assertRaisesRegex(
+        ValueError, "scroll_mode cannot be used with JS scroll source"):
+      ScrollAction.parse_dict({
+          "action": "scroll",
+          "source": "js",
+          "scroll_mode": "cosine_easing",
+      })
 
   def test_parse_click_minimal_selector(self):
     config_dict = {"action": "click", "selector": "#button"}
