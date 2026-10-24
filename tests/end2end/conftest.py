@@ -178,22 +178,33 @@ def mock_patch_chrome_stable(browser_path) -> Iterator[None]:
     yield
 
 
+def _kill_lingering_chromedriver() -> None:
+  if not plt.PLATFORM.is_win:
+    return
+  for proc in psutil.process_iter():
+    with contextlib.suppress(psutil.Error):
+      if "chromedriver" in proc.name().lower():
+        proc.kill()
+
+
 @pytest.fixture
 def test_env(request):
   test_name = re.sub(r"[\[\]\\/*?:\"<>|]", "_", request.node.name)
   maybe_cas_archive: str | None = request.config.getoption(CAS_ARCHIVE_FLAG)
   if maybe_cas_archive:
     cas_test_env = TestEnv(pathlib.Path(maybe_cas_archive), test_name)
-    yield cas_test_env
-    cas_test_env.remove_non_result()
+    try:
+      yield cas_test_env
+    finally:
+      _kill_lingering_chromedriver()
+      cas_test_env.remove_non_result()
   else:
     with tempfile.TemporaryDirectory() as tmp_dirname:
       tmp_test_env = TestEnv(pathlib.Path(tmp_dirname), test_name)
-      yield tmp_test_env
-      if plt.PLATFORM.is_win:
-        for proc in psutil.process_iter():
-          if "chromedriver" in proc.name().lower():
-            proc.kill()
+      try:
+        yield tmp_test_env
+      finally:
+        _kill_lingering_chromedriver()
 
 
 @pytest.fixture(scope="session")

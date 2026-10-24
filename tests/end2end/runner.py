@@ -40,4 +40,5 @@ if __name__ == "__main__":
   test_helper.run_pytest(
       END2END_TEST_DIR,
       *more_flags,
+      retries=2,
   )

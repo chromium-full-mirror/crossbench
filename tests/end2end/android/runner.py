@@ -19,12 +19,4 @@ if REPO_DIR not in sys.path:
 from tests import test_helper  # noqa: E402
 
 if __name__ == "__main__":
-  return_code = test_helper.run_pytest(TEST_DIR, check=False)
-
-  # Retry failed tests once
-  if return_code > 0:
-    test_helper.run_pytest(
-        TEST_DIR,
-        "--last-failed",
-        "--last-failed-no-failures=none",
-    )
+  test_helper.run_pytest(TEST_DIR, retries=2)

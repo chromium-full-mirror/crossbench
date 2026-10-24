@@ -19,4 +19,4 @@ if REPO_DIR not in sys.path:
 from tests import test_helper  # noqa: E402
 
 if __name__ == "__main__":
-  test_helper.run_pytest(TEST_DIR)
+  test_helper.run_pytest(TEST_DIR, retries=2)

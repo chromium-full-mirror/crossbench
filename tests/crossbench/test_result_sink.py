@@ -572,6 +572,90 @@ class ResultSinkPluginTestCase(unittest.TestCase):
     self.assertEqual(len(plugin._pending_results), 0)
     self.assertEqual(plugin._reported_count, 1)
 
+  def test_build_retry_args(self) -> None:
+    base_args = ["-vv", "-n", "1"]
+    self.assertEqual(
+        test_helper.build_retry_args(base_args),
+        ["-vv", "-n", "1", "--last-failed", "--last-failed-no-failures=none"],
+    )
+    existing_retry_args = [
+        "-vv",
+        "-n",
+        "1",
+        "--last-failed",
+        "--last-failed-no-failures=none",
+    ]
+    self.assertEqual(
+        test_helper.build_retry_args(existing_retry_args),
+        existing_retry_args,
+    )
+
+  def test_build_retry_args_cov(self) -> None:
+    cov_args = ["-vv", "--cov=crossbench", "--cov-report=lcov:out.info"]
+    self.assertEqual(
+        test_helper.build_retry_args(cov_args),
+        [
+            "-vv",
+            "--cov=crossbench",
+            "--cov-report=lcov:out.info",
+            "--last-failed",
+            "--last-failed-no-failures=none",
+            "--cov-append",
+        ],
+    )
+    bare_cov_args = ["-vv", "--cov", "crossbench"]
+    self.assertEqual(
+        test_helper.build_retry_args(bare_cov_args),
+        [
+            "-vv",
+            "--cov",
+            "crossbench",
+            "--last-failed",
+            "--last-failed-no-failures=none",
+            "--cov-append",
+        ],
+    )
+    existing_cov_retry_args = [
+        "--cov=crossbench",
+        "--cov-append",
+        "--last-failed",
+        "--last-failed-no-failures=none",
+    ]
+    self.assertEqual(
+        test_helper.build_retry_args(existing_cov_retry_args),
+        existing_cov_retry_args,
+    )
+
+  def test_run_pytest_retries(self) -> None:
+    with self.assertRaises(AssertionError):
+      test_helper.run_pytest("tests/end2end", check=False, retries=-1)
+
+    with mock.patch.object(sys, "argv", ["runner.py"]), mock.patch.object(
+        pytest,
+        "main",
+        side_effect=[
+            pytest.ExitCode.TESTS_FAILED,
+            pytest.ExitCode.TESTS_FAILED,
+            pytest.ExitCode.OK,
+        ],
+    ) as mock_main:
+      code = test_helper.run_pytest(
+          "tests/end2end",
+          "--cov=crossbench",
+          use_default_flags=False,
+          check=False,
+          retries=2,
+      )
+      self.assertEqual(code, pytest.ExitCode.OK)
+      self.assertEqual(mock_main.call_count, 3)
+      first_call_args = mock_main.call_args_list[0].args[0]
+      retry_call_args = mock_main.call_args_list[1].args[0]
+      self.assertNotIn("--last-failed", first_call_args)
+      self.assertNotIn("--cov-append", first_call_args)
+      self.assertIn("--last-failed", retry_call_args)
+      self.assertIn("--last-failed-no-failures=none", retry_call_args)
+      self.assertIn("--cov-append", retry_call_args)
+
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)
