@@ -22,6 +22,8 @@ from crossbench import path as pth
 from crossbench import plt
 from crossbench.action_runner.action.wait_for_ready_state import \
     WaitForReadyStateAction
+from crossbench.benchmarks.loading.browser_startup import \
+    BrowserStartupBenchmark
 from crossbench.benchmarks.loading.playback_controller import \
     PlaybackController
 from crossbench.benchmarks.loading.tab_controller import TabController
@@ -148,6 +150,10 @@ class CrossbenchConfigTestMixin:
     self.setup_config_dir(
         LoadLine2TabletBenchmark.default_network_config_path().parent)
 
+  def setup_browser_startup_configs(self) -> None:
+    self.setup_config_dir(
+        BrowserStartupBenchmark.default_probe_config_path().parent)
+
   def setup_perfetto_config_presets(self):
     self.setup_config_dir(TraceConfig.preset_dir())
     self.setup_config_dir(config_dir() / "doc/probe")
@@ -267,6 +273,7 @@ class BaseCliTestCase(BaseCrossbenchTestCase):
     self.setup_wrap_patcher()
     self.setup_wait_for_ready_state_patcher()
     self.setup_loadline_configs()
+    self.setup_browser_startup_configs()
     self.setup_perfetto_config_presets()
 
   def setup_tabulate_patcher(self) -> None:
