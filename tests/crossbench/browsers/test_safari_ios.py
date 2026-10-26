@@ -124,9 +124,10 @@ class SafariIosBrowserTestCase(CrossbenchFakeFsTestCase):
     with self.assertRaises(NotImplementedError):
       browser.show_url("https://example.com", WindowTarget.NEW_TAB)
 
-    # about:blank should be ignored.
+    # about:blank and data: URLs should be ignored.
     mock_wda.open_url.reset_mock()
     browser.show_url("about:blank")
+    browser.show_url("data:text/html;charset=utf-8,<html></html>")
     mock_wda.open_url.assert_not_called()
 
     mock_wda.terminate_app.reset_mock()
@@ -134,13 +135,14 @@ class SafariIosBrowserTestCase(CrossbenchFakeFsTestCase):
     mock_wda.terminate_app.assert_called_once_with("com.apple.mobilesafari")
     self.assertFalse(browser.is_running)
 
-  def test_js_not_implemented(self) -> None:
+  def test_js_not_implemented_and_user_agent(self) -> None:
     platform = self.setup_platform()
     browser = SafariWdaIOS(
         "test-safari",
         platform.path("/Applications/Safari.app"),
         settings=Settings(platform=platform),
     )
+    self.assertIn("Safari", browser.user_agent())
     with self.assertRaises(NotImplementedError):
       browser.js("return 1;")
 

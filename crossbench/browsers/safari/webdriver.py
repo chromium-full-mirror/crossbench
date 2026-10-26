@@ -329,6 +329,10 @@ class SafariWdaIOS(Safari):
     self._is_running = True
 
   @override
+  def user_agent(self) -> str:
+    return str(self.version)
+
+  @override
   def show_url(
       self,
       url: str,
@@ -340,8 +344,8 @@ class SafariWdaIOS(Safari):
     logging.debug("SafariWdaIOS.show_url(%s)", url)
     # WDA's /url endpoint uses iOS system URL scheme deep-linking (openURL:
     # via SpringBoard), which only routes http/https URLs to Safari and fails
-    # on about:blank.
-    if not url or url == "about:blank":
+    # on about:blank or data: URLs.
+    if not url or url == "about:blank" or url.startswith("data:"):
       return
     self.ios_platform.wda.open_url(url)
 
