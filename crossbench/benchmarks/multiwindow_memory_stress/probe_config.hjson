@@ -1,0 +1,17 @@
+{
+  "probes": {
+    "trace_processor": {
+      "metric_definitions": [
+        "./metrics/metrics.textproto"
+      ]
+      "module_paths": [
+        "./metrics/sql_packages"
+      ]
+    }
+    "perfetto": {
+      "textproto": "./perfetto_minimal.txtpb"
+    }
+    // Required by the meminfo actions of the story.
+    "meminfo": {}
+  }
+}

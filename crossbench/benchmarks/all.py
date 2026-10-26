@@ -28,6 +28,8 @@ from crossbench.benchmarks.motionmark import MotionMark10Benchmark, \
     MotionMark11Benchmark, MotionMark12Benchmark, MotionMark13Benchmark, \
     MotionMark20Benchmark, MotionMark131Benchmark, MotionMark132Benchmark, \
     MotionMarkMainBenchmark
+from crossbench.benchmarks.multiwindow_memory_stress import \
+    MultiwindowMemoryStressBenchmark
 from crossbench.benchmarks.powerline import PowerlineBenchmark
 from crossbench.benchmarks.speedometer import Speedometer10Benchmark, \
     Speedometer20Benchmark, Speedometer21Benchmark, Speedometer30Benchmark, \
@@ -74,6 +76,7 @@ __all__ = [
     "MotionMark13Benchmark",
     "MotionMark20Benchmark",
     "MotionMarkMainBenchmark",
+    "MultiwindowMemoryStressBenchmark",
     "PowerlineBenchmark",
     "Speedometer10Benchmark",
     "Speedometer20Benchmark",

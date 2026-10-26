@@ -1,0 +1,89 @@
+# Copyright 2026 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+query {
+  id: "tab_timing_query"
+  table {
+    table_name: "tab_timing_by_tab_index"
+    module_name: "sql_packages.multiwindow_memory_stress.tab_timing"
+    column_names: "it_id"
+    column_names: "tab_index"
+    column_names: "page_load_duration_ms"
+    column_names: "allocation_duration_ms"
+  }
+}
+
+metric_spec: {
+  id: "multiwindow-memory-stress.page_load_duration_ms"
+  dimensions: "it_id"
+  value: "page_load_duration_ms"
+  polarity: LOWER_IS_BETTER
+  query {
+    inner_query_id: "tab_timing_query"
+  }
+}
+
+metric_spec: {
+  id: "multiwindow-memory-stress.allocation_duration_ms"
+  dimensions: "it_id"
+  value: "allocation_duration_ms"
+  polarity: LOWER_IS_BETTER
+  query {
+    inner_query_id: "tab_timing_query"
+  }
+}
+
+metric_spec: {
+  id: "multiwindow-memory-stress.page_load_duration_ms_by_tab_index"
+  dimensions: "it_id"
+  dimensions: "tab_index"
+  value: "page_load_duration_ms"
+  polarity: LOWER_IS_BETTER
+  query {
+    inner_query_id: "tab_timing_query"
+  }
+}
+
+metric_spec: {
+  id: "multiwindow-memory-stress.allocation_duration_ms_by_tab_index"
+  dimensions: "it_id"
+  dimensions: "tab_index"
+  value: "allocation_duration_ms"
+  polarity: LOWER_IS_BETTER
+  query {
+    inner_query_id: "tab_timing_query"
+  }
+}
+
+query {
+  id: "tab_revisit_query"
+  table {
+    table_name: "tab_revisit_by_tab_index"
+    module_name: "sql_packages.multiwindow_memory_stress.tab_revisit"
+    column_names: "it_id"
+    column_names: "tab_index"
+    column_names: "tab_revisit_duration_ms"
+  }
+}
+
+metric_spec: {
+  id: "multiwindow-memory-stress.tab_revisit_duration_ms"
+  dimensions: "it_id"
+  value: "tab_revisit_duration_ms"
+  polarity: LOWER_IS_BETTER
+  query {
+    inner_query_id: "tab_revisit_query"
+  }
+}
+
+metric_spec: {
+  id: "multiwindow-memory-stress.tab_revisit_duration_ms_by_tab_index"
+  dimensions: "it_id"
+  dimensions: "tab_index"
+  value: "tab_revisit_duration_ms"
+  polarity: LOWER_IS_BETTER
+  query {
+    inner_query_id: "tab_revisit_query"
+  }
+}

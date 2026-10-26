@@ -1,0 +1,76 @@
+buffers {
+  size_kb: 300000
+  fill_policy: DISCARD
+}
+data_sources {
+  config {
+    name: "org.chromium.trace_metadata2"
+  }
+}
+data_sources {
+  config {
+    name: "track_event"
+    track_event_config {
+      disabled_categories: "*"
+      enabled_categories: "blink.user_timing"
+      enabled_categories: "blink.console"
+      enabled_categories: "__metadata"
+      timestamp_unit_multiplier: 1000
+      enable_thread_time_sampling: false
+      filter_debug_annotations: false
+      filter_dynamic_event_names: false
+    }
+  }
+}
+data_sources {
+  config {
+    name: "org.chromium.trace_event"
+    chrome_config {
+      trace_config: "{\"record_mode\":\"record-until-full\",\"included_categories\":[\"blink.user_timing\",\"blink.console\"]}"
+      privacy_filtering_enabled: false
+      client_priority: USER_INITIATED
+    }
+  }
+}
+data_sources {
+  config {
+    name: "org.chromium.histogram_sample"
+    # Memory, image decode, tab switch and discard histograms. Only add
+    # histograms with low sampling rates here.
+    chromium_histogram_samples {
+      histograms {
+        histogram_name: "Memory.Discardable.LockingSuccess"
+      }
+      histograms {
+        histogram_name: "Memory.DiscardableAllocationSize"
+      }
+      histograms {
+        histogram_name: "Memory.Renderer.PrivateMemoryFootprint"
+      }
+      histograms {
+        histogram_name: "Memory.Renderer.PrivateSwapFootprint"
+      }
+      histograms {
+        histogram_name: "Renderer4.ImageDecodeTaskDurationUs.Software"
+      }
+      histograms {
+        histogram_name: "Browser.Tabs.TotalSwitchDuration3"
+      }
+      histograms {
+        histogram_name: "Discarding.DiscardLatency"
+      }
+      histograms {
+        histogram_name: "Discarding.DiscardingProtectedTab"
+      }
+      histograms {
+        histogram_name: "Discarding.DiscardingProtectedTab2"
+      }
+      histograms {
+        histogram_name: "Discarding.DiscardingFocusedTab"
+      }
+      histograms {
+        histogram_name: "Discarding.DiscardingFocusedTab2"
+      }
+    }
+  }
+}
