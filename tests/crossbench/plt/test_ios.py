@@ -888,10 +888,14 @@ class IOsWdaTestCase(BaseIOsMockPlatformTestCase):
         devices=DEVICES_SINGLE, simulators=SIMULATORS_SAMPLE)
     platform = IOSPlatform(self.host_platform, "00001111-11AA22BB33DD")
     wda = WDAClient(platform)
-    output = "Device is locked. Please unlock the device."
-    with self.assertRaises(WDAError) as cm:
-      wda._handle_runner_error(65, output)
-    self.assertIn("Device 00001111-11AA22BB33DD is locked", str(cm.exception))
+    for output in (
+        "Device is locked. Please unlock the device.",
+        "Xcode cannot launch WebDriverAgentRunner because the device is "
+        "locked.",
+    ):
+      with self.assertRaises(WDAError) as cm:
+        wda._handle_runner_error(65, output)
+      self.assertIn("Device 00001111-11AA22BB33DD is locked", str(cm.exception))
 
   def test_wda_password_auth_error(self):
     self.expect_startup_devices(

@@ -235,6 +235,8 @@ class WDAClient:
           combined_output += "\n" + (self._platform.host_platform.cat(log_file))
       except (OSError, subprocess.SubprocessError) as e:
         logging.warning("Could not inspect xcresult log: %s", e)
+    # Xcode varies the wording and casing of these over versions.
+    combined_output = combined_output.lower()
     # 0xe8008012 (kAMDProvisioningProfileInstallFailedError) is reported when
     # the embedded provisioning profile does not include this device's UDID.
     if ("provisioning profile cannot be installed on this device"
@@ -252,7 +254,7 @@ class WDAClient:
           "and select your connected iPhone/iPad as the target device.\n"
           "3. In the Xcode menu bar, click Product -> Build For -> Testing "
           "(Cmd+Shift+U) so Xcode registers this device and updates the build.")
-    if ("Developer App Certificate is not trusted" in combined_output or
+    if ("developer app certificate is not trusted" in combined_output or
         "profile has not been explicitly trusted" in combined_output):
       self.stop()
       raise WDAError(
@@ -262,7 +264,7 @@ class WDAClient:
           "device and trust your Developer App certificate. Note: The device "
           "requires an internet connection (Wi-Fi or cellular) to verify the "
           "certificate.")
-    if "Guided Access active" in combined_output:
+    if "guided access active" in combined_output:
       self.stop()
       raise WDAError(
           f"Guided Access is active on device {self._platform.udid}, which "
@@ -270,24 +272,24 @@ class WDAClient:
           "Access on the device (triple-click the side button, enter your "
           "passcode, and tap 'End', or disable it under "
           "Settings -> Accessibility -> Guided Access).")
-    if "agreed to the Xcode license agreements" in combined_output:
+    if "agreed to the xcode license agreements" in combined_output:
       self.stop()
       raise WDAError(
           "Xcode license agreements have not been accepted. "
           "Please run 'sudo xcodebuild -license accept' in a Terminal.")
-    if ("Developer Mode is disabled" in combined_output or
-        "Developer Mode not enabled" in combined_output):
+    if ("developer mode is disabled" in combined_output or
+        "developer mode not enabled" in combined_output):
       self.stop()
       raise WDAError(
           f"Developer Mode is disabled on device {self._platform.udid}. "
           "Please open Settings -> Privacy & Security -> Developer Mode on "
           "the device to enable it.")
-    if ("Device is locked" in combined_output or
+    if ("device is locked" in combined_output or
         "device was locked" in combined_output):
       self.stop()
       raise WDAError(f"Device {self._platform.udid} is locked. "
                      "Please unlock the device.")
-    if "password" in combined_output.lower():
+    if "password" in combined_output:
       self.stop()
       raise WDAError(
           "xcodebuild is requesting authentication. "
