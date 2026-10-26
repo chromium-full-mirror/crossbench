@@ -4,22 +4,150 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, ClassVar, Mapping, Sequence
 
+import pandas as pd
+from tabulate import tabulate
 from typing_extensions import override
 
 from crossbench import config
 from crossbench import path as pth
 from crossbench.benchmarks.base import RegexFilter
+from crossbench.benchmarks.benchmark_probe import BenchmarkProbeMixin
 from crossbench.benchmarks.loading.config.pages import PagesConfig
 from crossbench.benchmarks.loading.loading_benchmark import LoadingBenchmark, \
     LoadingPageFilter
 from crossbench.parse import ObjectParser
+from crossbench.probes.probe import Probe, ProbePriority
+from crossbench.probes.probe_context import EmptyProbeContext
+from crossbench.probes.results import EmptyProbeResult, LocalProbeResult
+from crossbench.probes.trace_processor.trace_processor import \
+    TraceProcessorProbe
 
 if TYPE_CHECKING:
   import argparse
 
+  from crossbench.probes.results import ProbeResult
+  from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.stories.story import Story
+
+
+class BrowserStartupProbe(BenchmarkProbeMixin, Probe):
+  """Summarizes browser startup trace_processor metrics per story."""
+
+  NAME: ClassVar = "browser_startup"
+  PRIORITY: ClassVar = ProbePriority.PRE_TRACE_PROCESSOR
+  IS_GENERAL_PURPOSE: ClassVar = False
+  PRODUCES_DATA: ClassVar = False
+  SUMMARY_CSV_NAME: ClassVar = "startup_summary.csv"
+  METADATA_COLUMNS: ClassVar[frozenset[str]] = frozenset({
+      "cb_browser",
+      "cb_story",
+      "cb_temperature",
+      "cb_run",
+  })
+  SUMMARY_COLUMNS: ClassVar[tuple[str, ...]] = (
+      "metric",
+      "cb_story",
+      "cb_browser",
+      "count",
+      "median",
+      "iqr",
+      "mean",
+      "std",
+      "min",
+      "max",
+  )
+
+  @override
+  def get_context_cls(self) -> type[EmptyProbeContext[BrowserStartupProbe]]:
+    return EmptyProbeContext
+
+  @classmethod
+  def compute_summary(
+      cls, csv_files: Sequence[pth.LocalPath]) -> pd.DataFrame:
+    rows: list[dict[str, str | int | float]] = []
+    for csv_path in csv_files:
+      rows.extend(cls._summarize_csv_file(csv_path))
+    return pd.DataFrame(rows, columns=cls.SUMMARY_COLUMNS)
+
+  @classmethod
+  def _summarize_csv_file(
+      cls, csv_path: pth.LocalPath) -> list[dict[str, str | int | float]]:
+    if not csv_path.is_file() or csv_path.stat().st_size == 0:
+      return []
+    try:
+      df = pd.read_csv(csv_path)
+    except pd.errors.EmptyDataError:
+      return []
+    if df.empty or not {"cb_browser", "cb_story"}.issubset(df.columns):
+      return []
+    rows: list[dict[str, str | int | float]] = []
+    metric_cols = [
+        col for col in df.columns if col not in cls.METADATA_COLUMNS
+    ]
+    for metric_col in metric_cols:
+      rows.extend(cls._summarize_metric_column(df, str(metric_col)))
+    return rows
+
+  @classmethod
+  def _summarize_metric_column(
+      cls, df: pd.DataFrame,
+      metric_col: str) -> list[dict[str, str | int | float]]:
+    numeric_df = df[["cb_story", "cb_browser"]].copy()
+    numeric_df["value"] = pd.to_numeric(df[metric_col], errors="coerce")
+    numeric_df = numeric_df.dropna(subset=["value"])
+    if numeric_df.empty:
+      return []
+    rows: list[dict[str, str | int | float]] = []
+    grouped = numeric_df.groupby(["cb_story", "cb_browser"], sort=False)
+    for (story, browser), group_df in grouped:
+      series = group_df["value"]
+      count = int(len(series))
+      q75 = float(series.quantile(0.75))
+      q25 = float(series.quantile(0.25))
+      rows.append({
+          "metric": metric_col,
+          "cb_story": str(story),
+          "cb_browser": str(browser),
+          "count": count,
+          "median": float(series.median()),
+          "iqr": q75 - q25,
+          "mean": float(series.mean()),
+          "std": float(series.std(ddof=1)) if count > 1 else 0.0,
+          "min": float(series.min()),
+          "max": float(series.max()),
+      })
+    return rows
+
+  @override
+  def merge_browsers(self, group: BrowsersRunGroup) -> ProbeResult:
+    if not (trace_result := group.results.get_by_name(
+        TraceProcessorProbe.NAME)):
+      return EmptyProbeResult()
+    if not (csv_list := trace_result.csv_list):
+      return EmptyProbeResult()
+    summary_df = self.compute_summary(csv_list)
+    if summary_df.empty:
+      return EmptyProbeResult()
+    summary_file = group.get_local_probe_result_path(self).with_name(
+        self.SUMMARY_CSV_NAME)
+    summary_df.to_csv(summary_file, index=False)
+    return LocalProbeResult(csv=(summary_file,))
+
+  @override
+  def log_browsers_result(self, group: BrowsersRunGroup) -> None:
+    if not (result := group.results.get(self)) or not result.csv_list:
+      return
+    summary_file = result.csv
+    summary_table = tabulate(
+        pd.read_csv(summary_file),
+        headers="keys",
+        tablefmt="plain",
+        showindex=False,
+        floatfmt=".2f")
+    logging.critical("Browser Startup Summary:\n%s", summary_table)
 
 
 class BrowserStartupPageFilter(LoadingPageFilter):
@@ -45,6 +173,7 @@ class BrowserStartupBenchmark(LoadingBenchmark):
   """Benchmark for measuring browser startup performance."""
 
   NAME = "browser-startup"
+  PROBES: ClassVar = (BrowserStartupProbe,)
   STORY_FILTER_CLS: ClassVar = BrowserStartupPageFilter
 
   @classmethod
