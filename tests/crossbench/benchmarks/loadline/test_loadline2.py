@@ -5,18 +5,25 @@
 from __future__ import annotations
 
 import abc
+import datetime as dt
 from unittest import mock
 
 import pandas as pd
 from typing_extensions import override
 
+from crossbench.action_runner.action.js import JsAction
+from crossbench.action_runner.action.wait import WaitAction
+from crossbench.action_runner.action_runner import ActionRunner
 from crossbench.action_runner.config import ActionRunnerConfig
+from crossbench.benchmarks.loading.config.blocks import ActionBlock
 from crossbench.benchmarks.loading.page.combined import CombinedPage
+from crossbench.benchmarks.loading.page.interactive import InteractivePage
 from crossbench.benchmarks.loadline import LoadLine2PhoneBenchmark, \
     LoadLine2PhoneDebugBenchmark, LoadLine2TabletBenchmark, \
     LoadLine2TabletDebugBenchmark, LoadLine2WebApiPhoneBenchmark, \
     LoadLine2WebApiPhoneDebugBenchmark
-from crossbench.benchmarks.loadline.loadline_2 import process_scores
+from crossbench.benchmarks.loadline.loadline_2 import LoadLine2CombinedPage, \
+    process_scores
 from crossbench.browsers.attributes import BrowserAttributes
 from crossbench.stories.story import Story
 from tests import test_helper
@@ -108,6 +115,31 @@ class TestLoadLine2Helpers(BaseCrossbenchTestCase):
     self.assertEqual(scores["chrome"].loc["metric1"], "100.000")
     self.assertNotIn("TOTAL_SCORE", scores["chrome"])
 
+  def test_combined_page_android_load_block_triggers_sync_touch_nav(
+      self) -> None:
+    nav_action = JsAction(
+        script="window.location.href = 'https://example.com';")
+    wait_action = WaitAction(duration=dt.timedelta(milliseconds=100))
+    load_block = ActionBlock(
+        label="load", index=1, actions=(nav_action, wait_action))
+    page = InteractivePage("test_page", (load_block,))
+    combined_page = LoadLine2CombinedPage((page,))
+    action_runner = mock.MagicMock(spec=ActionRunner)
+    action_runner.browser_platform.is_android = True
+    mock_actions = action_runner.actions.return_value.__enter__.return_value
+
+    combined_page.run_with(action_runner, multiple_tabs=False)
+
+    action_runner.actions.assert_called_once_with(
+        "TouchSyncSetup", measure=False)
+    self.assertIn("100vh", mock_actions.js.call_args[0][0])
+    self.assertIn("https://example.com", mock_actions.js.call_args[0][0])
+    action_runner.click_touch.assert_called_once()
+    click_action = action_runner.click_touch.call_args[0][0]
+    self.assertEqual(click_action.position.selector.selector, "html")
+    remaining_blocks = action_runner.run_blocks.call_args[0][0]
+    self.assertEqual(tuple(remaining_blocks[0].actions), (wait_action,))
+
 
 class BaseLoadLine2BenchmarkTestCase(
     BaseLoadLineBenchmarkTestCase, metaclass=abc.ABCMeta):
@@ -157,6 +189,7 @@ class TestLoadLine2PhoneBenchmark(BaseLoadLine2BenchmarkTestCase):
                                            story)
     self.assertIn("--site-per-process", flags)
     self.assertIn("--disable-back-forward-cache", flags)
+    self.assertIn("--disable-external-intent-requests", flags)
     self.assertIn("SpareRendererForSitePerProcess",
                   flags.get("--disable-features", ""))
 

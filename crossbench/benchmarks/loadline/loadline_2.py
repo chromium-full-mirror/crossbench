@@ -14,7 +14,9 @@ from typing_extensions import override
 from crossbench import config
 from crossbench import path as pth
 from crossbench.action_runner.action.click import ClickAction
+from crossbench.action_runner.action.js import JsAction
 from crossbench.action_runner.action.position import PositionConfig
+from crossbench.benchmarks.loading.config.blocks import ActionBlock
 from crossbench.benchmarks.loading.input_source import InputSource
 from crossbench.benchmarks.loading.page.combined import CombinedPage
 from crossbench.benchmarks.loading.page.interactive import InteractivePage
@@ -39,7 +41,7 @@ if TYPE_CHECKING:
 
 # We should increase the minor version number every time there are any changes
 # that might affect the benchmark score.
-VERSION_STRING: Final[str] = "2.7.0"
+VERSION_STRING: Final[str] = "2.8.0"
 
 
 class MetricStats(TypedDict):
@@ -193,6 +195,44 @@ class LoadLine2ProbeContext(ProbeContext[LoadLine2Probe]):
 
 class LoadLine2CombinedPage(CombinedPage):
 
+  ANDROID_VIEWPORT_TAP_POSITION: Final[PositionConfig] = (
+      PositionConfig.from_selector("html"))
+
+  def _tap_viewport_for_scheduling_boost(
+      self, action_runner: ActionRunner) -> None:
+    action = ClickAction.create(
+        source=InputSource.TOUCH, position=self.ANDROID_VIEWPORT_TAP_POSITION)
+    action_runner.click_touch(action)
+
+  def _run_android_load_block(self, action_runner: ActionRunner,
+                              block: ActionBlock) -> None:
+    first_action = block.actions[0] if block.actions else None
+    if not isinstance(first_action, JsAction):
+      action_runner.run_blocks((block,))
+      return
+
+    setup_script = f"""
+      (() => {{
+        document.documentElement.style.height = '100vh';
+        window.__ll_nav_triggered = false;
+        const triggerNav = () => {{
+          if (window.__ll_nav_triggered) return;
+          window.__ll_nav_triggered = true;
+          {first_action.script}
+        }};
+        for (const evt of ['pointerup', 'touchend', 'click']) {{
+          window.addEventListener(evt, triggerNav, {{once: true}});
+          document.addEventListener(evt, triggerNav, {{once: true}});
+        }}
+      }})();
+    """
+    with action_runner.actions("TouchSyncSetup", measure=False) as actions:
+      actions.js(setup_script)
+    self._tap_viewport_for_scheduling_boost(action_runner)
+    remaining_block = ActionBlock(
+        label=block.label, index=block.index, actions=block.actions[1:])
+    action_runner.run_blocks((remaining_block,))
+
   @override
   def run_with(self, action_runner: ActionRunner, multiple_tabs: bool) -> None:
     del multiple_tabs
@@ -202,13 +242,9 @@ class LoadLine2CombinedPage(CombinedPage):
         continue
       for block in page.blocks:
         if block.label == "load" and action_runner.browser_platform.is_android:
-          # Trigger a scheduling boost on devices that boost performance on
-          # user input.
-          action = ClickAction.create(
-              source=InputSource.TOUCH,
-              position=PositionConfig.from_coordinates(0, 0))
-          action_runner.click_touch(action)
-        action_runner.run_blocks((block,))
+          self._run_android_load_block(action_runner, block)
+        else:
+          action_runner.run_blocks((block,))
 
   @override
   def run_once(self, run: Run) -> None:
@@ -282,6 +318,10 @@ class LoadLine2Benchmark(LoadLineBenchmark):
       # navigating away from it. This can interfere with the next page load,
       # increasing measurement noise. To reduce noise, we disable BFCache.
       chrome_flags.set("--disable-back-forward-cache")
+      # Navigating from a touch listener sets transient user activation, which
+      # allows Chrome on Android to intercept URLs (e.g. Google Docs) and
+      # launch external intent handlers instead of loading them in the tab.
+      chrome_flags.set("--disable-external-intent-requests")
       # Additional flags that make Chrome behavior more deterministic, at the
       # expense of making it less representative of real-world usage.
       if cls.DETERMINISTIC:
