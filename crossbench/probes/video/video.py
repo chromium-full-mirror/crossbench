@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import os
 import subprocess
@@ -12,21 +13,26 @@ from typing import TYPE_CHECKING, ClassVar, Final, Self, TextIO
 
 from typing_extensions import override
 
+from crossbench import path as pth
+from crossbench import plt
 from crossbench.config import ConfigEnum
-from crossbench.helper import collection_helper
+from crossbench.helper import collection_helper, wait
 from crossbench.parse import ObjectParser
+from crossbench.plt.ios import IOSPlatform
 from crossbench.probes.probe import Probe, ProbeConfigParser, ProbeContext
-from crossbench.probes.probe_error import ProbeMissingDataError
+from crossbench.probes.probe_error import ProbeIncompatibleBrowser, \
+    ProbeMissingDataError
 from crossbench.probes.result_location import ResultLocation
-from crossbench.probes.results import LocalProbeResult, ProbeResult
+from crossbench.probes.results import EmptyProbeResult, LocalProbeResult, \
+    ProbeResult
 
 if TYPE_CHECKING:
-  from crossbench import path as pth
-  from crossbench.browsers.browser import Viewport
+  from crossbench.browsers.browser import Browser, Viewport
   from crossbench.env.runner_env import RunnerEnv
   from crossbench.runner.groups.browsers import BrowsersRunGroup
   from crossbench.runner.groups.repetitions import RepetitionsRunGroup
   from crossbench.runner.run import Run
+  from crossbench.runner.runner import Runner
   from crossbench.stories.story import Story
 
 
@@ -55,6 +61,9 @@ class VideoProbe(Probe):
   IMAGE_FORMAT: Final = "png"
   TIMESTRIP_FILE_SUFFIX: Final = f".timestrip.{IMAGE_FORMAT}"
   FRAMERATE: Final = 60
+  # The recorder for physical iOS devices, compiled in setup().
+  IOS_USB_RECORDER_SOURCE: Final = (
+      pth.LocalPath(__file__).parent / "ios_usb_screen_recorder.swift")
 
   @classmethod
   @override
@@ -92,6 +101,21 @@ class VideoProbe(Probe):
     self._generate_timestrip: Final[bool] = generate_timestrip
     self._merge_runs: Final[bool] = merge_runs
     self._orientation: Final[Orientation] = orientation
+    self._ios_usb_recorder: pth.LocalPath | None = None
+
+  @property
+  def ios_usb_recorder(self) -> pth.LocalPath:
+    assert self._ios_usb_recorder, "iOS recorder not compiled."
+    return self._ios_usb_recorder
+
+  @override
+  def setup(self, runner: Runner) -> None:
+    super().setup(runner)
+    if not any(browser.platform.is_ios for browser in self.browsers):
+      return
+    self._ios_usb_recorder = runner.out_dir / "ios_usb_screen_recorder"
+    runner.platform.sh("swiftc", "-O", self.IOS_USB_RECORDER_SOURCE, "-o",
+                       self._ios_usb_recorder)
 
   @property
   @override
@@ -117,6 +141,14 @@ class VideoProbe(Probe):
     return self._merge_runs
 
   @override
+  def validate_browser(self, env: RunnerEnv, browser: Browser) -> None:
+    super().validate_browser(env, browser)
+    platform = browser.platform
+    if isinstance(platform, IOSPlatform) and platform.is_simulator:
+      raise ProbeIncompatibleBrowser(self, browser,
+                                     "iOS simulators are not supported")
+
+  @override
   def validate_env(self, env: RunnerEnv) -> None:
     super().validate_env(env)
     if env.repetitions > 10:
@@ -133,6 +165,14 @@ class VideoProbe(Probe):
           message="Missing 'montage' binary, please install imagemagick.")
       # Check that montage can be executed
       env.check_sh_success("montage", "--version")
+    if any(browser.platform.is_ios for browser in env.browsers):
+      # No check_installed(): macOS ships /usr/bin/swiftc as a shim that only
+      # works once a toolchain is installed, so it has to be run to tell.
+      env.check_sh_success(
+          "swiftc",
+          "--version",
+          message="Cannot run swiftc, needed to record an iOS device's "
+          "screen; install the Xcode command line tools: {}")
     self._pre_check_viewport_size(env)
 
   def _pre_check_viewport_size(self, env: RunnerEnv) -> None:
@@ -264,30 +304,85 @@ class VideoProbeContext(ProbeContext[VideoProbe]):
       "y=h-line_h-5:x=5:"
       "box=1:boxborderw=15:boxcolor=white")
 
+  # The iOS device recorder prints READY once it has written its first
+  # frame; the run waits for that so the recording covers it from the start.
+  IOS_RECORDER_READY_WAIT: Final = wait.WaitRange(
+      min=dt.timedelta(milliseconds=50),
+      max=dt.timedelta(milliseconds=50),
+      timeout=dt.timedelta(seconds=15))
+
+  # How long the iOS device recorder gets to finish its file once told to stop.
+  IOS_RECORDER_STOP_TIMEOUT: Final = dt.timedelta(seconds=10)
+
   def __init__(self, probe: VideoProbe, run: Run) -> None:
     super().__init__(probe, run)
     self._record_process: subprocess.Popen | None = None
     self._recorder_log_file: TextIO | None = None
 
+  @override
+  def get_default_result_path(self) -> pth.AnyPath:
+    if self.browser_platform.is_ios:
+      return self.run.get_local_probe_result_path(self.probe)
+    return super().get_default_result_path()
+
+  @property
+  def _recorder_platform(self) -> plt.Platform:
+    # iOS devices are recorded over USB from the host.
+    if self.browser_platform.is_ios:
+      return self.host_platform
+    return self.browser_platform
+
+  @property
+  def _recorder_log_path(self) -> pth.LocalPath:
+    return self.local_result_path.with_suffix(".recorder.log")
+
   def start(self) -> None:
     browser = self.run.browser
     cmd = self._record_cmd(browser.viewport)
     logging.debug("Screen recorder cmd: %s", cmd)
-    if self.browser_platform.is_remote:
+    if self._recorder_platform.is_remote:
       self._recorder_log_file = None
     else:
-      self._recorder_log_file = self.local_result_path.with_suffix(
-          ".recorder.log").open(
-              "w", encoding="utf-8")
-    self._record_process = self.browser_platform.popen(
+      self._recorder_log_file = self._recorder_log_path.open(
+          "w", encoding="utf-8")
+    self._record_process = self._recorder_platform.popen(
         *cmd,
         stdin=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         stdout=self._recorder_log_file)
     if self._record_process.poll():
       raise ValueError("Could not start screen recorder")
+    if self.browser_platform.is_ios:
+      self._wait_for_ios_recorder_ready()
+      return
     # TODO: Add common start-story-delay on runner for these cases.
     self.host_platform.sleep(1)
+
+  def _wait_for_ios_recorder_ready(self) -> None:
+    assert self._record_process
+    try:
+      for _ in wait.wait_with_backoff(self.IOS_RECORDER_READY_WAIT):
+        if self._ios_recorder_is_ready():
+          return
+    except TimeoutError as e:
+      # Only the error raised here should be reported, so stop the recorder
+      # for good rather than leaving it to stop() and teardown().
+      self.stop_process()
+      raise RuntimeError("iOS screen recorder not ready after "
+                         f"{self.IOS_RECORDER_READY_WAIT.timeout}, "
+                         f"see {self._recorder_log_path}") from e
+
+  def _ios_recorder_is_ready(self) -> bool:
+    """Whether the recorder has printed READY; raises if it has exited."""
+    assert self._record_process
+    if self._record_process.poll() is not None:
+      self.stop_process()
+      raise RuntimeError("iOS screen recorder exited before becoming ready, "
+                         f"see {self._recorder_log_path}")
+    if not self._recorder_log_path.exists():
+      return False
+    log = self._recorder_log_path.read_text(encoding="utf-8")
+    return "READY" in log.splitlines()
 
   def _record_cmd(self, viewport: Viewport) -> tuple[str, ...]:
     if self.browser_platform.is_linux:
@@ -302,10 +397,22 @@ class VideoProbeContext(ProbeContext[VideoProbe]):
               str(self.result_path))
     if self.browser_platform.is_android:
       return ("screenrecord", str(self.result_path))
+    if self.browser_platform.is_ios:
+      browser_platform = self.browser_platform
+      assert isinstance(browser_platform, IOSPlatform)
+      # The capture device is published under the device's name.
+      return (
+          str(self.probe.ios_usb_recorder),
+          browser_platform.model,
+          str(self.result_path),
+          str(self.probe.FRAMERATE),
+      )
     raise ValueError("Invalid platform")
 
   def stop(self) -> None:
-    assert self._record_process, "screencapture stopped early."
+    if not self._record_process:
+      # Gone already, which is reported already.
+      return
     if self.browser_platform.is_macos:
       assert not self._record_process.poll(), (
           "screencapture stopped early. "
@@ -313,24 +420,51 @@ class VideoProbeContext(ProbeContext[VideoProbe]):
           "permissions")
       # The mac screencapture stops on the first (arbitrary) input.
       self._record_process.communicate(input=b"stop")
+    elif self.browser_platform.is_ios:
+      assert not self._record_process.poll(), "screencapture stopped early."
+      self._stop_ios_recorder()
     elif self.browser_platform.is_android:
       assert not self._record_process.poll(), ("screencapture stopped early. ")
       self.browser_platform.send_signal(
           self._record_process, signal=self.browser_platform.signals.SIGINT)
     else:
-      self.browser_platform.terminate(self._record_process)
+      self._recorder_platform.terminate(self._record_process)
+
+  def _stop_ios_recorder(self) -> None:
+    """Lets the recorder finish its file; raises if it did not."""
+    process = self._record_process
+    assert process
+    # Closing its stdin tells the recorder to finish the file.
+    try:
+      process.communicate(
+          timeout=self.IOS_RECORDER_STOP_TIMEOUT.total_seconds())
+    except subprocess.TimeoutExpired:
+      logging.warning("iOS screen recorder did not stop in %s",
+                      self.IOS_RECORDER_STOP_TIMEOUT)
+      self.host_platform.terminate_gracefully(process)
+    returncode = process.poll()
+    if returncode == 0:
+      return
+    # The file is unplayable without a proper finish, so take it away from
+    # teardown().
+    self.stop_process()
+    raise RuntimeError("iOS screen recorder did not finish its file (exit "
+                       f"code {returncode}), see {self._recorder_log_path}")
 
   def teardown(self) -> ProbeResult:
-    assert self._record_process, "Screen recorder stopped early."
     if self._recorder_log_file:
       self._recorder_log_file.close()
+    if not self._record_process:
+      # Gone already, which is reported already.
+      return EmptyProbeResult()
     self.stop_process()
-    if not self.browser_platform.is_file(self.result_path):
+    if not self._recorder_platform.is_file(self.result_path):
       raise ProbeMissingDataError(
           f"No screen recording video found at: {self.result_path}")
-    # Copy files
-    browser_result = self.browser_result(file=(self.result_path,))
-    self._default_result_path = browser_result.file
+    if not self.browser_platform.is_ios:
+      # Copy files
+      browser_result = self.browser_result(file=(self.result_path,))
+      self._default_result_path = browser_result.file
     assert self.host_platform.exists(self.result_path)
 
     if not self.probe.generate_timestrip:
@@ -344,7 +478,7 @@ class VideoProbeContext(ProbeContext[VideoProbe]):
 
   def stop_process(self) -> None:
     if self._record_process:
-      self.browser_platform.terminate_gracefully(
+      self._recorder_platform.terminate_gracefully(
           self._record_process, timeout=5)
       self._record_process = None
 
