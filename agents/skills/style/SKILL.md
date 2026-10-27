@@ -136,10 +136,18 @@ import subprocess
     return "done"
   ```
 
-- **Reduce Code Comments**: Avoid inline code comments and prefer using
-  well-named constants and helper methods and helper classes. Code comments
-  bit-rod, it's better to have executable documentation like tests. Comments on
-  classes are good.
+- **Reduce Code Comments**: Prefer readable code (well-named identifiers, helper
+  methods and helper classes) over comments.
+
+  Prefer comments that explain *why* some piece of code is there rather than
+  repeat the code. Highlighting shortcomings of the current approach is also
+  valid.
+
+  Class-level docs are useful as a way to elucidate their responsibilities and
+  the desired design.
+
+  Prefer validating your assumptions at runtime, type-check time, or test time,
+  rather than adding a comment.
 
 - **Avoid defensive programming**: Fail early and explicitly for stricter code
   and better tests. defensive programming is not good for code health.
