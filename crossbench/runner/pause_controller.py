@@ -8,15 +8,13 @@ import argparse
 import enum
 import logging
 import threading
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Self
 
 from crossbench.helper import input_helper, terminal
 from crossbench.parse import ObjectParser
 
 if TYPE_CHECKING:
   from types import TracebackType
-
-  from typing_extensions import Self
 
 
 @enum.unique

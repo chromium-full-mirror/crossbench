@@ -9,7 +9,7 @@ import contextlib
 import dataclasses
 import datetime as dt
 import enum
-from typing import TYPE_CHECKING, Callable, Final, Sequence, TypeVar
+from typing import TYPE_CHECKING, Callable, Final, Self, Sequence, TypeVar
 
 from immutabledict import immutabledict
 
@@ -23,8 +23,6 @@ from crossbench.pinpoint.format_time import format_datetime
 from crossbench.pinpoint.job_config import fetch_job_config
 
 if TYPE_CHECKING:
-  from typing_extensions import Self
-
   from crossbench.types import JsonDict
 
 
