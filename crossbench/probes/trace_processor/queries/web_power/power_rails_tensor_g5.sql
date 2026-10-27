@@ -1,5 +1,6 @@
 INCLUDE PERFETTO MODULE ext.web_power_rails;
 
+CREATE OR REPLACE PERFETTO TABLE web_power_power_rails AS
 SELECT
   power_rail_name,
   avg_power_mw
@@ -44,5 +45,10 @@ WHERE power_rail_name IN (
     'power.S7S_MLDO_uws',
     'power.S8S_VDD_GMC_uws',
     'power.S9S_VDD_INFRA_uws'
-  )
+  );
+
+SELECT
+  power_rail_name,
+  avg_power_mw
+FROM web_power_power_rails
 ORDER BY 1;

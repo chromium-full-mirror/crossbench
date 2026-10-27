@@ -274,6 +274,7 @@ class WebPowerBenchmarkBaseTestCase(BaseWebPowerBenchmarkTestCase):
         config.config_dir() / "benchmark/web_power/perfetto_basic.txtpb",
         contents="duration_ms: 1000",
     )
+    self.fs.add_real_file(WebPowerProbe.METRIC_DEFINITIONS_FILE)
     self.bits_path = pth.LocalPath(self.platform.default_tmp_dir) / "bits"
 
   @property

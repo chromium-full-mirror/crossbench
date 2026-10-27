@@ -62,6 +62,8 @@ class WebPowerProbe(BenchmarkProbeMixin, Probe):
   INTERNAL_QUERIES_DIR: ClassVar = (
       pth.ROOT_DIR / "internal" / "probes" / "trace_processor" / "queries" /
       "web_power")
+  METRIC_DEFINITIONS_FILE: ClassVar = (
+      config.config_dir() / "benchmark/web_power/metrics.textproto")
   QUERY_NAME: ClassVar = "power_rails"
 
   @override
@@ -136,6 +138,9 @@ class WebPowerProbe(BenchmarkProbeMixin, Probe):
         queries=[
             self._get_query_config(),
             TraceProcessorQueryConfig.parse_str("web_power/cpu_time"),
+        ],
+        metric_definitions=[
+            self.METRIC_DEFINITIONS_FILE.read_text(encoding="utf-8"),
         ],
     )
 

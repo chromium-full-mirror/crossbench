@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import enum
+import os
 import re
 import tempfile
 import typing
@@ -15,6 +16,7 @@ from unittest import mock
 
 import pandas as pd
 import pytest
+from perfetto.trace_processor.api import TraceProcessor
 
 from crossbench import path as pth
 from crossbench.benchmarks.web_power.base import VERSION_STRING
@@ -49,6 +51,7 @@ class WebPowerProbeTestCase(CrossbenchFakeFsTestCase):
     self.runner = mock.MagicMock()
     # Simulate that only the "perfetto" probe is attached.
     self.runner.has_probe.side_effect = lambda name: name == "perfetto"
+    self.fs.add_real_file(WebPowerProbe.METRIC_DEFINITIONS_FILE)
 
   def _benchmark_version_str(self) -> str:
     return ".".join(map(str, self.mock_benchmark.version()))
@@ -820,6 +823,13 @@ class WebPowerProbeTestCase(CrossbenchFakeFsTestCase):
     self.assertEqual(extra_probes[0], bits_probe)
     self.assertEqual(extra_probes[1].name, "trace_processor")
 
+  def test_get_extra_probes_trace_processor_v2_metrics(self):
+    (tp_probe,) = self._test_get_extra_probes(lambda name: name == "perfetto")
+    assert isinstance(tp_probe, TraceProcessorProbe)
+    self.assertSequenceEqual(
+        tp_probe.metric_definitions,
+        (WebPowerProbe.METRIC_DEFINITIONS_FILE.read_text(encoding="utf-8"),))
+
 
 class Mapping(enum.Enum):
   PUBLIC = "public"
@@ -843,6 +853,7 @@ class WebPowerProbeMappingTestCase(CrossbenchFakeFsTestCase):
     self.runner = mock.MagicMock()
     # Simulate that only the "perfetto" probe is attached.
     self.runner.has_probe.side_effect = lambda name: name == "perfetto"
+    self.fs.add_real_file(WebPowerProbe.METRIC_DEFINITIONS_FILE)
 
   def _get_mapping_dir(self, mapping: Mapping) -> pth.LocalPath:
     match mapping:
@@ -1071,54 +1082,55 @@ class WebPowerProbeQueryValidationTestCase(unittest.TestCase):
     self.runner = mock.MagicMock(has_probe=lambda name: name == "perfetto")
     extra_probes = tuple(self.probe.get_extra_probes(self.runner))
     self.assertEqual(len(extra_probes), 1)
-    self.tp_probe = extra_probes[0]
-    self.assertIsInstance(self.tp_probe, TraceProcessorProbe)
-    self.tp_probe._browsers.clear()
-    self.assertEqual(len(self.tp_probe.queries), 2)
-    self.query, self.cpu_query = self.tp_probe.queries
-    self.assertIsInstance(self.query, DeviceSpecificTraceProcessorQuery)
+    default_tp_probe = extra_probes[0]
+    self.assertIsInstance(default_tp_probe, TraceProcessorProbe)
+    assert isinstance(default_tp_probe, TraceProcessorProbe)
+    self.assertEqual(len(default_tp_probe.queries), 2)
+    raw_query, self.cpu_query = default_tp_probe.queries
+    self.assertIsInstance(raw_query, DeviceSpecificTraceProcessorQuery)
+    assert isinstance(raw_query, DeviceSpecificTraceProcessorQuery)
     # Validate the cpu_query config independently
     self.assertIsInstance(self.cpu_query, TraceProcessorQueryConfig)
     self.assertEqual(self.cpu_query.name, "web_power_cpu_time")
 
-    self._setup_dummy_browsers()
+    self._module_paths = default_tp_probe.module_paths
+    self._metric_definitions = default_tp_probe.metric_definitions
+    self._query_name = raw_query.name
+    self._device_to_path = {
+        str(i): path
+        for i, path in enumerate(raw_query.device_override.values())
+    }
+    self.query, self.tp_probe = self._create_probe(self._device_to_path)
 
-  def _setup_dummy_browsers(self):
+  def _create_probe(
+      self,
+      overrides: dict[str, str],
+  ) -> tuple[DeviceSpecificTraceProcessorQuery, TraceProcessorProbe]:
     """
-    Overwrite the regex keys in the original device overrides with simple
-    dummy device names ('0', '1', ...) and create corresponding mock browsers.
-    This ensures that every mapped SQL file is validated exactly once
-    without presupposing the structure of the original regex mappings.
+    Build a DeviceSpecificTraceProcessorQuery and TraceProcessorProbe via public
+    APIs using simple dummy device names ('0', '1', ...) so every mapped SQL
+    file is validated once without mutating private probe attributes.
     """
-
-    paths = list(self.query.device_override.values())
-    dummy_overrides: dict[str, str] = {}
-
-    for path in paths:
-      device_name = str(len(self.tp_probe.browsers))
-      dummy_overrides[device_name] = path
+    query = DeviceSpecificTraceProcessorQuery.create(
+        name=self._query_name, device_override=overrides)
+    tp_probe = TraceProcessorProbe(
+        queries=[query, self.cpu_query],
+        module_paths=self._module_paths,
+        metric_definitions=self._metric_definitions,
+    )
+    for device_name in overrides:
       browser = mock.MagicMock()
       browser.platform.model = device_name
-      self.tp_probe.attach(browser)
-
-    self.query = DeviceSpecificTraceProcessorQuery.create(
-        name=self.query.name, device_override=dummy_overrides)
-    self.tp_probe._queries = (self.query, self.cpu_query)
+      tp_probe.attach(browser)
+    return query, tp_probe
 
   def _run_validation_with_sql(self, sql_content: str, device_name: str):
     with tempfile.NamedTemporaryFile(mode="w", suffix=".sql") as sql_file:
       sql_file.write(sql_content)
       sql_file.flush()
 
-      overrides = {device_name: sql_file.name}
-      test_query = DeviceSpecificTraceProcessorQuery.create(
-          name=self.query.name, device_override=overrides)
-      self.tp_probe._queries = (test_query, self.cpu_query)
-      browser = mock.MagicMock()
-      browser.platform.model = device_name
-      self.tp_probe.attach(browser)
-
-      self.tp_probe.validate_env(mock.MagicMock())
+      _, tp_probe = self._create_probe({device_name: sql_file.name})
+      tp_probe.validate_env(mock.MagicMock())
 
   def test_valid_query_passes_validation(self):
     """Verify that our validation mechanism successfully accepts valid SQL
@@ -1136,6 +1148,131 @@ class WebPowerProbeQueryValidationTestCase(unittest.TestCase):
     """Verify that the actual production SQL queries in WebPowerProbe are valid
     and compile correctly."""
     self.tp_probe.validate_env(mock.MagicMock())
+
+  def test_metric_definitions_unmapped_device_emits_empty_bundles(self):
+    """Verify the v2 metric spec preamble creates an empty fallback table and
+    emits empty metric bundles when no device query has run."""
+    specs = list(self.tp_probe.metric_definitions)
+    self.assertEqual(len(specs), 1)
+    with TraceProcessor(trace=os.devnull, config=self.tp_probe.tp_config) as tp:
+      summary = tp.trace_summary(specs=specs)
+      self.assertFalse(any(bundle.row for bundle in summary.metric_bundles))
+
+  def test_metric_definitions_compute_for_all_devices(self):
+    """Verify that every mapped device query computes accurate per-rail and
+    total power values and feeds the v2 metric definitions."""
+    specs = list(self.tp_probe.metric_definitions)
+    self.assertEqual(len(specs), 1)
+
+    # Synthetic power rail tracks and their expected average power (mW) over
+    # the 1s window [1.0s, 2.0s]: track 1 = 50, track 2 = 100, track 3 = 150,
+    # track 4 = 200.
+    # Each track has:
+    # - A pre-window sample at 0.5s (-999999 uWs) that must be ignored.
+    # - A non-zero baseline at 1.0s (10000 uWs).
+    # - An intermediate sample at 1.5s (10000 + 0.4 * delta uWs).
+    # - A window-end sample at 2.0s (10000 + delta uWs).
+    expected_valid_mw = {50.0, 100.0, 150.0, 200.0}
+
+    with TraceProcessor(trace=os.devnull, config=self.tp_probe.tp_config) as tp:
+      tp.query("""
+        CREATE TABLE _slice AS SELECT * FROM slice WHERE 0;
+        INSERT INTO _slice (ts, dur, name)
+        VALUES
+          (1000000000, 0, 'crossbench-web-power-start'),
+          (2000000000, 0, 'crossbench-web-power-stop');
+        DROP VIEW slice;
+        CREATE VIEW slice AS SELECT * FROM _slice;
+
+        CREATE TABLE _track AS SELECT * FROM track WHERE 0;
+        INSERT INTO _track (id, name, type, source_arg_set_id)
+        VALUES
+          (1, 'power.rails.tpu', 'power_rails', 1),
+          (2, 'power.rails.cpu.big', 'power_rails', 1),
+          (3, 'power.S4M_VDD_CPU_uws', 'power_rails', 1),
+          (4, 'power.rails.ddr.a', 'power_rails', 1);
+        DROP VIEW track;
+        CREATE VIEW track AS SELECT * FROM _track;
+
+        CREATE TABLE _counter_track AS SELECT * FROM counter_track WHERE 0;
+        INSERT INTO _counter_track (id, name, type, source_arg_set_id)
+        SELECT id, name, type, source_arg_set_id FROM _track;
+        DROP VIEW counter_track;
+        CREATE VIEW counter_track AS SELECT * FROM _counter_track;
+
+        CREATE TABLE _counter AS SELECT * FROM counter WHERE 0;
+        INSERT INTO _counter (id, ts, track_id, value)
+        SELECT
+          ROW_NUMBER() OVER () AS id,
+          ts,
+          track_id,
+          value
+        FROM (
+          SELECT 500000000 AS ts, 1 AS track_id, -999999.0 AS value
+          UNION ALL SELECT 1000000000, 1, 10000.0
+          UNION ALL SELECT 1500000000, 1, 30000.0
+          UNION ALL SELECT 2000000000, 1, 60000.0
+          UNION ALL SELECT 500000000, 2, -999999.0
+          UNION ALL SELECT 1000000000, 2, 10000.0
+          UNION ALL SELECT 1500000000, 2, 50000.0
+          UNION ALL SELECT 2000000000, 2, 110000.0
+          UNION ALL SELECT 500000000, 3, -999999.0
+          UNION ALL SELECT 1000000000, 3, 10000.0
+          UNION ALL SELECT 1500000000, 3, 70000.0
+          UNION ALL SELECT 2000000000, 3, 160000.0
+          UNION ALL SELECT 500000000, 4, -999999.0
+          UNION ALL SELECT 1000000000, 4, 10000.0
+          UNION ALL SELECT 1500000000, 4, 90000.0
+          UNION ALL SELECT 2000000000, 4, 210000.0
+        );
+        DROP VIEW counter;
+        CREATE VIEW counter AS SELECT * FROM _counter;
+      """)
+
+      for browser in self.tp_probe.browsers:
+        sql_path = self._device_to_path[browser.platform.model]
+        with self.subTest(sql=sql_path):
+          # Seed a sentinel Perfetto table before each query so any query that
+          # fails to use CREATE OR REPLACE PERFETTO TABLE or writes to a
+          # different table/view name will fail immediately.
+          tp.query("""
+            CREATE OR REPLACE PERFETTO TABLE web_power_power_rails AS
+            SELECT 'stale_rail' AS power_rail_name, -1.0 AS avg_power_mw;
+          """)
+          resolved = self.query.resolve_for_platform(browser.platform)
+          self.assertIsNotNone(resolved)
+          assert resolved is not None
+          df = tp.query(resolved.sql).as_pandas_dataframe()
+          self.assertListEqual(
+              list(df.columns), ["power_rail_name", "avg_power_mw"])
+          self.assertGreaterEqual(
+              len(df), 2, f"Expected >=2 matched rails in {sql_path}")
+
+          expected_rails = dict(
+              zip(df["power_rail_name"], df["avg_power_mw"], strict=True))
+          self.assertEqual(len(expected_rails), len(df))
+          for rail_name, mw in expected_rails.items():
+            self.assertIn(
+                mw, expected_valid_mw,
+                f"Unexpected power {mw} mW for {rail_name} in {sql_path}")
+          self.assertIn(50.0, expected_rails.values())
+
+          summary = tp.trace_summary(specs=specs)
+          bundles_by_id = {
+              bundle.specs[0].id: bundle for bundle in summary.metric_bundles
+          }
+          rails_bundle = bundles_by_id["web_power.power_rails_avg_power_mw"]
+          self.assertEqual(len(rails_bundle.row), len(df))
+          rails_values = {
+              row.dimension[0].string_value: row.values[0].double_value
+              for row in rails_bundle.row
+          }
+          self.assertEqual(rails_values, expected_rails)
+
+          total_bundle = bundles_by_id["web_power.total_power_mw"]
+          self.assertEqual(len(total_bundle.row), 1)
+          self.assertAlmostEqual(total_bundle.row[0].values[0].double_value,
+                                 sum(expected_rails.values()))
 
 
 if __name__ == "__main__":

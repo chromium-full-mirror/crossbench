@@ -20,6 +20,7 @@ from crossbench.benchmarks.web_power.idle import WebPowerIdleStory
 from crossbench.benchmarks.web_power.media_playback import AmbientMode, \
     WebPowerMediaPlaybackStory
 from crossbench.benchmarks.web_power.page_load import WebPowerPageLoadStory
+from crossbench.benchmarks.web_power.probe import WebPowerProbe
 from crossbench.benchmarks.web_power.scroll import WebPowerScrollStory
 from crossbench.benchmarks.web_power.volume_helper import VolumeMode
 from crossbench.browsers.attributes import BrowserAttributes
@@ -373,6 +374,7 @@ class WebPowerConsolidatedCliTestCase(BaseCliTestCase):
         config.config_dir() / "benchmark/web_power/perfetto_basic.txtpb")
     if not self.fs.exists(perfetto_basic):
       self.fs.create_file(perfetto_basic, contents="duration_ms: 1000")
+    self.fs.add_real_file(WebPowerProbe.METRIC_DEFINITIONS_FILE)
     self.fs.add_real_file(WebPowerBenchmark.required_device_config())
     mock_archive = pth.LocalPath("/mock/archive.wprgo")
     self.fs.create_file(mock_archive)

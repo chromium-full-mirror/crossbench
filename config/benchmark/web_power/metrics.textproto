@@ -1,0 +1,50 @@
+# Copyright 2026 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+query {
+  id: "web_power_power_rails"
+  sql {
+    preamble:
+      "CREATE TABLE IF NOT EXISTS web_power_power_rails(power_rail_name TEXT, avg_power_mw REAL);"
+    sql: "SELECT power_rail_name, avg_power_mw FROM web_power_power_rails"
+    column_names: "power_rail_name"
+    column_names: "avg_power_mw"
+  }
+}
+
+# Per-rail average power over the measured interval.
+# Metric id: "web_power.power_rails_avg_power_mw".
+metric_template_spec {
+  id_prefix: "web_power.power_rails"
+  dimensions: "power_rail_name"
+  value_column_specs {
+    name: "avg_power_mw"
+    unit: MILLI_WATTS
+    polarity: LOWER_IS_BETTER
+  }
+  query {
+    inner_query_id: "web_power_power_rails"
+  }
+}
+
+# Sum of all selected rails, i.e. the per-run equivalent of `odpm_total_mw`
+# in power_scores.csv.
+metric_spec {
+  id: "web_power.total_power_mw"
+  value: "total_power_mw"
+  unit: MILLI_WATTS
+  polarity: LOWER_IS_BETTER
+  query {
+    sql {
+      sql: "SELECT SUM(avg_power_mw) AS total_power_mw FROM $rails HAVING COUNT(*) > 0"
+      column_names: "total_power_mw"
+      dependencies {
+        alias: "rails"
+        query {
+          inner_query_id: "web_power_power_rails"
+        }
+      }
+    }
+  }
+}
