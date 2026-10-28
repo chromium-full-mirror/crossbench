@@ -86,6 +86,10 @@ class BondActionRunnerTestCase(BaseCrossbenchTestCase):
       code = bond_action_runner.get_current_conference_code(browser=browser)
       self.assertEqual(code, "abc-def-ghi")
 
+      browser.set_current_url("https://meet.google.com/meet/abc-def-ghi")
+      code = bond_action_runner.get_current_conference_code(browser=browser)
+      self.assertEqual(code, "abc-def-ghi")
+
   def test_get_current_conference_code_invalid(self):
     mock_run = self._make_mock_run()
     action_runner = ActionRunner(mock_run)

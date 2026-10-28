@@ -46,8 +46,7 @@ class BondActionRunner:
     url = ObjectParser.url(browser.current_url)
     if url.hostname != "meet.google.com":
       raise RuntimeError(f"Unsupported URL for Bond action: {url.geturl()}")
-    # Conference code is url path without leading '/'
-    return url.path[1:]
+    return url.path.split("/")[-1]
 
   def _timeout_from_deadline(self, deadline: dt.datetime) -> dt.timedelta:
     timeout = deadline - dt.datetime.now()
