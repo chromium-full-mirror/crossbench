@@ -782,6 +782,31 @@ class IOsWdaTestCase(BaseIOsMockPlatformTestCase):
     with mock.patch.object(wda, "_request", side_effect=TimeoutError()):
       self.assertIsNone(wda.find_element_text_with_prefix("cb:"))
 
+  def test_wda_perform_pointer_chains(self):
+    wda = self._wda_with_session()
+    chains = [{"type": "pointer", "id": "finger1", "actions": []}]
+    with mock.patch.object(wda, "_request") as mock_request:
+      wda.perform_pointer_chains(chains, dt.timedelta(seconds=2))
+      mock_request.assert_called_once_with(
+          "POST",
+          "/session/test-session-123/actions",
+          {"actions": chains},
+          timeout=WDAClient.REQUEST_TIMEOUT + dt.timedelta(seconds=2),
+      )
+    # Nothing to do without chains.
+    with mock.patch.object(wda, "_request") as mock_request:
+      wda.perform_pointer_chains([], dt.timedelta(seconds=2))
+      mock_request.assert_not_called()
+    # A failed batch stops the runner so that no gesture keeps running.
+    with mock.patch.object(wda, "_request") as mock_request, \
+         mock.patch.object(wda, "stop") as mock_stop, \
+         mock.patch.object(wda, "_abort_device_actions") as mock_abort:
+      mock_request.side_effect = WDAError("boom")
+      with self.assertRaises(WDAError):
+        wda.perform_pointer_chains(chains, dt.timedelta(seconds=2))
+      mock_stop.assert_called_once_with()
+      mock_abort.assert_called_once_with()
+
   def test_wda_settings_and_session_configuration(self):
     self.expect_startup_devices(
         devices=DEVICES_SINGLE, simulators=SIMULATORS_SAMPLE)

@@ -645,10 +645,20 @@ class WDAClient:
               ),
       })
     total_duration = len(swipes) * (duration + settle_duration + lift_duration)
+    self.perform_pointer_chains(pointer_chains, total_duration)
+
+  def perform_pointer_chains(
+      self,
+      pointer_chains: Sequence[dict[str, Any]],
+      total_duration: dt.timedelta,
+  ) -> None:
+    """Execute a batch of W3C pointer action chains in a single request."""
+    if not pointer_chains:
+      return
     try:
       self._session_post(
           "actions",
-          {"actions": pointer_chains},
+          {"actions": list(pointer_chains)},
           timeout=self.REQUEST_TIMEOUT + total_duration,
       )
     except BaseException:
