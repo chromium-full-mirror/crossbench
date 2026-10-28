@@ -15,7 +15,7 @@ from perfetto.trace_processor.api import TraceProcessorConfig
 from crossbench import path as pth
 from crossbench import plt
 from crossbench.cli.config.probe_list import ProbeListConfig
-from crossbench.exception import ArgumentTypeMultiException
+from crossbench.exception import ArgumentTypeMultiException, MultiException
 from crossbench.probes.all import TraceProcessorProbe
 from crossbench.probes.trace_processor.constants import MODULES_DIR, \
     QUERIES_DIR
@@ -89,6 +89,63 @@ class TraceProcessorProbeTestCase(unittest.TestCase):
               },
           ],
       })
+
+  def _create_metric_spec(self,
+                          metric_id: str = "test_metric",
+                          sql: str = "SELECT 1 AS val") -> str:
+    return f"""
+      metric_spec {{
+        id: "{metric_id}"
+        value: "val"
+        query {{
+          sql {{
+            sql: "{sql}"
+            column_names: "val"
+          }}
+        }}
+      }}
+    """
+
+  @unittest.skipIf(not plt.PLATFORM.which("trace_processor"),
+                   "trace_processor not available")
+  def test_validate_env_valid_metric_definitions_only(self):
+    spec = self._create_metric_spec()
+    probe = TraceProcessorProbe(metric_definitions=[spec])
+    probe.attach(unittest.mock.MagicMock())
+    probe.validate_env(unittest.mock.MagicMock())
+
+  @unittest.skipIf(not plt.PLATFORM.which("trace_processor"),
+                   "trace_processor not available")
+  def test_validate_env_invalid_metric_definitions_only_raises(self):
+    probe = TraceProcessorProbe(metric_definitions=["invalid_textproto {"])
+    probe.attach(unittest.mock.MagicMock())
+    with self.assertRaises(MultiException):
+      probe.validate_env(unittest.mock.MagicMock())
+
+  @unittest.skipIf(not plt.PLATFORM.which("trace_processor"),
+                   "trace_processor not available")
+  def test_validate_env_invalid_sql_in_metric_definitions_only_raises(self):
+    spec = self._create_metric_spec(
+        metric_id="broken_sql_metric", sql="SYNTAX ERROR")
+    probe = TraceProcessorProbe(metric_definitions=[spec])
+    probe.attach(unittest.mock.MagicMock())
+    with self.assertRaises(MultiException):
+      probe.validate_env(unittest.mock.MagicMock())
+
+  @unittest.skipIf(not plt.PLATFORM.which("trace_processor"),
+                   "trace_processor not available")
+  def test_validate_env_summary_metrics(self):
+    spec = self._create_metric_spec()
+    valid_probe = TraceProcessorProbe(
+        metric_definitions=[spec], summary_metrics=["test_metric"])
+    valid_probe.attach(unittest.mock.MagicMock())
+    valid_probe.validate_env(unittest.mock.MagicMock())
+
+    invalid_probe = TraceProcessorProbe(
+        metric_definitions=[spec], summary_metrics=["nonexistent_metric"])
+    invalid_probe.attach(unittest.mock.MagicMock())
+    with self.assertRaises(MultiException):
+      invalid_probe.validate_env(unittest.mock.MagicMock())
 
 
 class TraceProcessorProbeFakeFsTestCase(CrossbenchFakeFsTestCase):

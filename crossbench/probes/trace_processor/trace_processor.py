@@ -331,11 +331,11 @@ class TraceProcessorProbe(Probe):
               if resolved_query := query.resolve_for_platform(platform):
                 tp.query(resolved_query.sql)
 
-      if summary_metrics := self.summary_metrics:
+      if self.summary_metrics or self.metric_definitions:
         with exceptions.capture("summary metrics:"):
+          metric_ids = list(self.summary_metrics) or None
           tp.trace_summary(
-              specs=list(self.metric_definitions),
-              metric_ids=list(summary_metrics))
+              specs=list(self.metric_definitions), metric_ids=metric_ids)
 
   def _add_cb_columns(self, df: pd.DataFrame, run: Run) -> pd.DataFrame:
     df["cb_browser"] = run.browser.unique_name
