@@ -290,6 +290,33 @@ class SafariWdaIOS(Safari):
 
   BUNDLE_ID: Final[str] = "com.apple.mobilesafari"
 
+  def __init__(
+      self,
+      label: str,
+      path: pth.AnyPath,
+      settings: Settings | None = None,
+  ) -> None:
+    super().__init__(label, path, settings=settings)
+    self._manual: bool = False
+
+  @property
+  def manual(self) -> bool:
+    """Whether a person, not WDA, operates Safari during the run.
+
+    In manual mode nothing is attached to the device: the XCTest runner
+    (and the "Automation Running" shield it puts up) is stopped and the WDA
+    client disabled, so that any WDA request fails instead of reattaching
+    the runner; Safari is launched and navigated through devicectl instead.
+
+    TODO: Consider a separate, devicectl-only Safari class instead of this
+    mode switch.
+    """
+    return self._manual
+
+  @manual.setter
+  def manual(self, value: bool) -> None:
+    self._manual = value
+
   @classmethod
   @override
   def attributes(cls) -> BrowserAttributes:
@@ -319,6 +346,11 @@ class SafariWdaIOS(Safari):
   def start(self, session: BrowserSessionRunGroup) -> None:
     super().start(session)
     self._log_browser_start(self._get_browser_flags_for_session(session))
+    if self._manual:
+      self.ios_platform.wda.stop_device_runner()
+      self.ios_platform.wda.enabled = False
+      self._is_running = True
+      return
     # /wda/apps/launch only activates an already running Safari, so terminate
     # it first to start every session from a fresh process.
     try:
@@ -346,6 +378,9 @@ class SafariWdaIOS(Safari):
     # via SpringBoard), which only routes http/https URLs to Safari and fails
     # on about:blank or data: URLs.
     if not url or url == "about:blank" or url.startswith("data:"):
+      return
+    if self._manual:
+      self.ios_platform.open_url(url)
       return
     self.ios_platform.wda.open_url(url)
 
@@ -375,8 +410,9 @@ class SafariWdaIOS(Safari):
     if not self._is_running:
       return
     logging.info("SafariWdaIOS.force_quit()")
-    try:
-      self.ios_platform.wda.terminate_app(self.BUNDLE_ID)
-    except (WDAError, OSError) as e:
-      logging.warning("Failed to terminate Safari on iOS: %s", e)
+    if not self._manual:
+      try:
+        self.ios_platform.wda.terminate_app(self.BUNDLE_ID)
+      except (WDAError, OSError) as e:
+        logging.warning("Failed to terminate Safari on iOS: %s", e)
     self._is_running = False

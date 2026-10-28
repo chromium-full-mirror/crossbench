@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import datetime as dt
 import io
@@ -195,6 +196,34 @@ class BaseIOsMockPlatformTestCase(BaseMockPlatformTestCase):
 
   def test_is_apple(self):
     self.assertTrue(self.platform.is_apple)
+
+  @override
+  def test_open_url(self):
+    platform = self.setup_platform()
+    self.host_platform.expect_sh(
+        "xcrun",
+        "devicectl",
+        "device",
+        "process",
+        "launch",
+        "--device",
+        platform.udid,
+        "--terminate-existing",
+        "--payload-url",
+        "https://example.com",
+        "com.apple.mobilesafari",
+        result="",
+    )
+    self.assertTrue(platform.open_url("https://example.com"))
+
+  @override
+  def test_open_url_invalid(self):
+    platform = self.setup_platform()
+    with self.assertRaises(argparse.ArgumentTypeError):
+      platform.open_url("ftp://example.com")
+    with self.assertRaises(argparse.ArgumentTypeError):
+      platform.open_url("not-a-url")
+
 
 class IOsMockPlatformTestCase(BaseIOsMockPlatformTestCase):
   __test__ = True
@@ -806,6 +835,25 @@ class IOsWdaTestCase(BaseIOsMockPlatformTestCase):
         wda.perform_pointer_chains(chains, dt.timedelta(seconds=2))
       mock_stop.assert_called_once_with()
       mock_abort.assert_called_once_with()
+
+  def test_wda_stop_device_runner(self):
+    wda = self._wda_with_session()
+    with mock.patch.object(wda, "stop") as mock_stop, \
+         mock.patch.object(wda, "_abort_device_actions") as mock_abort:
+      wda.stop_device_runner()
+      mock_stop.assert_called_once_with()
+      mock_abort.assert_called_once_with()
+
+  def test_wda_not_enabled_does_not_start_a_session(self):
+    wda = self._wda_with_session()
+    wda._session_id = None
+    wda.enabled = False
+    with mock.patch.object(wda, "start") as mock_start:
+      with self.assertRaises(WDAError):
+        wda.ensure_session()
+      mock_start.assert_not_called()
+    wda.enabled = True
+    self.assertTrue(wda.enabled)
 
   def test_wda_settings_and_session_configuration(self):
     self.expect_startup_devices(

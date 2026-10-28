@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Final, cast
 from typing_extensions import override
 
 from crossbench import path as pth
-from crossbench.parse import NumberParser
+from crossbench.parse import NumberParser, ObjectParser
 from crossbench.plt.base import Platform
 from crossbench.plt.bin import Binaries
 from crossbench.plt.device_info import DeviceInfo
@@ -158,6 +158,7 @@ class IOSPortManager(SubprocessPortManager):
 # TODO: Follow remove-posix pattern and redirect all shell commands to the
 #       host platform.
 class IOSPlatform(RemotePlatformMixin, Platform):
+  SAFARI_BUNDLE_ID: Final[str] = "com.apple.mobilesafari"
 
   def __init__(self,
                host_platform: Platform,
@@ -311,6 +312,32 @@ class IOSPlatform(RemotePlatformMixin, Platform):
     if self._wda is None:
       self._wda = WDAClient(self)
     return self._wda
+
+  @override
+  def open_url(self, url: str) -> bool:
+    """Opens a URL in Safari on the device, with nothing else attached.
+
+    Unlike WDAClient.open_url(), this needs no WebDriverAgent or XCTest
+    session; Safari is (re)launched with the URL through devicectl.
+    """
+    url = ObjectParser.url_str(url, schemes=("http", "https"))
+    if self.is_simulator:
+      self.host_platform.sh("xcrun", "simctl", "openurl", self.udid, url)
+      return True
+    self.host_platform.sh(
+        "xcrun",
+        "devicectl",
+        "device",
+        "process",
+        "launch",
+        "--device",
+        self.udid,
+        "--terminate-existing",
+        "--payload-url",
+        url,
+        self.SAFARI_BUNDLE_ID,
+    )
+    return True
 
   @override
   def display_resolution(self) -> DisplayResolution:

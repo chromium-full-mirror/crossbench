@@ -156,6 +156,57 @@ class SafariIosBrowserTestCase(CrossbenchFakeFsTestCase):
     # performance_mark should succeed without calling js().
     browser.performance_mark("test-mark")
 
+  def test_manual_mode_does_not_use_wda(self) -> None:
+    platform = self.setup_platform()
+    mock_network = mock.MagicMock()
+    mock_network.is_running = True
+    mock_network.extra_flags.return_value = ()
+    browser = SafariWdaIOS(
+        "test-safari",
+        platform.path("/Applications/Safari.app"),
+        settings=Settings(platform=platform, network=mock_network),
+    )
+    browser.manual = True
+    mock_wda = mock.MagicMock()
+    platform._wda = mock_wda
+
+    session = mock.create_autospec(
+        BrowserSessionRunGroup,
+        instance=True,
+        extra_flags=(),
+    )
+    session.network = mock.MagicMock()
+    session.network.extra_flags.return_value = ()
+
+    browser.start(session)
+    mock_wda.stop_device_runner.assert_called_once_with()
+    self.assertFalse(mock_wda.enabled)
+    mock_wda.launch_app.assert_not_called()
+    self.assertTrue(browser.is_running)
+
+    self.host_platform.expect_sh(
+        "xcrun",
+        "devicectl",
+        "device",
+        "process",
+        "launch",
+        "--device",
+        "00001111-11AA22BB33DD",
+        "--terminate-existing",
+        "--payload-url",
+        "https://example.com",
+        "com.apple.mobilesafari",
+        result="",
+    )
+    browser.show_url("https://example.com", WindowTarget.SELF)
+    mock_wda.open_url.assert_not_called()
+
+    browser.force_quit()
+    mock_wda.terminate_app.assert_not_called()
+    # WDA stays disabled: nothing may reattach it after a manual run either.
+    self.assertFalse(mock_wda.enabled)
+    self.assertFalse(browser.is_running)
+
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)

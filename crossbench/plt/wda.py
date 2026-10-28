@@ -74,6 +74,9 @@ class WDAClient:
     self._remote_port: Final[int] = remote_port
     self._session_id: str | None = None
     self._xcodebuild_proc: subprocess.Popen[Any] | None = None
+    # While not enabled, no session is created: requests fail instead of
+    # silently relaunching the XCTest runner (see SafariWdaIOS.manual).
+    self._enabled: bool = True
     atexit.register(self.stop)
 
   @property
@@ -364,10 +367,20 @@ class WDAClient:
       logging.warning("Could not locate WebDriverAgent.xcodeproj: %s", e)
     return host.path("WebDriverAgent.xcodeproj")
 
+  @property
+  def enabled(self) -> bool:
+    return self._enabled
+
+  @enabled.setter
+  def enabled(self, value: bool) -> None:
+    self._enabled = value
+
   def ensure_session(self) -> str:
     """Return active session ID or create a new session if needed."""
     if self._session_id:
       return self._session_id
+    if not self._enabled:
+      raise WDAError("WebDriverAgent is disabled (Safari in manual mode).")
 
     self.start()
 
@@ -709,6 +722,11 @@ class WDAClient:
             )
           except (subprocess.SubprocessError, OSError) as e:
             logging.warning("Failed to terminate device process %s: %s", pid, e)
+
+  def stop_device_runner(self) -> None:
+    """Stop local WDA session and terminate any on-device XCTest runner."""
+    self.stop()
+    self._abort_device_actions()
 
   def scroll(self, direction: str = "down") -> None:
     """Perform a native scroll gesture (down, up, left, right)."""
