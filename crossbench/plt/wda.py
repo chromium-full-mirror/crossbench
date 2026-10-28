@@ -101,6 +101,27 @@ class WDAClient:
       body = e.read().decode("utf-8", errors="replace")
       raise WDAError(f"{method} {url}: HTTP {e.code}: {body}") from e
 
+  def _session_get(
+      self,
+      endpoint: str,
+      timeout: dt.timedelta = REQUEST_TIMEOUT,
+  ) -> dict[str, Any]:
+    """GET an endpoint of the active session, starting one if needed."""
+    session_id = self.ensure_session()
+    return self._request(
+        "GET", f"/session/{session_id}/{endpoint}", timeout=timeout)
+
+  def _session_post(
+      self,
+      endpoint: str,
+      data: dict[str, Any] | None = None,
+      timeout: dt.timedelta = REQUEST_TIMEOUT,
+  ) -> dict[str, Any]:
+    """POST to an endpoint of the active session, starting one if needed."""
+    session_id = self.ensure_session()
+    return self._request(
+        "POST", f"/session/{session_id}/{endpoint}", data, timeout=timeout)
+
   def is_connected(self) -> bool:
     """Check whether WebDriverAgent HTTP server is responsive and ready."""
     try:
@@ -348,7 +369,7 @@ class WDAClient:
       if session_id := (status.get("sessionId") or
                         status.get("value", {}).get("sessionId")):
         self._session_id = session_id
-        self._configure_session(session_id)
+        self._configure_session()
         return session_id
     except (WDAError, urllib.error.URLError, TimeoutError, OSError) as e:
       raise WDAError("Failed to query WebDriverAgent status") from e
@@ -368,45 +389,29 @@ class WDAClient:
     if not session_id:
       raise WDAError(f"Failed to create WebDriverAgent session: {resp}")
     self._session_id = session_id
-    self._configure_session(session_id)
+    self._configure_session()
     return self._session_id
 
   def set_settings(self, settings: dict[str, Any]) -> None:
     """Update WebDriverAgent runtime settings for the active session."""
-    session_id = self.ensure_session()
-    self._request(
-        "POST",
-        f"/session/{session_id}/appium/settings",
-        {"settings": settings},
-        timeout=self.REQUEST_TIMEOUT,
-    )
+    self._session_post("appium/settings", {"settings": settings})
 
-  def _configure_session(self, session_id: str) -> None:
+  def _configure_session(self) -> None:
     """Disable quiescence, animation cooldown, and deep DOM snapshots."""
     try:
-      self._request(
-          "POST",
-          f"/session/{session_id}/appium/settings",
-          {
-              "settings": {
-                  "animationCoolOffTimeout": 0,
-                  "snapshotMaxChildren": 1,
-                  "snapshotMaxDepth": 1,
-                  "waitForIdleTimeout": 0,
-              },
-          },
-          timeout=self.REQUEST_TIMEOUT,
-      )
+      self.set_settings({
+          "animationCoolOffTimeout": 0,
+          "snapshotMaxChildren": 1,
+          "snapshotMaxDepth": 1,
+          "waitForIdleTimeout": 0,
+      })
     except (WDAError, urllib.error.URLError, TimeoutError, OSError) as e:
-      logging.warning("Failed to configure WDA session %s: %s", session_id, e)
+      logging.warning("Failed to configure WDA session %s: %s",
+                      self._session_id, e)
 
   def window_size(self) -> DisplayResolution:
     """Return device window dimensions in points."""
-    session_id = self.ensure_session()
-    resp = self._request(
-        "GET",
-        f"/session/{session_id}/window/size",
-        timeout=self.REQUEST_TIMEOUT)
+    resp = self._session_get("window/size")
     val = resp.get("value", {})
     width = int(val.get("width", 0))
     height = int(val.get("height", 0))
@@ -423,7 +428,6 @@ class WDAClient:
       duration: dt.timedelta = dt.timedelta(milliseconds=400),
   ) -> None:
     """Perform a coordinate-based drag/swipe gesture in points."""
-    session_id = self.ensure_session()
     payload = {
         "fromX": from_x,
         "fromY": from_y,
@@ -431,9 +435,8 @@ class WDAClient:
         "toY": to_y,
         "duration": duration.total_seconds(),
     }
-    self._request(
-        "POST",
-        f"/session/{session_id}/wda/dragfromtoforduration",
+    self._session_post(
+        "wda/dragfromtoforduration",
         payload,
         timeout=self.REQUEST_TIMEOUT + duration)
 
@@ -553,7 +556,6 @@ class WDAClient:
     """Perform a sequence of touch swipes in a single W3C action batch."""
     if not swipes:
       return
-    session_id = self.ensure_session()
     duration_ms = max(50, int(duration.total_seconds() * 1000))
     cycle_ms = (
         duration_ms + max(0, int(settle_duration.total_seconds() * 1000)) +
@@ -581,9 +583,8 @@ class WDAClient:
       })
     total_duration = len(swipes) * (duration + settle_duration + lift_duration)
     try:
-      self._request(
-          "POST",
-          f"/session/{session_id}/actions",
+      self._session_post(
+          "actions",
           {"actions": pointer_chains},
           timeout=self.REQUEST_TIMEOUT + total_duration,
       )
@@ -638,13 +639,7 @@ class WDAClient:
 
   def scroll(self, direction: str = "down") -> None:
     """Perform a native scroll gesture (down, up, left, right)."""
-    session_id = self.ensure_session()
-    self._request(
-        "POST",
-        f"/session/{session_id}/wda/scroll",
-        {"direction": direction},
-        timeout=self.REQUEST_TIMEOUT,
-    )
+    self._session_post("wda/scroll", {"direction": direction})
 
   def launch_app(
       self,
@@ -652,16 +647,10 @@ class WDAClient:
       arguments: Sequence[str] | None = None,
   ) -> None:
     """Launch an application on the device by bundle identifier."""
-    session_id = self.ensure_session()
-    payload: dict[str, object] = {"bundleId": bundle_id}
+    payload: dict[str, Any] = {"bundleId": bundle_id}
     if arguments:
       payload["arguments"] = list(arguments)
-    self._request(
-        "POST",
-        f"/session/{session_id}/wda/apps/launch",
-        payload,
-        timeout=self.REQUEST_TIMEOUT,
-    )
+    self._session_post("wda/apps/launch", payload)
     # Tell WDA which app is in the foreground so that gesture requests do
     # not have to discover the active application through the accessibility
     # stack on every call (saves tens of milliseconds per request).
@@ -686,13 +675,7 @@ class WDAClient:
 
   def open_url(self, url: str) -> None:
     """Open a URL in the active browser on device."""
-    session_id = self.ensure_session()
-    self._request(
-        "POST",
-        f"/session/{session_id}/url",
-        {"url": url},
-        timeout=self.REQUEST_TIMEOUT,
-    )
+    self._session_post("url", {"url": url})
 
   def stop(self) -> None:
     """Tear down any active xcodebuild process."""
