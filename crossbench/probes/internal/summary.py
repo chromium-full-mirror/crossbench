@@ -59,10 +59,11 @@ class ResultsSummaryProbe(InternalJsonResultProbe):
 
     has_empty_results = False
     for run in group.runs:
-      if run.results[self].is_empty:
+      result = run.results.get(self, EmptyProbeResult())
+      if result.is_empty:
         has_empty_results = True
         continue
-      source_file = run.results[self].json
+      source_file = result.json
       assert source_file.is_file()
       with source_file.open(encoding="utf-8") as f:
         repetition_data = json.load(f)

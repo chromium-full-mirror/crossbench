@@ -31,7 +31,8 @@ from crossbench.probes.trace_processor.trace_processor import \
 from crossbench.runner.groups.session import BrowserSessionRunGroup
 from crossbench.runner.groups.thread import RunThreadGroup
 from crossbench.runner.pause_controller import ResumeMode
-from crossbench.runner.runner import CacheTemperature, Runner, ThreadMode
+from crossbench.runner.runner import CacheTemperature, Runner, \
+    RunnerException, ThreadMode
 from tests import test_helper
 from tests.crossbench.mock_browser import MockChromeDev
 from tests.crossbench.mock_helper import MockBenchmark
@@ -259,6 +260,38 @@ class RunnerTestCase(BaseRunnerTestCase):
       runs_symlinks = list(
           (runner.out_dir / browser.unique_name / "runs").iterdir())
       self.assertEqual(len(runs_symlinks), 2)
+
+  def test_run_one_browser_startup_failure_writes_results(self):
+    browser = self.mock_chrome_dev
+    runner = Runner(
+        self.out_dir,
+        browsers=[browser],
+        benchmark=self.benchmark,
+        platform=self.platform,
+        repetitions=2,
+        throw=False,
+        in_memory_result_db=True)
+    original_start = browser.start
+    start_count = 0
+
+    def mock_start_fail_once(session: BrowserSessionRunGroup) -> None:
+      nonlocal start_count
+      start_count += 1
+      if start_count == 2:
+        raise CustomException("failed to change window state to 'normal'")
+      original_start(session)
+
+    browser.start = mock_start_fail_once
+    with self.assertRaises(RunnerException):
+      runner.run()
+    self.assertEqual(start_count, 4)
+    self.assertEqual(len(runner.exceptions), 1)
+    self.assertIsInstance(runner.exceptions[0].exception, CustomException)
+    results_file = self.out_dir / "cb.results.json"
+    self.assertTrue(results_file.is_file())
+    with results_file.open(encoding="utf-8") as f:
+      results = json.load(f)
+    self.assertEqual(results["errors"], [])
 
   def test_story_specific_extra_flags(self) -> None:
 
