@@ -1,6 +1,6 @@
 # Browser Startup Benchmark
 
-This benchmark measures browser startup paint latencies (`Startup.BrowserWindow.FirstPaint`, `Startup.FirstWebContents.NonEmptyPaint3`, and `InitialWebUI.Startup.ReloadButton.FirstContentfulPaint`) across startup stories (`newtab_startup`, `blank_startup`, and `google_startup`). It compares a **baseline** configuration against one with the **InitialWebUI** feature enabled.
+This benchmark measures browser startup paint latencies (`Startup.BrowserWindow.FirstPaint`, `InitialWebUI.Startup.BrowserWindow.FirstPaint`, `Startup.FirstWebContents.NonEmptyPaint3`, and `InitialWebUI.Startup.ReloadButton.FirstContentfulPaint`) across startup stories (`newtab_startup`, `blank_startup`, and `google_startup`). It compares a **baseline** configuration against one with the **InitialWebUI** feature enabled.
 
 ## Running the Benchmark
 
@@ -28,6 +28,7 @@ poetry run cb browser-startup \
 After the run finishes, Crossbench outputs a path to the results directory (e.g., `results/latest/`).
 Within the `trace_processor/` sub-directory, look for the following CSV (or `.json`) files containing per-run metrics:
 
-- `browser_window_first_paint.csv` (`Startup.BrowserWindow.FirstPaint`): Contains `browser_window_first_paint_ms` for each run and story.
+- `browser_window_first_paint.csv` (`Startup.BrowserWindow.FirstPaint`): Contains `browser_window_first_paint_ms` (CPU paint recording in `BrowserView::PaintChildren`) for each run and story.
+- `initial_webui_browser_window_first_paint.csv` (`InitialWebUI.Startup.BrowserWindow.FirstPaint`): Contains `initial_webui_browser_window_first_paint_ms` (actual window presentation on screen via `BrowserView::OnFirstPresentation`) for each run and story.
 - `first_web_contents_non_empty_paint.csv` (`Startup.FirstWebContents.NonEmptyPaint3`): Contains `first_web_contents_non_empty_paint_ms` for each run and story.
 - `reload_button_fcp.csv` (`InitialWebUI.Startup.ReloadButton.FirstContentfulPaint`): Contains `reload_button_fcp_ms` for each run and story (emitted only when `InitialWebUI` + `WebUIReloadButton` are enabled).

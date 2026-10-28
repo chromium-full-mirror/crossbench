@@ -53,6 +53,7 @@ class BrowserStartupProbe(BenchmarkProbeMixin, Probe):
       "cb_browser",
       "count",
       "median",
+      "p90",
       "iqr",
       "mean",
       "std",
@@ -105,6 +106,7 @@ class BrowserStartupProbe(BenchmarkProbeMixin, Probe):
     for (story, browser), group_df in grouped:
       series = group_df["value"]
       count = int(len(series))
+      p90 = float(series.quantile(0.90))
       q75 = float(series.quantile(0.75))
       q25 = float(series.quantile(0.25))
       rows.append({
@@ -113,6 +115,7 @@ class BrowserStartupProbe(BenchmarkProbeMixin, Probe):
           "cb_browser": str(browser),
           "count": count,
           "median": float(series.median()),
+          "p90": p90,
           "iqr": q75 - q25,
           "mean": float(series.mean()),
           "std": float(series.std(ddof=1)) if count > 1 else 0.0,

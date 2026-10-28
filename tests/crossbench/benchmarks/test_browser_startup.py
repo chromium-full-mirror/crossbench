@@ -163,6 +163,8 @@ class TestBrowserStartupBenchmark(BaseCrossbenchTestCase):
     self.assertSequenceEqual(
         list(summary_df["median"]), [110.0, 100.0])
     self.assertSequenceEqual(
+        list(summary_df["p90"]), [118.0, 108.0])
+    self.assertSequenceEqual(
         list(summary_df["count"]), [2, 2])
 
   def test_probe_merge_and_log_browsers_result(self) -> None:

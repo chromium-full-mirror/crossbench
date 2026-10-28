@@ -16,6 +16,7 @@
               enabled_categories: "benchmark"
               enabled_categories: "toplevel"
               enabled_categories: "startup"
+              enabled_categories: "waap"
               enabled_categories: "blink.user_timing"
               enabled_categories: "navigation"
               enabled_categories: "loading"
@@ -30,6 +31,9 @@
             chromium_histogram_samples {
               histograms {
                 histogram_name: "Startup.BrowserWindow.FirstPaint"
+              }
+              histograms {
+                histogram_name: "InitialWebUI.Startup.BrowserWindow.FirstPaint"
               }
               histograms {
                 histogram_name: "Startup.FirstWebContents.NonEmptyPaint3"
@@ -61,6 +65,22 @@
             WHERE s.name = 'HistogramSample'
               AND a_name.key = 'chrome_histogram_sample.name'
               AND a_name.string_value = 'Startup.BrowserWindow.FirstPaint'
+              AND a_sample.key = 'chrome_histogram_sample.sample'
+            LIMIT 1
+            '''
+        }
+        {
+          "name": "initial_webui_browser_window_first_paint"
+          "sql":
+            '''
+            SELECT
+              a_sample.int_value AS initial_webui_browser_window_first_paint_ms
+            FROM slice s
+            JOIN args a_name ON s.arg_set_id = a_name.arg_set_id
+            JOIN args a_sample ON s.arg_set_id = a_sample.arg_set_id
+            WHERE s.name = 'HistogramSample'
+              AND a_name.key = 'chrome_histogram_sample.name'
+              AND a_name.string_value = 'InitialWebUI.Startup.BrowserWindow.FirstPaint'
               AND a_sample.key = 'chrome_histogram_sample.sample'
             LIMIT 1
             '''
