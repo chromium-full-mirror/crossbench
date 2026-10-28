@@ -33,7 +33,7 @@ import subprocess
 import tempfile
 import urllib.error
 import urllib.request
-from typing import IO, TYPE_CHECKING, Any, Final, Sequence
+from typing import IO, TYPE_CHECKING, Any, Final, Mapping, Sequence
 
 from crossbench.helper.wait import wait_with_backoff
 from crossbench.plt.bin import Binaries
@@ -43,6 +43,13 @@ from crossbench.plt.port_manager import PortForwardException
 if TYPE_CHECKING:
   from crossbench import path as pth
   from crossbench.plt.ios import IOSPlatform
+
+# The keys under which WebDriver responses carry an element's id: the W3C
+# WebDriver "web element identifier" (a fixed string, see
+# https://www.w3.org/TR/webdriver/#dfn-web-element-identifier) and its JSON
+# Wire Protocol predecessor, which WebDriverAgent still sends alongside.
+W3C_ELEMENT_KEY: Final = "element-6066-11e4-a52e-4f735466cecf"
+LEGACY_ELEMENT_KEY: Final = "ELEMENT"
 
 
 class WDAError(RuntimeError):
@@ -418,6 +425,62 @@ class WDAClient:
     if width <= 0 or height <= 0:
       raise WDAError(f"Invalid window size received from WDA: {val}")
     return DisplayResolution(width, height)
+
+  @staticmethod
+  def _extract_element_id(resp: Mapping[str, object]) -> str | None:
+    val = resp.get("value")
+    if not isinstance(val, dict):
+      return None
+    for key in (W3C_ELEMENT_KEY, LEGACY_ELEMENT_KEY):
+      if elem_id := val.get(key):
+        return str(elem_id)
+    return None
+
+  def webview_offset(self) -> tuple[int, int] | None:
+    """Return the (x, y) screen offset in points of the active WebView."""
+    try:
+      resp = self._session_post("element", {
+          "using": "class name",
+          "value": "XCUIElementTypeWebView",
+      })
+      elem_id = self._extract_element_id(resp)
+      if not elem_id:
+        return None
+      rect_resp = self._session_get(f"element/{elem_id}/rect")
+      rect = rect_resp.get("value", {})
+      if isinstance(rect, dict) and "x" in rect and "y" in rect:
+        return (int(rect["x"]), int(rect["y"]))
+    except (WDAError, urllib.error.URLError, TimeoutError, OSError,
+            ValueError) as e:
+      logging.debug("Could not query WebView offset from WDA: %s", e)
+    return None
+
+  def find_element_text_with_prefix(self, prefix: str) -> str | None:
+    """Returns the text after `prefix` of the first element carrying it.
+
+    "First" is in accessibility order, among elements whose label, name or
+    value starts with `prefix`; callers should use a prefix unique to the
+    page. None if there is no such element or the query fails.
+    """
+    predicate = (f"label BEGINSWITH '{prefix}' OR "
+                 f"name BEGINSWITH '{prefix}' OR "
+                 f"value BEGINSWITH '{prefix}'")
+    try:
+      resp = self._session_post("element", {
+          "using": "predicate string",
+          "value": predicate,
+      })
+      elem_id = self._extract_element_id(resp)
+      if not elem_id:
+        return None
+      for attr in ("label", "name", "value"):
+        attr_resp = self._session_get(f"element/{elem_id}/attribute/{attr}")
+        val = attr_resp.get("value")
+        if isinstance(val, str) and val.startswith(prefix):
+          return val[len(prefix):]
+    except (WDAError, urllib.error.URLError, TimeoutError, OSError) as e:
+      logging.debug("Could not read WDA element with prefix %s: %s", prefix, e)
+    return None
 
   def drag(
       self,

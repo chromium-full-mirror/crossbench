@@ -25,7 +25,8 @@ from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.ios import IOSDeviceInfo, IOSPlatform, IOSPortManager, \
     IOSSimulatorPortManager, ios_devices
 from crossbench.plt.version import PlatformVersion
-from crossbench.plt.wda import WDAClient, WDAError
+from crossbench.plt.wda import LEGACY_ELEMENT_KEY, W3C_ELEMENT_KEY, \
+    WDAClient, WDAError
 from tests import test_helper
 from tests.crossbench.mock_helper import MacOsMockPlatform
 from tests.crossbench.plt.helper import BaseMockPlatformTestCase
@@ -671,6 +672,115 @@ class IOsWdaTestCase(BaseIOsMockPlatformTestCase):
           {"url": "https://example.com"},
           timeout=mock.ANY,
       )
+
+  def _wda_with_session(self) -> WDAClient:
+    self.expect_startup_devices(
+        devices=DEVICES_SINGLE, simulators=SIMULATORS_SAMPLE)
+    platform = IOSPlatform(self.host_platform, "00001111-11AA22BB33DD")
+    wda = WDAClient(platform)
+    wda._session_id = "test-session-123"
+    return wda
+
+  @staticmethod
+  def _element(elem_id: str, key: str = W3C_ELEMENT_KEY) -> dict[str, object]:
+    """A WDA find-element response."""
+    return {"value": {key: elem_id}}
+
+  @staticmethod
+  def _value(value: object) -> dict[str, object]:
+    """A WDA response carrying a plain value."""
+    return {"value": value}
+
+  def test_wda_webview_offset(self):
+    wda = self._wda_with_session()
+    responses = [self._element("web-1"), self._value({"x": 0, "y": 140})]
+    with mock.patch.object(wda, "_request", side_effect=responses) as request:
+      self.assertEqual(wda.webview_offset(), (0, 140))
+    request.assert_has_calls([
+        mock.call(
+            "POST",
+            "/session/test-session-123/element",
+            {
+                "using": "class name",
+                "value": "XCUIElementTypeWebView",
+            },
+            timeout=mock.ANY,
+        ),
+        mock.call(
+            "GET",
+            "/session/test-session-123/element/web-1/rect",
+            timeout=mock.ANY,
+        ),
+    ])
+
+  def test_wda_webview_offset_legacy_element_key(self):
+    wda = self._wda_with_session()
+    responses = [
+        self._element("web-2", key=LEGACY_ELEMENT_KEY),
+        self._value({
+            "x": 10,
+            "y": 20,
+        }),
+    ]
+    with mock.patch.object(wda, "_request", side_effect=responses):
+      self.assertEqual(wda.webview_offset(), (10, 20))
+
+  def test_wda_webview_offset_without_webview(self):
+    wda = self._wda_with_session()
+    with mock.patch.object(wda, "_request", return_value=self._value(None)):
+      self.assertIsNone(wda.webview_offset())
+
+  def test_wda_webview_offset_malformed_rect(self):
+    wda = self._wda_with_session()
+    responses = [self._element("web-1"), self._value(1)]
+    with mock.patch.object(wda, "_request", side_effect=responses):
+      self.assertIsNone(wda.webview_offset())
+
+  def test_wda_webview_offset_request_error(self):
+    wda = self._wda_with_session()
+    with mock.patch.object(wda, "_request", side_effect=WDAError("boom")):
+      self.assertIsNone(wda.webview_offset())
+
+  def test_wda_find_element_text_with_prefix(self):
+    wda = self._wda_with_session()
+    responses = [self._element("el-1"), self._value("cb:12345")]
+    with mock.patch.object(wda, "_request", side_effect=responses) as request:
+      self.assertEqual(wda.find_element_text_with_prefix("cb:"), "12345")
+    find, label = request.call_args_list
+    self.assertEqual(find.args[:2],
+                     ("POST", "/session/test-session-123/element"))
+    self.assertEqual(find.args[2]["using"], "predicate string")
+    self.assertIn("BEGINSWITH 'cb:'", find.args[2]["value"])
+    self.assertEqual(label.args[1],
+                     "/session/test-session-123/element/el-1/attribute/label")
+
+  def test_wda_find_element_text_with_prefix_falls_back_to_name(self):
+    wda = self._wda_with_session()
+    responses = [
+        self._element("el-1"),
+        self._value("something else"),  # label
+        self._value("cb:12345"),  # name
+    ]
+    with mock.patch.object(wda, "_request", side_effect=responses) as request:
+      self.assertEqual(wda.find_element_text_with_prefix("cb:"), "12345")
+    self.assertEqual(request.call_args_list[-1].args[1],
+                     "/session/test-session-123/element/el-1/attribute/name")
+
+  def test_wda_find_element_text_with_prefix_without_element(self):
+    wda = self._wda_with_session()
+    with mock.patch.object(wda, "_request", return_value=self._value({})):
+      self.assertIsNone(wda.find_element_text_with_prefix("cb:"))
+
+  def test_wda_find_element_text_with_prefix_without_match(self):
+    wda = self._wda_with_session()
+    responses = [self._element("el-1")] + [self._value("nope")] * 3
+    with mock.patch.object(wda, "_request", side_effect=responses):
+      self.assertIsNone(wda.find_element_text_with_prefix("cb:"))
+
+  def test_wda_find_element_text_with_prefix_request_error(self):
+    wda = self._wda_with_session()
+    with mock.patch.object(wda, "_request", side_effect=TimeoutError()):
+      self.assertIsNone(wda.find_element_text_with_prefix("cb:"))
 
   def test_wda_settings_and_session_configuration(self):
     self.expect_startup_devices(
