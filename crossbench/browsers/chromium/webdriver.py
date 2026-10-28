@@ -315,9 +315,7 @@ class ChromiumWebDriverAndroid(ChromiumBasedWebDriver):
       self.maximize_window()
     elif (not self.viewport.is_default and self.viewport.has_size and
           self._supports_set_window_rect()):
-      self._private_driver.set_window_position(self.viewport.x, self.viewport.y)
-      self._private_driver.set_window_size(self.viewport.width,
-                                           self.viewport.height)
+      self._set_window_rect()
     else:
       logging.debug("%s: Skipping viewport settings %s on %s",
                     type(self).__name__, self.viewport, self)

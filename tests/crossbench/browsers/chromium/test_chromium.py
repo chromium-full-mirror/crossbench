@@ -195,6 +195,29 @@ class ChromiumBasedWebDriverTestCase(unittest.TestCase):
     mock_driver.window_handles = handles
     return (browser, mock_driver)
 
+  def test_setup_window_retries_set_window_rect(self):
+    mock_driver = mock.MagicMock(name="Mock Driver")
+    browser = MockChromiumBasedWebDriver("test-driver", mock_driver)
+    error = selenium.common.exceptions.WebDriverException(
+        "failed to change window state to 'normal'")
+    mock_driver.set_window_rect.side_effect = [error, None]
+    with mock.patch("crossbench.browsers.webdriver.time.sleep") as mock_sleep:
+      browser._setup_window()
+    self.assertEqual(mock_driver.set_window_rect.call_count, 2)
+    mock_sleep.assert_called_once_with(1)
+
+  def test_setup_window_set_window_rect_fails(self):
+    mock_driver = mock.MagicMock(name="Mock Driver")
+    browser = MockChromiumBasedWebDriver("test-driver", mock_driver)
+    mock_driver.set_window_rect.side_effect = (
+        selenium.common.exceptions.WebDriverException(
+            "failed to change window state to 'normal'"))
+    with mock.patch("crossbench.browsers.webdriver.time.sleep") as mock_sleep:
+      with self.assertRaises(selenium.common.exceptions.WebDriverException):
+        browser._setup_window()
+    self.assertEqual(mock_driver.set_window_rect.call_count, 3)
+    self.assertEqual(mock_sleep.call_count, 2)
+
   def test_switch_tab_title(self):
     browser, mock_driver = self._make_tab_switch_mocks(["a", "b", "c"], "b")
 
@@ -641,23 +664,21 @@ class ChromiumPathAndroidTest(BaseCrossbenchTestCase):
     browser = self._create_android_browser(
         "153.0.7993.0", viewport=Viewport(800, 600, 20, 30))
     browser._setup_window()
-    browser._private_driver.set_window_position.assert_not_called()
-    browser._private_driver.set_window_size.assert_not_called()
+    browser._private_driver.set_window_rect.assert_not_called()
 
   def test_setup_window_explicit_bounds_supported_version(self):
     browser = self._create_android_browser(
         "153.0.7994.0", viewport=Viewport(800, 600, 20, 30))
     browser._setup_window()
-    browser._private_driver.set_window_position.assert_called_once_with(20, 30)
-    browser._private_driver.set_window_size.assert_called_once_with(800, 600)
+    browser._private_driver.set_window_rect.assert_called_once_with(
+        20, 30, 800, 600)
 
   def test_setup_window_default_viewport_skipped(self):
     browser = self._create_android_browser(
         "153.0.7994.0", viewport=Viewport.DEFAULT)
     browser._setup_window()
     browser._private_driver.maximize_window.assert_not_called()
-    browser._private_driver.set_window_position.assert_not_called()
-    browser._private_driver.set_window_size.assert_not_called()
+    browser._private_driver.set_window_rect.assert_not_called()
 
 
 if __name__ == "__main__":

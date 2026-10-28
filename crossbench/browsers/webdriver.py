@@ -254,9 +254,21 @@ class WebDriverBrowser(Browser, metaclass=abc.ABCMeta):
     elif self.viewport.is_maximized:
       self._private_driver.maximize_window()
     else:
-      self._private_driver.set_window_position(self.viewport.x, self.viewport.y)
-      self._private_driver.set_window_size(self.viewport.width,
-                                           self.viewport.height)
+      self._set_window_rect()
+
+  def _set_window_rect(self, attempts: int = 3) -> None:
+    for attempt in range(1, attempts + 1):
+      try:
+        self._private_driver.set_window_rect(self.viewport.x, self.viewport.y,
+                                             self.viewport.width,
+                                             self.viewport.height)
+        return
+      except selenium.common.exceptions.WebDriverException as e:
+        if attempt == attempts:
+          raise
+        logging.warning("%s: Failed to set window rect (attempt %d/%d): %s",
+                        self, attempt, attempts, e.msg)
+        time.sleep(1)
 
   @abc.abstractmethod
   def _start_driver(self, session: BrowserSessionRunGroup,
