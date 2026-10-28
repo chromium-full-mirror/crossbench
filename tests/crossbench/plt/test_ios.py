@@ -630,15 +630,29 @@ class IOsWdaTestCase(BaseIOsMockPlatformTestCase):
           "com.apple.mobilesafari",
           arguments=["-u", "https://example.com"],
       )
-      mock_request.assert_called_once_with(
-          "POST",
-          "/session/test-session-123/wda/apps/launch",
-          {
-              "bundleId": "com.apple.mobilesafari",
-              "arguments": ["-u", "https://example.com"],
-          },
-          timeout=mock.ANY,
-      )
+      mock_request.assert_has_calls([
+          mock.call(
+              "POST",
+              "/session/test-session-123/wda/apps/launch",
+              {
+                  "bundleId": "com.apple.mobilesafari",
+                  "arguments": ["-u", "https://example.com"],
+              },
+              timeout=mock.ANY,
+          ),
+          # The launched app is registered as WDA's default active app.
+          mock.call(
+              "POST",
+              "/session/test-session-123/appium/settings",
+              {
+                  "settings": {
+                      "defaultActiveApplication": "com.apple.mobilesafari",
+                  },
+              },
+              timeout=mock.ANY,
+          ),
+      ])
+      self.assertEqual(mock_request.call_count, 2)
 
     with mock.patch.object(wda, "_request") as mock_request:
       wda.terminate_app("com.apple.mobilesafari")

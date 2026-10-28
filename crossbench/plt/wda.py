@@ -662,6 +662,13 @@ class WDAClient:
         payload,
         timeout=self.REQUEST_TIMEOUT,
     )
+    # Tell WDA which app is in the foreground so that gesture requests do
+    # not have to discover the active application through the accessibility
+    # stack on every call (saves tens of milliseconds per request).
+    try:
+      self.set_settings({"defaultActiveApplication": bundle_id})
+    except (WDAError, urllib.error.URLError, TimeoutError, OSError) as e:
+      logging.debug("Failed to set defaultActiveApplication: %s", e)
 
   def terminate_app(self, bundle_id: str) -> None:
     """Terminate an application on the device by bundle identifier."""
