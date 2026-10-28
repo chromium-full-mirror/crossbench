@@ -4,6 +4,15 @@ buffers {
 }
 data_sources {
   config {
+    name: "linux.process_stats"
+    process_stats_config {
+      scan_all_processes_on_start: true
+      proc_stats_poll_ms: 5000
+    }
+  }
+}
+data_sources {
+  config {
     name: "android.heapprofd"
     heapprofd_config {
       sampling_interval_bytes: 4096

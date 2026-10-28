@@ -90,6 +90,21 @@ class TraceProcessorProbeTestCase(unittest.TestCase):
           ],
       })
 
+  def test_parse_wv_shell_heapdump_config(self):
+    config_file = (
+        test_helper.config_dir() /
+        "team/woa/wv_shell_heapdump.probe.config.hjson")
+    self.assertTrue(config_file.is_file())
+    probes = ProbeListConfig.parse(config_file).probes
+    self.assertEqual(len(probes), 2)
+    tp_probe = probes[0]
+    self.assertIsInstance(tp_probe, TraceProcessorProbe)
+    assert isinstance(tp_probe, TraceProcessorProbe)
+    self.assertEqual(len(tp_probe.queries), 1)
+    self.assertEqual(tp_probe.queries[0].name, "wv_heapdump_memory")
+    self.assertEqual(tp_probe.queries[0].sql,
+                     read_query_sql("wv_heapdump_memory.sql"))
+
   def _create_metric_spec(self,
                           metric_id: str = "test_metric",
                           sql: str = "SELECT 1 AS val") -> str:
