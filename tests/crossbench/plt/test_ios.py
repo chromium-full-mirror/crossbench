@@ -197,8 +197,7 @@ class BaseIOsMockPlatformTestCase(BaseMockPlatformTestCase):
   def test_is_apple(self):
     self.assertTrue(self.platform.is_apple)
 
-  @override
-  def test_open_url(self):
+  def test_open_url_in_app(self):
     platform = self.setup_platform()
     self.host_platform.expect_sh(
         "xcrun",
@@ -211,18 +210,17 @@ class BaseIOsMockPlatformTestCase(BaseMockPlatformTestCase):
         "--terminate-existing",
         "--payload-url",
         "https://example.com",
-        "com.apple.mobilesafari",
+        "com.example.browser",
         result="",
     )
-    self.assertTrue(platform.open_url("https://example.com"))
+    platform.open_url_in_app("com.example.browser", "https://example.com")
 
-  @override
-  def test_open_url_invalid(self):
+  def test_open_url_in_app_invalid(self):
     platform = self.setup_platform()
     with self.assertRaises(argparse.ArgumentTypeError):
-      platform.open_url("ftp://example.com")
+      platform.open_url_in_app("com.example.browser", "ftp://example.com")
     with self.assertRaises(argparse.ArgumentTypeError):
-      platform.open_url("not-a-url")
+      platform.open_url_in_app("com.example.browser", "not-a-url")
 
 
 class IOsMockPlatformTestCase(BaseIOsMockPlatformTestCase):

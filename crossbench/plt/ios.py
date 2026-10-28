@@ -158,7 +158,6 @@ class IOSPortManager(SubprocessPortManager):
 # TODO: Follow remove-posix pattern and redirect all shell commands to the
 #       host platform.
 class IOSPlatform(RemotePlatformMixin, Platform):
-  SAFARI_BUNDLE_ID: Final[str] = "com.apple.mobilesafari"
 
   def __init__(self,
                host_platform: Platform,
@@ -313,17 +312,16 @@ class IOSPlatform(RemotePlatformMixin, Platform):
       self._wda = WDAClient(self)
     return self._wda
 
-  @override
-  def open_url(self, url: str) -> bool:
-    """Opens a URL in Safari on the device, with nothing else attached.
+  def open_url_in_app(self, bundle_id: str, url: str) -> None:
+    """Opens a URL in the given app on the device, with nothing else attached.
 
     Unlike WDAClient.open_url(), this needs no WebDriverAgent or XCTest
-    session; Safari is (re)launched with the URL through devicectl.
+    session; the app is (re)launched with the URL through devicectl.
     """
     url = ObjectParser.url_str(url, schemes=("http", "https"))
     if self.is_simulator:
       self.host_platform.sh("xcrun", "simctl", "openurl", self.udid, url)
-      return True
+      return
     self.host_platform.sh(
         "xcrun",
         "devicectl",
@@ -335,9 +333,8 @@ class IOSPlatform(RemotePlatformMixin, Platform):
         "--terminate-existing",
         "--payload-url",
         url,
-        self.SAFARI_BUNDLE_ID,
+        bundle_id,
     )
-    return True
 
   @override
   def display_resolution(self) -> DisplayResolution:

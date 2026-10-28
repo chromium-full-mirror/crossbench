@@ -380,7 +380,7 @@ class SafariWdaIOS(Safari):
     if not url or url == "about:blank" or url.startswith("data:"):
       return
     if self._manual:
-      self.ios_platform.open_url(url)
+      self.ios_platform.open_url_in_app(self.BUNDLE_ID, url)
       return
     self.ios_platform.wda.open_url(url)
 
