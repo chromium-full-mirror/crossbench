@@ -53,7 +53,7 @@ crossbench tries to follow
 - Type-annotate variables on first use.
 
 #### Typing-tools
-- Fix all mypy errors: `poetry run mypy crossbench --check-untyped-defs `.
+- Fix all pyrefly errors: `poetry run pyrefly check`.
 
 ### ConfigObject and Input Validation
 Any non-trivial configuration should use a dedicate ConfigObject.

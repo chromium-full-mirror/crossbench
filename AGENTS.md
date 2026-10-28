@@ -55,7 +55,7 @@ If running `./cb.py` fails, try the following:
 
 # Crossbench Sanity Checks
 - When producing changes, you should run the following four validations:
-  (1) tests, (2) mypy, (3) ruff, (4) git-cl-format-js.
+  (1) tests, (2) pyrefly, (3) ruff, (4) git-cl-format-js.
   However, it is extremely important to run such validations at the right time
   only, because the user's time is valuable. Unless there is good reason to do
   otherwise, these steps should run in the order below, with each step only
@@ -66,27 +66,24 @@ If running `./cb.py` fails, try the following:
      Working on CLs is an iterative process. Only run the relevant subset of
      tests during most iterations (e.g. only relevant files), and only run the
      entire suite when it's time to finalise a CL.
-  2. mypy: Run `vpython3 -m mypy` only when absolutely necessary (e.g., after a
-     larger change). To save time during iterative development, restrict mypy to
-     the minimum set of modified files rather than the entire codebase. Infer
-     the user's intent and recognize when it's time to finalize the CL;
-     when that happens, DO run mypy over the entire codebase.
+  2. pyrefly: Run `vpython3 -m pyrefly check` to type check the whole
+     project (it only takes a few seconds).
   3. ruff: Always do `vpython3 -m ruff check` after completing a change to
      validate all results.
   4. Run `git cl format --js`.
 - Be judicious after minor iterations. Scale validation to what changed:
   for comment- or docstring-only edits, ruff alone is usually enough (it
   checks line length); for small, local code edits, run only the affected
-  test file and mypy on the modified file. Skip steps that cannot be
+  test file and pyrefly. Skip steps that cannot be
   affected by the change.
 - Batch the validations into a single command. Decide up front which of the
   steps above apply to the current change, then run them all in one shell
   invocation instead of one tool call per step. Chain them with `&&` to
   preserve the ordering and stop-on-first-failure behaviour described above,
   e.g.:
-  `vpython3 -m pytest tests/crossbench/test_foo.py -x -n 7 && vpython3 -m mypy
-  crossbench/foo.py && vpython3 -m ruff check && git cl format --js`.
-  If the checks are cheap and independent (e.g. mypy and ruff), you may chain
+  `vpython3 -m pytest tests/crossbench/test_foo.py -x -n 7 && vpython3 -m
+  pyrefly check && vpython3 -m ruff check && git cl format --js`.
+  If the checks are cheap and independent (e.g. pyrefly and ruff), you may chain
   them with `;` instead, so that all failures are reported at once.
   Rationale: every separate tool call adds a full round trip in which the
   user waits for the LLM to read the result and decide on the next command.

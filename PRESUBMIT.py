@@ -104,45 +104,31 @@ def CheckChange(input_api: Any, output_api: Any, on_commit: bool) -> Any:
       ))
 
   # ---------------------------------------------------------------------------
-  # MyPy & Pyrefly:
+  # Pyrefly:
   # ---------------------------------------------------------------------------
-  mypy_files_to_check: list[str] = TyperPaths(input_api, on_commit,
-                                              modified_py_files)
-  if mypy_files_to_check:
+  typer_files_to_check: list[str] = TyperPaths(input_api, on_commit,
+                                               modified_py_files)
+  if typer_files_to_check and (platform.system() != "Linux" or
+                               platform.machine() == "x86_64"):
+    from tools.presubmit.pyrefly_check import ParsePyreflyOutput
     tests.append(
         input_api.Command(
-            name="mypy",
+            name="pyrefly",
             cmd=[
                 input_api.python3_executable,
                 "-m",
-                "mypy",
-                "--check-untyped-defs",
-                "--pretty",
-            ] + mypy_files_to_check,
+                "pyrefly",
+                "check",
+                "--output-format=json",
+                "-c",
+                str(root_path / "pyproject.toml"),
+            ] + typer_files_to_check,
             message=output_api.PresubmitError,
             kwargs={},
             python3=True,
+            output_parser=functools.partial(ParsePyreflyOutput, output_api,
+                                            root_path),
         ))
-    if platform.system() != "Linux" or platform.machine() == "x86_64":
-      from tools.presubmit.pyrefly_check import ParsePyreflyOutput
-      tests.append(
-          input_api.Command(
-              name="pyrefly",
-              cmd=[
-                  input_api.python3_executable,
-                  "-m",
-                  "pyrefly",
-                  "check",
-                  "--output-format=json",
-                  "-c",
-                  str(root_path / "pyproject.toml"),
-              ] + mypy_files_to_check,
-              message=output_api.PresubmitError,
-              kwargs={},
-              python3=True,
-              output_parser=functools.partial(ParsePyreflyOutput, output_api,
-                                              root_path),
-          ))
 
   # ---------------------------------------------------------------------------
   # isort:
@@ -248,16 +234,16 @@ def TyperPaths(
 ) -> list[str]:
   from tools.presubmit.common import GlobalSkipChecks
   root_path = pathlib.Path(input_api.PresubmitLocalPath())
-  mypy_files_to_check = {"PRESUBMIT.py"}
+  typer_files_to_check = {"PRESUBMIT.py"}
   crossbench_path = root_path / "crossbench"
   if on_commit:
-    mypy_files_to_check.add(str(crossbench_path))
-    mypy_files_to_check.add(str(root_path / "tools"))
+    typer_files_to_check.add(str(crossbench_path))
+    typer_files_to_check.add(str(root_path / "tools"))
   else:
-    mypy_files_to_check.update(modified_py_files)
-  # TODO: enable mypy on all tests
+    typer_files_to_check.update(modified_py_files)
+  # TODO: enable type checking on all tests
   result = []
-  for file in mypy_files_to_check:
+  for file in typer_files_to_check:
     if file.startswith("tests/"):
       continue
     if GlobalSkipChecks(input_api, file):

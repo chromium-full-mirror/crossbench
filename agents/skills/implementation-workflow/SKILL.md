@@ -37,5 +37,5 @@ Use parallel subagents to validate and improve a working implementation.
 
 - Use `python-style` skill to validate code changes.
 - Iterate until ruff shows no errors.
-- Iterate until mypy shows no errors.
+- Iterate until pyrefly shows no errors.
 - Iterate until all tests pass.

@@ -201,7 +201,7 @@ ______________________________________________________________________
 
 Before committing or uploading changes, always run the validation suite:
 
-1. **Mypy Type Checker:** `poetry run mypy crossbench`
+1. **Pyrefly Type Checker:** `poetry run pyrefly check`
 2. **Unit Tests:** `poetry run pytest tests/crossbench -x -n 7`
 3. **Crossbench Invocation:** Use `poetry run cb` instead of executing `./cb.py`
    directly.

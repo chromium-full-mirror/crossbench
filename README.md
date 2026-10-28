@@ -372,7 +372,7 @@ Run detailed test coverage:
 poetry run pytest --cov=crossbench --cov-report=html
 ```
 
-Run [mypy](http://mypy-lang.org/) type checker:
+Run [pyrefly](https://pyrefly.org/) type checker:
 ```bash
-poetry run mypy crossbench --check-untyped-defs
+poetry run pyrefly check
 ```

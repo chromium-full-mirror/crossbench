@@ -4,7 +4,6 @@ dependencies = [
   'pytest==9.0.2',
   'pytest-cov==5.0.0',
   'pytest-timeout==2.2.0',
-  'mypy==1.20.2',
   'types-psutil==7.0.0.20250822',
   'types-protobuf==7.35.1.20260821',
   'selenium==4.44.0',
