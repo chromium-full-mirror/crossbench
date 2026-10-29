@@ -417,6 +417,45 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
         WaitEvent(duration=dt.timedelta(milliseconds=600)),
     ])
 
+  def test_text_input_text_repeat(self) -> None:
+    text_input_action = TextInputAction.create(
+        InputSource.KEYBOARD, text="ab", repeat=2, duration=dt.timedelta())
+    self.run_action(text_input_action)
+
+    self.assert_input_events_injected([
+        KeyEvent("KeyA", is_down=True),
+        KeyEvent("KeyA", is_down=False),
+        KeyEvent("KeyB", is_down=True),
+        KeyEvent("KeyB", is_down=False),
+        KeyEvent("KeyA", is_down=True),
+        KeyEvent("KeyA", is_down=False),
+        KeyEvent("KeyB", is_down=True),
+        KeyEvent("KeyB", is_down=False),
+    ])
+
+  def test_text_input_keyevent_repeat(self) -> None:
+    text_input_action = TextInputAction.create(
+        InputSource.KEYBOARD,
+        keyevent="Backspace",
+        repeat=3,
+        duration=dt.timedelta(milliseconds=300))
+    self.run_action(text_input_action)
+
+    self.assert_input_events_injected([
+        KeyEvent("Backspace", is_down=True),
+        WaitEvent(duration=dt.timedelta(milliseconds=40)),
+        KeyEvent("Backspace", is_down=False),
+        WaitEvent(duration=dt.timedelta(milliseconds=60)),
+        KeyEvent("Backspace", is_down=True),
+        WaitEvent(duration=dt.timedelta(milliseconds=40)),
+        KeyEvent("Backspace", is_down=False),
+        WaitEvent(duration=dt.timedelta(milliseconds=60)),
+        KeyEvent("Backspace", is_down=True),
+        WaitEvent(duration=dt.timedelta(milliseconds=40)),
+        KeyEvent("Backspace", is_down=False),
+        WaitEvent(duration=dt.timedelta(milliseconds=60)),
+    ])
+
   def test_text_input_with_source_device(self) -> None:
     text_input_action = TextInputAction.create(
         InputSource.KEYBOARD,

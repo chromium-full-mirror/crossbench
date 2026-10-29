@@ -593,10 +593,11 @@ class ActionRunner:
     return None
 
   def text_input_js(self, action: i_action.TextInputAction) -> None:
+    assert action.text is not None
     with self.actions("TextInput", measure=False) as actions:
       actions.js(
           "document.activeElement.value = arguments[0]",
-          arguments=[action.text])
+          arguments=[action.text * action.repeat])
 
   def _text_to_weighted_events(self, text: str) -> list[KeyEvent | int]:
     events: list[KeyEvent | int] = []
@@ -627,14 +628,15 @@ class ActionRunner:
     with self.actions("TextInput", measure=False):
       events_with_weights: list[KeyEvent | int] = []
       if text := action.text:
-        events_with_weights.extend(self._text_to_weighted_events(text))
+        events_with_weights.extend(
+            self._text_to_weighted_events(text * action.repeat))
       elif keyevent := action.keyevent:
         events_with_weights.extend([
             KeyEvent(key_code=keyevent, is_down=True),
             self.KEY_HOLD_WEIGHT,
             KeyEvent(key_code=keyevent, is_down=False),
             self.KEY_GAP_WEIGHT,
-        ])
+        ] * action.repeat)
 
       if not events_with_weights:
         return

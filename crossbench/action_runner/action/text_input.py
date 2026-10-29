@@ -14,7 +14,7 @@ from typing_extensions import override
 from crossbench.action_runner.action.action_type import ActionType
 from crossbench.action_runner.action.base_input_source import InputSourceAction
 from crossbench.benchmarks.loading.input_source import InputSource
-from crossbench.parse import DurationParser, ObjectParser
+from crossbench.parse import DurationParser, NumberParser, ObjectParser
 
 if TYPE_CHECKING:
   from crossbench.action_runner.action_runner import ActionRunner
@@ -28,6 +28,7 @@ class TextInputAction(InputSourceAction):
 
   text: str | None = None
   keyevent: str | None = None
+  repeat: int = 1
 
   @classmethod
   @override
@@ -41,6 +42,11 @@ class TextInputAction(InputSourceAction):
         required=False,
         help="Keyevent code name to trigger on Android, instead of text. "
         "See https://developer.android.com/reference/android/view/KeyEvent")
+    parser.add_argument(
+        "repeat",
+        type=NumberParser.positive_int,
+        default=1,
+        help="Number of times to repeat the text input or keyevent.")
     parser.add_argument(
         "duration",
         type=DurationParser.positive_or_zero_duration,
@@ -79,4 +85,6 @@ class TextInputAction(InputSourceAction):
       details["text"] = text
     if keyevent := self.keyevent:
       details["keyevent"] = keyevent
+    if self.repeat != 1:
+      details["repeat"] = self.repeat
     return details

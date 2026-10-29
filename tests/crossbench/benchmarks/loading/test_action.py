@@ -753,6 +753,7 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
     self.assertEqual(action.input_source, InputSource.KEYBOARD)
     self.assertIsNone(action.text)
     self.assertEqual(action.keyevent, "KEYCODE_BACK")
+    self.assertEqual(action.repeat, 1)
     self.assertEqual(action.duration, dt.timedelta(seconds=1))
     self.assertTrue(action.has_timeout)
     action.validate()
@@ -760,6 +761,38 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
     action_2 = TextInputAction.parse_dict(action.to_json())
     self.assertEqual(action, action_2)
     action_2.validate()
+
+  def test_parse_text_input_keyevent_repeat(self):
+    config_dict = {
+        "action": "text_input",
+        "source": "keyboard",
+        "keyevent": "Backspace",
+        "repeat": 15,
+    }
+    action = TextInputAction.parse_dict(config_dict)
+    self.assertEqual(action.keyevent, "Backspace")
+    self.assertEqual(action.repeat, 15)
+    action.validate()
+
+    action_2 = TextInputAction.parse_dict(action.to_json())
+    self.assertEqual(action, action_2)
+    self.assertEqual(action_2.repeat, 15)
+
+  def test_parse_text_input_text_repeat(self):
+    config_dict = {
+        "action": "text_input",
+        "source": "keyboard",
+        "text": "abc",
+        "repeat": 2,
+    }
+    action = TextInputAction.parse_dict(config_dict)
+    self.assertEqual(action.text, "abc")
+    self.assertEqual(action.repeat, 2)
+    action.validate()
+
+    action_2 = TextInputAction.parse_dict(action.to_json())
+    self.assertEqual(action, action_2)
+    self.assertEqual(action_2.repeat, 2)
 
   def test_parse_text_input_both(self):
     config_dict = {

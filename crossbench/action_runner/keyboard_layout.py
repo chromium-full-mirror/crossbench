@@ -63,6 +63,7 @@ def _build_us_keyboard_layout() -> immutabledict[str, KeyMapping]:
       "\n": KeyMapping("Enter", "Enter"),
       "\r": KeyMapping("Enter", "Enter"),
       "\t": KeyMapping("Tab", "Tab"),
+      "\b": KeyMapping("Backspace", "Backspace"),
   }
   for char in "abcdefghijklmnopqrstuvwxyz":
     layout[char] = KeyMapping(char, f"Key{char.upper()}")
