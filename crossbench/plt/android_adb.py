@@ -1596,6 +1596,17 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
 
   @override
   @contextlib.contextmanager
+  def disable_secure_windows(self) -> Iterator[None]:
+    self.adb.shell("settings", "put", "--user", "0", "secure",
+                   "disable_secure_windows", "1")
+    try:
+      yield
+    finally:
+      self.adb.shell("settings", "delete", "--user", "0", "secure",
+                     "disable_secure_windows")
+
+  @override
+  @contextlib.contextmanager
   def low_power_mode(self) -> Iterator[None]:
     try:
       self.lock_screen()

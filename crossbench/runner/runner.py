@@ -610,7 +610,8 @@ class Runner:
         self._required_device_config_mode = RequiredDeviceConfigMode.WARN
     self._state.expect(RunnerState.INITIAL)
     logging.info("🏗️  STATUS FILE: %s", self.status.path)
-    with self._wakelocks(), self._restoring_device_config():
+    with (self._wakelocks(), self._disable_secure_windows(),
+          self._restoring_device_config()):
       try:
         with self._exceptions.annotate("Preparing"):
           self._setup()
@@ -698,6 +699,13 @@ class Runner:
     with contextlib.ExitStack() as stack:
       for platform in {self._platform, *self.platforms}:
         stack.enter_context(platform.wakelock())
+      yield
+
+  @contextlib.contextmanager
+  def _disable_secure_windows(self) -> Iterator[None]:
+    with contextlib.ExitStack() as stack:
+      for platform in {self._platform, *self.platforms}:
+        stack.enter_context(platform.disable_secure_windows())
       yield
 
   @contextlib.contextmanager

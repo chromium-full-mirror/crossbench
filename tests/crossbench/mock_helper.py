@@ -547,6 +547,10 @@ class MockPlatformMixin:
   def wakelock(self) -> Iterator[None]:
     yield
 
+  @contextlib.contextmanager
+  def disable_secure_windows(self) -> Iterator[None]:
+    yield
+
 
 class MockFd:
 

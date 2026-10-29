@@ -1299,6 +1299,12 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
     with self.platform.wakelock():
       pass
 
+  def test_disable_secure_windows(self) -> None:
+    self.expect_sh("settings put --user 0 secure disable_secure_windows 1")
+    self.expect_sh("settings delete --user 0 secure disable_secure_windows")
+    with self.platform.disable_secure_windows():
+      pass
+
   def test_lock_screen(self):
     self.expect_sh("input keyevent KEYCODE_POWER")
     self.platform.lock_screen()

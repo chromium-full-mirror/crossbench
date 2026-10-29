@@ -1370,6 +1370,13 @@ class Platform(abc.ABC):
     logging.debug("Missing wakelock support on %s", self)
     yield
 
+  @contextlib.contextmanager
+  def disable_secure_windows(self) -> Iterator[None]:
+    """
+    Allow capturing screenshots of secure / protected windows while active.
+    """
+    yield
+
   def set_all_cpus_power_mode(self, mode: str | None) -> None:
     raise NotImplementedError(
         "'set_all_cpus_power_mode' is only available on Android for now")
