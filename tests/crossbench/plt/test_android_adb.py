@@ -1292,6 +1292,13 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
     self.expect_sh("dumpsys battery reset")
     self.platform.exit_doze()
 
+  def test_wakelock(self) -> None:
+    self.expect_sh("svc power stayon true")
+    self.expect_sh("input keyevent KEYCODE_WAKEUP")
+    self.expect_sh("svc power stayon false")
+    with self.platform.wakelock():
+      pass
+
   def test_lock_screen(self):
     self.expect_sh("input keyevent KEYCODE_POWER")
     self.platform.lock_screen()

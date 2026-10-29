@@ -1586,6 +1586,16 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
 
   @override
   @contextlib.contextmanager
+  def wakelock(self) -> Iterator[None]:
+    self.adb.shell("svc", "power", "stayon", "true")
+    self.adb.shell("input", "keyevent", "KEYCODE_WAKEUP")
+    try:
+      yield
+    finally:
+      self.adb.shell("svc", "power", "stayon", "false")
+
+  @override
+  @contextlib.contextmanager
   def low_power_mode(self) -> Iterator[None]:
     try:
       self.lock_screen()
