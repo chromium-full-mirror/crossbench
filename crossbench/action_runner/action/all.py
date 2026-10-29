@@ -14,6 +14,7 @@ from crossbench.action_runner.action.get import GetAction
 from crossbench.action_runner.action.inject_new_document_script import \
     InjectNewDocumentScriptAction
 from crossbench.action_runner.action.js import JsAction
+from crossbench.action_runner.action.launch_app import LaunchAppAction
 from crossbench.action_runner.action.meet_create import MeetCreateAction
 from crossbench.action_runner.action.meet_script import MeetScriptAction
 from crossbench.action_runner.action.meminfo import MeminfoAction
@@ -47,6 +48,7 @@ ACTIONS_TUPLE: tuple[type[Action], ...] = (
     GetAction,
     InjectNewDocumentScriptAction,
     JsAction,
+    LaunchAppAction,
     MeetCreateAction,
     MeetScriptAction,
     MeminfoAction,

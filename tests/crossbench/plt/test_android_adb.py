@@ -1308,6 +1308,10 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
     self.expect_sh("input keyevent KEYCODE_MENU")
     self.platform.unlock_screen()
 
+  def test_launch_app(self) -> None:
+    self.expect_sh("am start -W -n com.android.settings/.Settings")
+    self.platform.launch_app("com.android.settings/.Settings")
+
   def test_users(self):
     self.expect_sh(
         "pm list users",

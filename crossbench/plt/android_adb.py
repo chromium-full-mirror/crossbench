@@ -1622,6 +1622,12 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
     self.adb.shell("input", "keyevent", "KEYCODE_MENU")
 
   @override
+  def launch_app(self, component: str) -> None:
+    # -W: wait for the activity launch to complete before returning.
+    # -n: specify the explicit component name (e.g. "<package>/<activity>").
+    self.sh("am", "start", "-W", "-n", component)
+
+  @override
   def gpu_vram_used(self) -> dict[str, float]:
     """Queries graphics / unified memory allocation on Android."""
     # Try Qualcomm Adreno sysfs if available

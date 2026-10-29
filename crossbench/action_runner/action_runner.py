@@ -968,6 +968,10 @@ class ActionRunner:
           action.timeout,
       )
 
+  def launch_app(self, action: i_action.LaunchAppAction) -> None:
+    with self.actions(f"LaunchApp {action.component}", measure=False):
+      self.browser_platform.launch_app(action.component)
+
   def close_all_tabs(self, action: i_action.CloseAllTabsAction) -> None:
     del action
     with self.actions("CloseAllTabsAction", measure=False):

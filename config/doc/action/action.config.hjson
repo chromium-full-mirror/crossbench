@@ -192,6 +192,12 @@
         "action": "close_all_tabs"
       }
     ]
+    "launch_app": [
+      {
+        "action": "launch_app"
+        "component": "com.android.settings/.Settings"
+      }
+    ]
     "close_tab": [
       {
         "action": "close_tab"

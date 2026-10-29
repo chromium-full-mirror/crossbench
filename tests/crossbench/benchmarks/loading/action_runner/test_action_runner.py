@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, call
 
 from crossbench.action_runner.action.click import ClickAction
 from crossbench.action_runner.action.enums import ButtonClick, ScrollMode
+from crossbench.action_runner.action.launch_app import LaunchAppAction
 from crossbench.action_runner.action.position import PositionConfig
 from crossbench.action_runner.action.probe import ProbeAction
 from crossbench.action_runner.action.raw_input import RawInputAction
@@ -1093,6 +1094,19 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
     with mock.patch("crossbench.action_runner.action_runner.time") as mock_time:
       mock_time.time.side_effect = [0.0, 1.0]
       self.run_action(scroll_action)
+
+  def test_launch_app(self) -> None:
+    launch_action = LaunchAppAction(component="com.android.settings/.Settings")
+    with mock.patch.object(self.action_runner.browser_platform,
+                           "launch_app") as mock_launch_app:
+      self.run_action(launch_action)
+    mock_launch_app.assert_called_once_with("com.android.settings/.Settings")
+
+  def test_launch_app_not_implemented_raises(self) -> None:
+    launch_action = LaunchAppAction(component="com.android.settings/.Settings")
+    with self.assertRaisesRegex(NotImplementedError,
+                                "'launch_app' is not supported"):
+      self.run_action(launch_action)
 
 
 class ScriptsDirTestCase(unittest.TestCase):

@@ -1429,6 +1429,9 @@ class Platform(abc.ABC):
     raise NotImplementedError(
         f"'set_clipboard' is not supported on {self.name}")
 
+  def launch_app(self, component: str) -> None:
+    raise NotImplementedError(f"'launch_app' is not supported on {self.name}")
+
   def user_id(self) -> int:
     self.assert_is_local()
     return os.getuid()

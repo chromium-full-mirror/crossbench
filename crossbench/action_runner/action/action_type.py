@@ -47,3 +47,4 @@ class ActionType(ConfigEnum):
   MEMINFO = ("meminfo", "Dump current memory stats from the device.")
   PROBE = ("probe", "Invoke an action in the specified probe.")
   CLEAR_CACHE = ("clear_cache", "Clear browser cache and cookies")
+  LAUNCH_APP = ("launch_app", "Launch a native application or activity")

@@ -25,6 +25,7 @@ from crossbench.action_runner.action.get import GetAction
 from crossbench.action_runner.action.inject_new_document_script import \
     InjectNewDocumentScriptAction
 from crossbench.action_runner.action.js import JsAction
+from crossbench.action_runner.action.launch_app import LaunchAppAction
 from crossbench.action_runner.action.meminfo import MeminfoAction
 from crossbench.action_runner.action.position import CoordinatesConfig, \
     PositionConfig, SelectorConfig
@@ -1417,6 +1418,35 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
     action = CloseAllTabsAction.parse(config_dict)
 
     self.assertEqual(action.TYPE, ActionType.CLOSE_ALL_TABS)
+
+  def test_parse_launch_app(self) -> None:
+    config_dict = {
+        "action": "launch_app",
+        "component": "com.android.settings/.Settings",
+    }
+    action = LaunchAppAction.parse_dict(config_dict)
+    self.assertEqual(action.TYPE, ActionType.LAUNCH_APP)
+    self.assertEqual(action.component, "com.android.settings/.Settings")
+    action.validate()
+
+    action_2 = LaunchAppAction.parse_dict(action.to_json())
+    self.assertEqual(action, action_2)
+    action_2.validate()
+
+  def test_parse_launch_app_aliases(self) -> None:
+    for alias in ("app", "activity"):
+      with self.subTest(alias=alias):
+        action = LaunchAppAction.parse_dict({
+            "action": "launch_app",
+            alias: "com.android.settings/.Settings",
+        })
+        self.assertEqual(action.component, "com.android.settings/.Settings")
+
+  def test_parse_launch_app_invalid(self) -> None:
+    with self.assertRaises(ValueError):
+      LaunchAppAction.parse_dict({"action": "launch_app"})
+    with self.assertRaises(ValueError):
+      LaunchAppAction.parse_dict({"action": "launch_app", "component": ""})
 
   def test_parse_close_tab_all_args(self):
     config_dict = {
