@@ -157,8 +157,8 @@ def CheckChange(
   # ---------------------------------------------------------------------------
   # AST Checks (Banned builtins, Constants marked Final):
   # ---------------------------------------------------------------------------
-  from tools.presubmit.ast_checks import CheckAst
-  results += CheckAst(input_api, output_api)
+  from tools.presubmit.ast_checks import CombinedAstVisitor
+  results += CombinedAstVisitor.check(input_api, output_api)
 
   # ---------------------------------------------------------------------------
   # Top-level files:

@@ -20,7 +20,7 @@ from typing_extensions import override
 from tests import test_helper
 from tools.presubmit import ast_checks, banned_builtins, constant_final, \
     pyrefly_check, toplevel_files
-from tools.presubmit.common import PresubmitCheck
+from tools.presubmit.common import PresubmitCheck, RawAstViolation
 from tools.presubmit.toplevel_files import FileAction
 
 if TYPE_CHECKING:
@@ -84,44 +84,44 @@ class GetBypassReasonTestCase(unittest.TestCase):
 
 class BannedBuiltinVisitorTestCase(unittest.TestCase):
 
-  def _check(self, code: str) -> list[tuple[int, int, str]]:
+  def _check(self, code: str) -> list[RawAstViolation]:
     tree = ast.parse(code)
     visitor = banned_builtins.BannedBuiltinVisitor()
     visitor.visit(tree)
-    return visitor.violations
+    return list(visitor.violations)
 
   def test_getattr_detection(self) -> None:
     self.assertEqual(
         self._check("getattr(obj, 'prop')"),
-        [(1, 1, "getattr")],
+        [RawAstViolation(1, 1, "getattr")],
     )
     self.assertEqual(
         self._check("getattr(obj, 'prop', default)"),
-        [(1, 1, "getattr")],
+        [RawAstViolation(1, 1, "getattr")],
     )
     self.assertEqual(
         self._check("builtins.getattr(obj, 'prop')"),
-        [(1, 1, "getattr")],
+        [RawAstViolation(1, 1, "getattr")],
     )
 
   def test_setattr_detection(self) -> None:
     self.assertEqual(
         self._check("setattr(obj, 'prop', 123)"),
-        [(1, 1, "setattr")],
+        [RawAstViolation(1, 1, "setattr")],
     )
     self.assertEqual(
         self._check("builtins.setattr(obj, 'prop', 123)"),
-        [(1, 1, "setattr")],
+        [RawAstViolation(1, 1, "setattr")],
     )
 
   def test_hasattr_detection(self) -> None:
     self.assertEqual(
         self._check("hasattr(obj, 'prop')"),
-        [(1, 1, "hasattr")],
+        [RawAstViolation(1, 1, "hasattr")],
     )
     self.assertEqual(
         self._check("builtins.hasattr(obj, 'prop')"),
-        [(1, 1, "hasattr")],
+        [RawAstViolation(1, 1, "hasattr")],
     )
 
   def test_allowed_calls(self) -> None:
@@ -133,25 +133,32 @@ class BannedBuiltinVisitorTestCase(unittest.TestCase):
 
 class ConstantFinalVisitorTestCase(unittest.TestCase):
 
-  def _check(self, code: str) -> list[tuple[int, int, str]]:
+  def _check(self, code: str) -> list[RawAstViolation]:
     tree = ast.parse(code)
     visitor = constant_final.ConstantFinalVisitor()
     visitor.visit(tree)
-    return visitor.violations
+    return list(visitor.violations)
 
   def test_unannotated_constant_detection(self) -> None:
-    self.assertEqual(self._check("FOO = 1"), [(1, 1, "FOO")])
+    self.assertEqual(self._check("FOO = 1"), [RawAstViolation(1, 1, "FOO")])
     self.assertEqual(
-        self._check("_PRIVATE_FOO = 'bar'"), [(1, 1, "_PRIVATE_FOO")])
+        self._check("_PRIVATE_FOO = 'bar'"),
+        [RawAstViolation(1, 1, "_PRIVATE_FOO")],
+    )
     self.assertEqual(
-        self._check("FOO = BAR = 1"), [(1, 1, "FOO"), (1, 1, "BAR")])
+        self._check("FOO = BAR = 1"),
+        [RawAstViolation(1, 1, "FOO"),
+         RawAstViolation(1, 1, "BAR")],
+    )
 
   def test_annotated_non_final_constant_detection(self) -> None:
-    self.assertEqual(self._check("FOO: int = 1"), [(1, 1, "FOO")])
-    self.assertEqual(self._check("_BAR: str = 'val'"), [(1, 1, "_BAR")])
+    self.assertEqual(
+        self._check("FOO: int = 1"), [RawAstViolation(1, 1, "FOO")])
+    self.assertEqual(
+        self._check("_BAR: str = 'val'"), [RawAstViolation(1, 1, "_BAR")])
     self.assertEqual(
         self._check("PATTERN: re.Pattern = re.compile('a')"),
-        [(1, 1, "PATTERN")],
+        [RawAstViolation(1, 1, "PATTERN")],
     )
 
   def test_final_constant_allowed(self) -> None:
@@ -356,7 +363,7 @@ class CheckNoBannedBuiltinsTestCase(_PresubmitTestCase):
       input_api: InputApi,
       output_api: OutputApi,
   ) -> list[PresubmitResult]:
-    return banned_builtins.CheckNoBannedBuiltins(input_api, output_api)
+    return banned_builtins.BannedBuiltinVisitor.check(input_api, output_api)
 
   def test_no_violations(self) -> None:
     self._assert_no_errors(files={"foo.py": "x = obj.field\n"})
@@ -456,7 +463,7 @@ class CheckConstantsMarkedFinalTestCase(_PresubmitTestCase):
       input_api: InputApi,
       output_api: OutputApi,
   ) -> list[PresubmitResult]:
-    return constant_final.CheckConstantsMarkedFinal(input_api, output_api)
+    return constant_final.ConstantFinalVisitor.check(input_api, output_api)
 
   def test_no_violations(self) -> None:
     self._assert_no_errors(files={"foo.py": "FOO: Final = 1\n"})
@@ -516,7 +523,7 @@ class CheckAstCombinedTestCase(_PresubmitTestCase):
       input_api: InputApi,
       output_api: OutputApi,
   ) -> list[PresubmitResult]:
-    return ast_checks.CheckAst(input_api, output_api)
+    return ast_checks.CombinedAstVisitor.check(input_api, output_api)
 
   def test_combined_catches_both(self) -> None:
     results = self._check(files={"foo.py": self.COMBINED_AST_SNIPPET})
@@ -535,6 +542,16 @@ class CheckAstCombinedTestCase(_PresubmitTestCase):
     self.assertEqual(len(results), 2)
     self.assertEqual(results[0][0], PresubmitStatus.NOTIFY)
     self.assertEqual(results[1][0], PresubmitStatus.NOTIFY)
+
+  def test_third_party_skipped(self) -> None:
+    self._assert_no_errors(
+        files={"third_party/foo.py": self.COMBINED_AST_SNIPPET})
+
+  def test_empty_changed_lines_skipped(self) -> None:
+    self._assert_no_errors(
+        files={"crossbench/foo.py": self.COMBINED_AST_SNIPPET},
+        changed_lines_map={"crossbench/foo.py": set()},
+    )
 
 
 class CheckNoNewToplevelFilesTestCase(_PresubmitTestCase):

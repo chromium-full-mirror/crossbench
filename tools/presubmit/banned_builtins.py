@@ -5,134 +5,89 @@
 from __future__ import annotations
 
 import ast
-from typing import TYPE_CHECKING, Final, NamedTuple
+from typing import TYPE_CHECKING, Final
 
-from tools.presubmit.common import PresubmitCheck
+from tools.presubmit.common import AstCheckVisitor, AstViolation, \
+    PresubmitCheck
 
 if TYPE_CHECKING:
-  import pathlib
-
-  from presubmit_support import InputApi, OutputApi
+  from collections.abc import Sequence
 
 BANNED_BUILTIN_FUNCTIONS: Final[frozenset[str]] = frozenset(
     {"getattr", "setattr", "hasattr"})
 
 
-class BannedBuiltinViolation(NamedTuple):
-  file_path: str
-  line_number: int
-  col_offset: int
-  func_name: str
-  line_text: str
+class BannedBuiltinVisitor(AstCheckVisitor):
 
-
-class BannedBuiltinVisitor(ast.NodeVisitor):
-
-  def __init__(self) -> None:
-    super().__init__()
-    self.violations: list[tuple[int, int, str]] = []
+  def _banned_func_name(self, func: ast.expr) -> str | None:
+    name: str | None = None
+    if isinstance(func, ast.Name):
+      name = func.id
+    elif (isinstance(func, ast.Attribute) and
+          isinstance(func.value, ast.Name) and func.value.id == "builtins"):
+      name = func.attr
+    return name if name in BANNED_BUILTIN_FUNCTIONS else None
 
   def visit_Call(self, node: ast.Call) -> None:
-    func_name: str | None = None
-    if isinstance(node.func, ast.Name):
-      func_name = node.func.id
-    elif (isinstance(node.func, ast.Attribute) and
-          isinstance(node.func.value, ast.Name) and
-          node.func.value.id == "builtins"):
-      func_name = node.func.attr
-
-    if func_name and func_name in BANNED_BUILTIN_FUNCTIONS:
-      self.violations.append((node.lineno, node.col_offset + 1, func_name))
+    if func_name := self._banned_func_name(node.func):
+      self.add_violation(node, func_name)
     self.generic_visit(node)
 
+  @classmethod
+  def _create_violation_error(
+      cls,
+      presubmit: PresubmitCheck,
+      violations: Sequence[AstViolation],
+      missing_bypasses: Sequence[str],
+  ) -> object:
+    help_tags: str = "\n".join(f"  {key}=<REASON>" for key in missing_bypasses)
+    long_text: str = f"""\
+Calling `getattr()`, `setattr()`, or `hasattr()` is strictly
+discouraged in Crossbench:
+  - For CLI args/namespaces: configure proper defaults in argument
+    parsers (parser.set_defaults) or mock fixtures.
+  - For classes/objects: use explicit attributes, dataclasses,
+    properties, or protocols instead of dynamic reflection.
 
-def CheckNoBannedBuiltins(
-    input_api: InputApi,
-    output_api: OutputApi,
-) -> list[object]:
-  presubmit = PresubmitCheck(input_api, output_api)
-  results: list[object] = []
-  violations: list[BannedBuiltinViolation] = []
-  root_path: pathlib.Path = presubmit.root_path
+If dynamic attribute access is strictly necessary, provide a
+non-empty reason in your commit message footer/tags to bypass this
+check:
+{help_tags}
+"""
+    return presubmit.output_api.PresubmitError(
+        "Found banned built-in function calls in modified files:",
+        items=[v.format_error() for v in violations],
+        long_text=long_text)
 
-  for affected_file in presubmit.affected_python_files():
-    file_path: str = affected_file.LocalPath()
-    full_path: pathlib.Path = root_path / file_path
-    try:
-      content = input_api.ReadFile(str(full_path), "r")
-    except (OSError, UnicodeDecodeError) as e:
-      results.append(
-          output_api.PresubmitError(f"Could not read {file_path}: {e}"))
-      continue
-    try:
-      tree = ast.parse(content, filename=str(full_path))
-    except SyntaxError as e:
-      results.append(
-          output_api.PresubmitError(f"Syntax error in {file_path}: {e}"))
-      continue
+  @classmethod
+  def report(
+      cls,
+      presubmit: PresubmitCheck,
+      violations: Sequence[AstViolation],
+  ) -> list[object]:
+    if not violations:
+      return []
 
-    visitor = BannedBuiltinVisitor()
-    visitor.visit(tree)
-    if not visitor.violations:
-      continue
+    detected_functions: list[str] = sorted({v.name for v in violations})
+    missing_bypasses: list[str] = []
+    valid_bypasses: list[tuple[str, str]] = []
 
-    changed_line_numbers = presubmit.changed_lines(affected_file)
-    lines = content.splitlines()
-    for lineno, col, func_name in visitor.violations:
-      if lineno in changed_line_numbers:
-        line_text = lines[lineno -
-                          1].strip() if 0 <= lineno - 1 < len(lines) else ""
-        violations.append(
-            BannedBuiltinViolation(
-                file_path=file_path,
-                line_number=lineno,
-                col_offset=col,
-                func_name=func_name,
-                line_text=line_text,
-            ))
+    for func_name in detected_functions:
+      bypass_key: str = f"ALLOW_{func_name.upper()}"
+      if reason := presubmit.bypass_reason(bypass_key):
+        valid_bypasses.append((bypass_key, reason))
+      else:
+        missing_bypasses.append(bypass_key)
 
-  if not violations:
-    return results
+    if not missing_bypasses:
+      bypass_details: str = ", ".join(f"{k}={r}" for k, r in valid_bypasses)
+      return [
+          presubmit.output_api.PresubmitNotifyResult(
+              f"Bypassing banned built-in check "
+              f"({', '.join(detected_functions)}) "
+              f"via commit message tag(s): {bypass_details}"),
+      ]
 
-  detected_functions = {v.func_name for v in violations}
-  missing_bypasses: list[str] = []
-  valid_bypasses: list[tuple[str, str]] = []
-
-  for func_name in sorted(detected_functions):
-    bypass_key = f"ALLOW_{func_name.upper()}"
-    reason = presubmit.bypass_reason(bypass_key)
-    if reason:
-      valid_bypasses.append((bypass_key, reason))
-    else:
-      missing_bypasses.append(bypass_key)
-
-  if not missing_bypasses:
-    bypass_details = ", ".join(f"{k}={r}" for k, r in valid_bypasses)
-    results.append(
-        output_api.PresubmitNotifyResult(
-            f"Bypassing banned built-in check "
-            f"({', '.join(sorted(detected_functions))}) "
-            f"via commit message tag(s): {bypass_details}"))
-    return results
-
-  error_items = [
-      f"{v.file_path}:{v.line_number}:{v.col_offset}: {v.line_text}"
-      for v in violations
-  ]
-  help_tags = "\n".join(f"  {key}=<REASON>" for key in missing_bypasses)
-  long_text = (
-      "Calling `getattr()`, `setattr()`, or `hasattr()` is strictly\n"
-      "discouraged in Crossbench:\n"
-      "  - For CLI args/namespaces: configure proper defaults in argument\n"
-      "    parsers (parser.set_defaults) or mock fixtures.\n"
-      "  - For classes/objects: use explicit attributes, dataclasses,\n"
-      "    properties, or protocols instead of dynamic reflection.\n\n"
-      "If dynamic attribute access is strictly necessary, provide a non-empty\n"
-      "reason in your commit message footer/tags to bypass this check:\n"
-      f"{help_tags}\n")
-  results.append(
-      output_api.PresubmitError(
-          "Found banned built-in function calls in modified files:",
-          items=error_items,
-          long_text=long_text))
-  return results
+    return [
+        cls._create_violation_error(presubmit, violations, missing_bypasses),
+    ]
