@@ -89,6 +89,26 @@
         "duration": "100ms"
       }
     ]
+    "mouse_move": [
+      {
+        "action": "mouse_move"
+        "waypoints": [
+          {
+            "x": 100
+            "y": 100
+          }
+          {
+            "x": 200
+            "y": 100
+          }
+          {
+            "x": 100
+            "y": 100
+          }
+        ]
+        "duration": "500ms"
+      }
+    ]
     "raw_input": [
       {
         "action": "raw_input"

@@ -27,6 +27,7 @@ from crossbench.action_runner.action.inject_new_document_script import \
 from crossbench.action_runner.action.js import JsAction
 from crossbench.action_runner.action.launch_app import LaunchAppAction
 from crossbench.action_runner.action.meminfo import MeminfoAction
+from crossbench.action_runner.action.mouse_move import MouseMoveAction
 from crossbench.action_runner.action.position import CoordinatesConfig, \
     PositionConfig, SelectorConfig
 from crossbench.action_runner.action.probe import ProbeAction
@@ -1448,6 +1449,84 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
     with self.assertRaises(ValueError):
       LaunchAppAction.parse_dict({"action": "launch_app", "component": ""})
 
+  def test_parse_mouse_move(self) -> None:
+    config_dict = {
+        "action": "mouse_move",
+        "waypoints": [
+            {
+                "x": 100,
+                "y": 200,
+            },
+            {
+                "x": 300,
+                "y": 400,
+            },
+            {
+                "x": 100,
+                "y": 200,
+            },
+        ],
+        "duration": "500ms",
+    }
+    action = MouseMoveAction.parse_dict(config_dict)
+    self.assertEqual(action.TYPE, ActionType.MOUSE_MOVE)
+    self.assertEqual(
+        action.waypoints,
+        (Point(100, 200), Point(300, 400), Point(100, 200)),
+    )
+    self.assertEqual(action.duration, dt.timedelta(milliseconds=500))
+    self.assertEqual(action.source_device, "default_mouse")
+    action.validate()
+
+    action_2 = MouseMoveAction.parse_dict(action.to_json())
+    self.assertEqual(action, action_2)
+    action_2.validate()
+
+  def test_parse_mouse_move_aliases(self) -> None:
+    for alias in ("points", "positions", "path", "coordinates"):
+      with self.subTest(alias=alias):
+        action = MouseMoveAction.parse_dict({
+            "action": "mouse_move",
+            alias: [{
+                "x": 10,
+                "y": 20,
+            }, {
+                "x": 30,
+                "y": 40,
+            }],
+            "duration": "500ms",
+        })
+        self.assertEqual(action.waypoints, (Point(10, 20), Point(30, 40)))
+
+  def test_parse_mouse_move_invalid(self) -> None:
+    with self.assertRaises(ValueError):
+      MouseMoveAction.parse_dict({"action": "mouse_move"})
+    with self.assertRaises(ValueError):
+      MouseMoveAction.parse_dict({
+          "action": "mouse_move",
+          "waypoints": [{
+              "x": 10,
+              "y": 20,
+          }, {
+              "x": 30,
+              "y": 40,
+          }],
+      })
+    with self.assertRaises(ValueError):
+      MouseMoveAction.parse_dict({
+          "action": "mouse_move",
+          "waypoints": [],
+          "duration": "500ms",
+      })
+    with self.assertRaises(ValueError):
+      MouseMoveAction.parse_dict({
+          "action": "mouse_move",
+          "waypoints": [{
+              "x": 10,
+              "y": 20,
+          }],
+          "duration": "500ms",
+      })
   def test_parse_close_tab_all_args(self):
     config_dict = {
         "action": "close_tab",

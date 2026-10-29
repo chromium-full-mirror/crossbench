@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, call
 from crossbench.action_runner.action.click import ClickAction
 from crossbench.action_runner.action.enums import ButtonClick, ScrollMode
 from crossbench.action_runner.action.launch_app import LaunchAppAction
+from crossbench.action_runner.action.mouse_move import MouseMoveAction
 from crossbench.action_runner.action.position import PositionConfig
 from crossbench.action_runner.action.probe import ProbeAction
 from crossbench.action_runner.action.raw_input import RawInputAction
@@ -856,6 +857,28 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
         TouchEvent(Point(30, 60), is_down=False),
     ],
                                       expected_device_name="custom_ts")
+
+  def test_mouse_move_constant_speed_across_waypoints(self) -> None:
+    # 32ms at 125Hz (default_mouse) -> 4 steps (8ms each).
+    # Segment 1: (0, 0) -> (100, 0), length 100 (1 step).
+    # Segment 2: (100, 0) -> (100, 300), length 300 (3 steps).
+    mouse_move_action = MouseMoveAction.create(
+        waypoints=(Point(0, 0), Point(100, 0), Point(100, 300)),
+        duration=dt.timedelta(milliseconds=32))
+    self.run_action(mouse_move_action)
+
+    self.assert_input_events_injected([
+        MouseMoveEvent(Point(0, 0)),
+        WaitEvent(duration=dt.timedelta(microseconds=8000)),
+        MouseMoveEvent(Point(100, 0)),
+        WaitEvent(duration=dt.timedelta(microseconds=8000)),
+        MouseMoveEvent(Point(100, 100)),
+        WaitEvent(duration=dt.timedelta(microseconds=8000)),
+        MouseMoveEvent(Point(100, 200)),
+        WaitEvent(duration=dt.timedelta(microseconds=8000)),
+        MouseMoveEvent(Point(100, 300)),
+    ],
+                                      expected_device_name="default_mouse")
 
   def test_scroll_touch_window_down(self) -> None:
     scroll_action = ScrollAction.create(

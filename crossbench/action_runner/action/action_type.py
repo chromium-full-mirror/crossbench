@@ -17,6 +17,8 @@ class ActionType(ConfigEnum):
   SCROLL = ("scroll", "Scroll on page")
   CLICK = ("click", "Click on element or at specified coordinates")
   SWIPE = ("swipe", "Swipe on screen")
+  MOUSE_MOVE = ("mouse_move",
+                "Move the mouse cursor smoothly along a sequence of waypoints")
   TEXT_INPUT = ("text_input", "Type printable characters at a "
                 "specified speed.")
   RAW_INPUT = ("raw_input", "Inject a sequence of raw input events")

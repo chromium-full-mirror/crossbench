@@ -14,6 +14,8 @@ import time
 from typing import TYPE_CHECKING, Callable, Final, Iterable, Iterator, \
     Sequence, TypedDict
 
+import numpy as np
+
 from crossbench import exception
 from crossbench import path as pth
 from crossbench.action_runner.action.enums import ButtonClick, ScrollMode
@@ -29,6 +31,8 @@ from crossbench.action_runner.keyboard_layout import US_KEYBOARD_LAYOUT
 from crossbench.action_runner.screenshot_annotation import \
     ScreenshotPointAnnotation, ScreenshotRectAnnotation
 from crossbench.action_runner.viewport_info import ViewportInfo
+from crossbench.action_runner.virtual_device.mouse import \
+    DEFAULT_MOUSE_POLLING_RATE_HZ
 from crossbench.action_runner.virtual_device.pointing import \
     PointingVirtualDeviceConfig
 from crossbench.action_runner.virtual_device.touchscreen import \
@@ -682,6 +686,13 @@ class ActionRunner:
           duration=action.duration,
           source_device=action.source_device)
 
+  def mouse_move(self, action: i_action.MouseMoveAction) -> None:
+    with self.actions("MouseMoveAction", measure=False):
+      self._inject_mouse_move(
+          waypoints=action.waypoints,
+          duration=action.duration,
+          source_device=action.source_device)
+
   def raw_input(self, action: i_action.RawInputAction) -> None:
     with self.actions("RawInputAction", measure=False):
       self.browser_platform.inject_input_events(action.source_device,
@@ -694,11 +705,55 @@ class ActionRunner:
                                     polling_rate_hz)
     self.browser_platform.inject_input_events(source_device, events)
 
-  def _get_polling_rate_hz(self, source_device: str) -> int:
+  def _inject_mouse_move(self, waypoints: Sequence[Point],
+                         duration: dt.timedelta, source_device: str) -> None:
+    polling_rate_hz = self._get_polling_rate_hz(
+        source_device, default_rate_hz=DEFAULT_MOUSE_POLLING_RATE_HZ)
+    events = self._get_mouse_move_events(waypoints, duration, polling_rate_hz)
+    self.browser_platform.inject_input_events(source_device, events)
+
+  def _get_polling_rate_hz(
+      self,
+      source_device: str,
+      default_rate_hz: int = DEFAULT_TOUCH_POLLING_RATE_HZ,
+  ) -> int:
     device = self.browser_platform.virtual_devices.get(source_device)
     if isinstance(device, PointingVirtualDeviceConfig):
       return device.polling_rate_hz
-    return DEFAULT_TOUCH_POLLING_RATE_HZ
+    return default_rate_hz
+
+  def _get_mouse_move_events(
+      self,
+      waypoints: Sequence[Point],
+      duration: dt.timedelta,
+      polling_rate_hz: int,
+  ) -> list[InputEvent]:
+    assert len(waypoints) >= 2
+    points = np.array([(p.x, p.y) for p in waypoints], dtype=float)
+    deltas = np.diff(points, axis=0)
+    segment_distances = np.hypot(deltas[:, 0], deltas[:, 1])
+    cumulative_distances = np.concatenate(([0.0], np.cumsum(segment_distances)))
+
+    num_steps = max(1, round(duration.total_seconds() * polling_rate_hz))
+    sample_distances = np.linspace(0.0, cumulative_distances[-1], num_steps + 1)
+    xs = np.round(
+        np.interp(sample_distances, cumulative_distances,
+                  points[:, 0])).astype(int)
+    ys = np.round(
+        np.interp(sample_distances, cumulative_distances,
+                  points[:, 1])).astype(int)
+
+    prev_time = dt.timedelta()
+    events: list[InputEvent] = [MouseMoveEvent(position=waypoints[0])]
+    for step in range(1, num_steps + 1):
+      target_time = (duration * step) // num_steps
+      if wait := target_time - prev_time:
+        events.append(WaitEvent(duration=wait))
+      prev_time = target_time
+      events.append(
+          MouseMoveEvent(position=Point(int(xs[step]), int(ys[step]))))
+
+    return events
 
   def _get_swipe_events(
       self,

@@ -153,6 +153,66 @@ class TestAndroidInputInjection(BaseInputInjectionTest):
 
     self.run_loading_test(browser_config, page_config, test_env)
 
+  def test_mouse_move(self, browser_config: str, test_env: TestEnv) -> None:
+    self.check_input_source_supported(browser_config, InputSource.MOUSE)
+    test_page = urllib.parse.quote("""
+<!DOCTYPE html>
+<html>
+<body style="margin: 0; width: 100vw; height: 100vh;">
+  <script>
+    let startPoint = null;
+    window.addEventListener('mousemove', (e) => {
+      if (!startPoint) {
+        startPoint = { x: e.clientX, y: e.clientY };
+        return;
+      }
+      if (e.clientX > startPoint.x + 50 && e.clientY > startPoint.y + 50) {
+        document.body.id = 'mouse-moved';
+      }
+    });
+  </script>
+</body>
+</html>
+""")
+    page_config = {
+        "pages": {
+            "MouseMoveTest": {
+                "actions": [
+                    {
+                        "action": "get",
+                        "url": f"data:text/html;charset=utf-8,{test_page}",
+                        "ready_state": "complete",
+                    },
+                    {
+                        "action": "mouse_move",
+                        "waypoints": [
+                            {
+                                "x": 150,
+                                "y": 400,
+                            },
+                            {
+                                "x": 350,
+                                "y": 400,
+                            },
+                            {
+                                "x": 350,
+                                "y": 600,
+                            },
+                        ],
+                        "duration": "300ms",
+                    },
+                    {
+                        "action": "wait_for_element",
+                        "selector": "body[id='mouse-moved']",
+                        "timeout": "5s",
+                    },
+                ],
+            },
+        },
+    }
+
+    self.run_loading_test(browser_config, page_config, test_env)
+
 
 del BaseInputInjectionTest
 

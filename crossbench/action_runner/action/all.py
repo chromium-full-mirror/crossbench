@@ -18,6 +18,7 @@ from crossbench.action_runner.action.launch_app import LaunchAppAction
 from crossbench.action_runner.action.meet_create import MeetCreateAction
 from crossbench.action_runner.action.meet_script import MeetScriptAction
 from crossbench.action_runner.action.meminfo import MeminfoAction
+from crossbench.action_runner.action.mouse_move import MouseMoveAction
 from crossbench.action_runner.action.open_devtools import OpenDevToolsAction
 from crossbench.action_runner.action.probe import ProbeAction
 from crossbench.action_runner.action.raw_input import RawInputAction
@@ -52,6 +53,7 @@ ACTIONS_TUPLE: tuple[type[Action], ...] = (
     MeetCreateAction,
     MeetScriptAction,
     MeminfoAction,
+    MouseMoveAction,
     ProbeAction,
     RawInputAction,
     OpenDevToolsAction,
