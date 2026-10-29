@@ -87,3 +87,113 @@ metric_spec: {
     inner_query_id: "tab_revisit_query"
   }
 }
+
+query {
+  id: "uma_histogram_summaries_query"
+  table {
+    table_name: "uma_histogram_summaries"
+    module_name: "sql_packages.multiwindow_memory_stress.uma"
+    column_names: "hist_name"
+    column_names: "agg_type"
+    column_names: "value"
+    column_names: "polarity"
+  }
+}
+
+metric_spec: {
+  id: "multiwindow-memory-stress.uma.lower_is_better"
+  dimensions: "hist_name"
+  dimensions: "agg_type"
+  value: "value"
+  polarity: LOWER_IS_BETTER
+  query: {
+    inner_query_id: "uma_histogram_summaries_query"
+    filters {
+      column_name: "polarity"
+      op: EQUAL
+      string_rhs: "LOWER_IS_BETTER"
+    }
+  }
+}
+
+metric_spec: {
+  id: "multiwindow-memory-stress.uma.higher_is_better"
+  dimensions: "hist_name"
+  dimensions: "agg_type"
+  value: "value"
+  polarity: HIGHER_IS_BETTER
+  query: {
+    inner_query_id: "uma_histogram_summaries_query"
+    filters {
+      column_name: "polarity"
+      op: EQUAL
+      string_rhs: "HIGHER_IS_BETTER"
+    }
+  }
+}
+
+query {
+  id: "meminfo_total_query"
+  table {
+    table_name: "meminfo_total_output"
+    module_name: "sql_packages.multiwindow_memory_stress.meminfo"
+    column_names: "it_id"
+    column_names: "title"
+    column_names: "pss_total_mb"
+    column_names: "rss_total_mb"
+    column_names: "swap_total_mb"
+  }
+}
+
+metric_spec: {
+  id: "multiwindow-memory-stress.meminfo.browser_pss_total_mb"
+  dimensions: "it_id"
+  dimensions: "title"
+  value: "pss_total_mb"
+  polarity: LOWER_IS_BETTER
+  query {
+    inner_query_id: "meminfo_total_query"
+  }
+}
+
+metric_spec: {
+  id: "multiwindow-memory-stress.meminfo.browser_rss_total_mb"
+  dimensions: "it_id"
+  dimensions: "title"
+  value: "rss_total_mb"
+  polarity: LOWER_IS_BETTER
+  query {
+    inner_query_id: "meminfo_total_query"
+  }
+}
+
+metric_spec: {
+  id: "multiwindow-memory-stress.meminfo.browser_swap_total_mb"
+  dimensions: "it_id"
+  dimensions: "title"
+  value: "swap_total_mb"
+  polarity: LOWER_IS_BETTER
+  query {
+    inner_query_id: "meminfo_total_query"
+  }
+}
+
+query {
+  id: "cpu_usage_stat_query"
+  table {
+    table_name: "cpu_usage_stat_output"
+    module_name: "sql_packages.multiwindow_memory_stress.cpu"
+    column_names: "name"
+    column_names: "total_cputime"
+  }
+}
+
+metric_spec: {
+  id: "multiwindow-memory-stress.cpu_usage_stat.total_cputime"
+  dimensions: "name"
+  value: "total_cputime"
+  polarity: LOWER_IS_BETTER
+  query {
+    inner_query_id: "cpu_usage_stat_query"
+  }
+}

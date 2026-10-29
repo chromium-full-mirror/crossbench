@@ -362,7 +362,8 @@ class MultiwindowMemoryStressProbeConfigTestCase(unittest.TestCase):
                               re.DOTALL)
     self.assertTrue(metric_specs)
     for metric_spec in metric_specs:
-      self.assertIn("polarity: LOWER_IS_BETTER", metric_spec)
+      self.assertTrue("polarity: LOWER_IS_BETTER" in metric_spec or
+                      "polarity: HIGHER_IS_BETTER" in metric_spec)
 
   def test_perfetto_config_histograms(self) -> None:
     perfetto_config = (mw_stress.MultiwindowMemoryStressBenchmark
@@ -385,6 +386,12 @@ class MultiwindowMemoryStressProbeConfigTestCase(unittest.TestCase):
                 "sql_packages.multiwindow_memory_stress.tab_timing",
             "tab_revisit_by_tab_index":
                 "sql_packages.multiwindow_memory_stress.tab_revisit",
+            "uma_histogram_summaries":
+                "sql_packages.multiwindow_memory_stress.uma",
+            "meminfo_total_output":
+                "sql_packages.multiwindow_memory_stress.meminfo",
+            "cpu_usage_stat_output":
+                "sql_packages.multiwindow_memory_stress.cpu",
         })
     for table_name, module_name in tables.items():
       with self.subTest(module_name=module_name):

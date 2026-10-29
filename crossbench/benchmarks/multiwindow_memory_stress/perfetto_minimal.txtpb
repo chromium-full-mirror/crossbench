@@ -74,3 +74,12 @@ data_sources {
     }
   }
 }
+data_sources {
+  config {
+    name: "linux.sys_stats"
+    sys_stats_config {
+      stat_period_ms: 1000
+      stat_counters: STAT_CPU_TIMES
+    }
+  }
+}
