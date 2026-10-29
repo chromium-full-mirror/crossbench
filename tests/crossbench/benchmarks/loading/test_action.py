@@ -446,6 +446,7 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
     self.assertEqual(action.attempts, 1)
     action.validate()
 
+    self.assertEqual(action.to_json()["source"], "touch")
     action_2 = ClickAction.parse_dict(action.to_json())
     self.assertEqual(action, action_2)
     action_2.validate()

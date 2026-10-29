@@ -73,7 +73,7 @@ class InputSourceAction(BaseDurationAction, metaclass=abc.ABCMeta):
   @override
   def to_json(self) -> JsonDict:
     details = super().to_json()
-    details["source"] = self.input_source
+    details["source"] = str(self.input_source)
     if self.source_device:
       details["source_device"] = self.source_device
     return details
