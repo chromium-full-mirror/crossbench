@@ -8,9 +8,10 @@ import abc
 import ast
 import dataclasses
 import enum
+import fnmatch
 import pathlib
 import unittest
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Final, Iterable, \
+from typing import TYPE_CHECKING, Callable, ClassVar, Final, Iterable, \
     TypeAlias
 from unittest import mock
 
@@ -19,18 +20,66 @@ from typing_extensions import override
 from tests import test_helper
 from tools.presubmit import ast_checks, banned_builtins, constant_final, \
     pyrefly_check, toplevel_files
+from tools.presubmit.common import PresubmitCheck
 from tools.presubmit.toplevel_files import FileAction
 
 if TYPE_CHECKING:
   from collections.abc import Sequence
 
-ChangedLines: TypeAlias = set[int] | None
-ChangedLinesMap: TypeAlias = dict[str, set[int]] | None
+  from presubmit_support import InputApi, OutputApi, PresubmitResult
+
+ChangedLines: TypeAlias = set[int]
+ChangedLinesMap: TypeAlias = dict[str, set[int]]
 
 
 class PresubmitStatus(enum.StrEnum):
   ERROR = "ERROR"
   NOTIFY = "NOTIFY"
+
+
+class GetBypassReasonTestCase(unittest.TestCase):
+
+  def test_valid_reason(self) -> None:
+    desc = "Add feature\n\nALLOW_GETATTR=dynamic field lookup"
+    self.assertEqual(
+        PresubmitCheck.parse_bypass_reason(desc, "ALLOW_GETATTR"),
+        "dynamic field lookup",
+    )
+
+  def test_missing_or_empty_reason(self) -> None:
+    self.assertIsNone(
+        PresubmitCheck.parse_bypass_reason("Fix bug", "ALLOW_GETATTR"))
+    self.assertIsNone(
+        PresubmitCheck.parse_bypass_reason("Fix bug\nALLOW_GETATTR=",
+                                           "ALLOW_GETATTR"))
+    self.assertIsNone(
+        PresubmitCheck.parse_bypass_reason("Fix bug\nALLOW_GETATTR=   ",
+                                           "ALLOW_GETATTR"))
+    self.assertIsNone(
+        PresubmitCheck.parse_bypass_reason("Fix bug\nALLOW_GETATTR=\nNext line",
+                                           "ALLOW_GETATTR"))
+
+  def test_case_insensitive_and_whitespace(self) -> None:
+    desc = "Fix bug\n  allow_getattr =    needed for legacy API  "
+    self.assertEqual(
+        PresubmitCheck.parse_bypass_reason(desc, "ALLOW_GETATTR"),
+        "needed for legacy API",
+    )
+
+  def test_placeholder_reasons_rejected(self) -> None:
+    for placeholder in ("todo", "TODO", "tbd", "none", "n/a", "fixme", "xxx"):
+      desc = f"Fix bug\nALLOW_GETATTR={placeholder}"
+      self.assertIsNone(
+          PresubmitCheck.parse_bypass_reason(desc, "ALLOW_GETATTR"))
+
+  def test_multiple_tags_uses_valid_one(self) -> None:
+    desc = ("Fix bug\n"
+            "ALLOW_GETATTR=TODO\n"
+            "ALLOW_GETATTR=Real justification")
+    self.assertEqual(
+        PresubmitCheck.parse_bypass_reason(desc, "ALLOW_GETATTR"),
+        "Real justification",
+    )
 
 
 class BannedBuiltinVisitorTestCase(unittest.TestCase):
@@ -146,11 +195,11 @@ class MockAffectedFile:
   def __init__(
       self,
       path: str,
-      changed_lines: ChangedLines = None,
+      changed_lines: ChangedLines | None = None,
       action: FileAction = FileAction.ADD,
   ) -> None:
     self._path: Final[str] = path
-    self._changed_lines: Final[ChangedLines] = changed_lines
+    self._changed_lines: Final[ChangedLines | None] = changed_lines
     self._action: Final[FileAction] = action
 
   def LocalPath(self) -> str:  # noqa: N802
@@ -170,25 +219,22 @@ class _PresubmitTestCase(unittest.TestCase, metaclass=abc.ABCMeta):
   def _mock_input_api(
       self,
       files: dict[str, str],
-      changed_lines_map: ChangedLinesMap = None,
+      changed_lines_map: ChangedLinesMap | None = None,
       default_action: FileAction = FileAction.ADD,
       description: str = "",
   ) -> mock.MagicMock:
     input_api = mock.MagicMock()
     input_api.PresubmitLocalPath.return_value = "/root"
-    input_api.fnmatch.fnmatch.return_value = False
-    input_api.os_path.exists.side_effect = lambda path: str(path).replace(
-        "/root/", "") in files
+    input_api.fnmatch.fnmatch.side_effect = fnmatch.fnmatch
     input_api.ReadFile.side_effect = lambda path, mode="r": files[str(
         path).replace("/root/", "")]
-    input_api.change.DescriptionText.return_value = description
     input_api.change.FullDescriptionText.return_value = description
 
     affected_files: list[MockAffectedFile] = []
     for file_path in files:
-      changed_lines: ChangedLines = None
-      if changed_lines_map:
-        changed_lines = changed_lines_map.get(file_path)
+      changed_lines: ChangedLines | None = None
+      if changed_lines_map is not None:
+        changed_lines = changed_lines_map.get(file_path, set())
       affected_files.append(
           MockAffectedFile(file_path, changed_lines, action=default_action))
 
@@ -220,16 +266,20 @@ class _PresubmitTestCase(unittest.TestCase, metaclass=abc.ABCMeta):
     return output_api
 
   @abc.abstractmethod
-  def _run_check(self, input_api: Any, output_api: Any) -> list[Any]:
+  def _run_check(
+      self,
+      input_api: InputApi,
+      output_api: OutputApi,
+  ) -> list[PresubmitResult]:
     raise NotImplementedError
 
   def _check(
       self,
       files: dict[str, str],
-      changed_lines_map: ChangedLinesMap = None,
+      changed_lines_map: ChangedLinesMap | None = None,
       default_action: FileAction = FileAction.ADD,
       description: str = "",
-  ) -> list[Any]:
+  ) -> list[tuple[object, ...]]:
     input_api = self._mock_input_api(
         files=files,
         changed_lines_map=changed_lines_map,
@@ -241,7 +291,7 @@ class _PresubmitTestCase(unittest.TestCase, metaclass=abc.ABCMeta):
   def _assert_no_errors(
       self,
       files: dict[str, str],
-      changed_lines_map: ChangedLinesMap = None,
+      changed_lines_map: ChangedLinesMap | None = None,
       default_action: FileAction = FileAction.ADD,
       description: str = "",
   ) -> None:
@@ -256,34 +306,44 @@ class _PresubmitTestCase(unittest.TestCase, metaclass=abc.ABCMeta):
   def _assert_error(
       self,
       files: dict[str, str],
+      changed_lines_map: ChangedLinesMap | None = None,
       description: str = "",
       expected_msg: str = "",
       expected_items: list[str] | None = None,
       expected_long_text: str = "",
   ) -> None:
-    results = self._check(files=files, description=description)
+    results = self._check(
+        files=files,
+        changed_lines_map=changed_lines_map,
+        description=description,
+    )
     self.assertEqual(len(results), 1)
     status, msg, items, long_text = results[0]
     self.assertEqual(status, PresubmitStatus.ERROR)
     if expected_msg:
-      self.assertIn(expected_msg, msg)
+      self.assertIn(expected_msg, str(msg))
     if expected_items is not None:
       self.assertEqual(items, expected_items)
     if expected_long_text:
-      self.assertIn(expected_long_text, long_text)
+      self.assertIn(expected_long_text, str(long_text))
 
   def _assert_notify(
       self,
       files: dict[str, str],
       expected_substrings: Iterable[str],
+      changed_lines_map: ChangedLinesMap | None = None,
       description: str = "",
   ) -> None:
-    results = self._check(files=files, description=description)
+    results = self._check(
+        files=files,
+        changed_lines_map=changed_lines_map,
+        description=description,
+    )
     self.assertEqual(len(results), 1)
     status, msg = results[0]
     self.assertEqual(status, PresubmitStatus.NOTIFY)
     for substring in expected_substrings:
-      self.assertIn(substring, msg)
+      self.assertIn(substring, str(msg))
 
 
 class CheckNoBannedBuiltinsTestCase(_PresubmitTestCase):
@@ -291,7 +351,11 @@ class CheckNoBannedBuiltinsTestCase(_PresubmitTestCase):
   HASATTR_SNIPPET: ClassVar[str] = "if hasattr(obj, 'field'): pass\n"
 
   @override
-  def _run_check(self, input_api: Any, output_api: Any) -> list[Any]:
+  def _run_check(
+      self,
+      input_api: InputApi,
+      output_api: OutputApi,
+  ) -> list[PresubmitResult]:
     return banned_builtins.CheckNoBannedBuiltins(input_api, output_api)
 
   def test_no_violations(self) -> None:
@@ -387,7 +451,11 @@ class CheckConstantsMarkedFinalTestCase(_PresubmitTestCase):
   CONSTANT_SNIPPET: ClassVar[str] = "FOO = 1\n"
 
   @override
-  def _run_check(self, input_api: Any, output_api: Any) -> list[Any]:
+  def _run_check(
+      self,
+      input_api: InputApi,
+      output_api: OutputApi,
+  ) -> list[PresubmitResult]:
     return constant_final.CheckConstantsMarkedFinal(input_api, output_api)
 
   def test_no_violations(self) -> None:
@@ -443,13 +511,17 @@ class CheckAstCombinedTestCase(_PresubmitTestCase):
                                          "x = getattr(obj, 'prop')\n")
 
   @override
-  def _run_check(self, input_api: Any, output_api: Any) -> list[Any]:
+  def _run_check(
+      self,
+      input_api: InputApi,
+      output_api: OutputApi,
+  ) -> list[PresubmitResult]:
     return ast_checks.CheckAst(input_api, output_api)
 
   def test_combined_catches_both(self) -> None:
     results = self._check(files={"foo.py": self.COMBINED_AST_SNIPPET})
     self.assertEqual(len(results), 2)
-    messages = [res[1] for res in results]
+    messages = [str(res[1]) for res in results]
     self.assertTrue(any("banned built-in" in m for m in messages))
     self.assertTrue(
         any("constants not annotated with Final" in m for m in messages))
@@ -468,8 +540,12 @@ class CheckAstCombinedTestCase(_PresubmitTestCase):
 class CheckNoNewToplevelFilesTestCase(_PresubmitTestCase):
 
   @override
-  def _run_check(self, input_api: Any, output_api: Any) -> list[Any]:
-    return toplevel_files.check_no_new_toplevel_files(input_api, output_api)
+  def _run_check(
+      self,
+      input_api: InputApi,
+      output_api: OutputApi,
+  ) -> list[PresubmitResult]:
+    return toplevel_files.CheckNoNewToplevelFiles(input_api, output_api)
 
   def test_new_files_in_subdirectories_allowed(self) -> None:
     self._assert_no_errors(

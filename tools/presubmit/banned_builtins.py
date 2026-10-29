@@ -5,10 +5,14 @@
 from __future__ import annotations
 
 import ast
-import pathlib
-from typing import Any, Final, NamedTuple
+from typing import TYPE_CHECKING, Final, NamedTuple
 
-from tools.presubmit.common import GetBypassReason, GlobalSkipChecks
+from tools.presubmit.common import PresubmitCheck
+
+if TYPE_CHECKING:
+  import pathlib
+
+  from presubmit_support import InputApi, OutputApi
 
 BANNED_BUILTIN_FUNCTIONS: Final[frozenset[str]] = frozenset(
     {"getattr", "setattr", "hasattr"})
@@ -26,7 +30,7 @@ class BannedBuiltinVisitor(ast.NodeVisitor):
 
   def __init__(self) -> None:
     super().__init__()
-    self.violations: Final[list[tuple[int, int, str]]] = []
+    self.violations: list[tuple[int, int, str]] = []
 
   def visit_Call(self, node: ast.Call) -> None:
     func_name: str | None = None
@@ -42,19 +46,18 @@ class BannedBuiltinVisitor(ast.NodeVisitor):
     self.generic_visit(node)
 
 
-def CheckNoBannedBuiltins(input_api: Any, output_api: Any) -> list[Any]:
-  results: list[Any] = []
+def CheckNoBannedBuiltins(
+    input_api: InputApi,
+    output_api: OutputApi,
+) -> list[object]:
+  presubmit = PresubmitCheck(input_api, output_api)
+  results: list[object] = []
   violations: list[BannedBuiltinViolation] = []
-  root_path = pathlib.Path(input_api.PresubmitLocalPath())
+  root_path: pathlib.Path = presubmit.root_path
 
-  def file_filter(f: Any) -> bool:
-    return f.LocalPath().endswith(".py") and not GlobalSkipChecks(
-        input_api, f.LocalPath())
-
-  for affected_file in input_api.AffectedFiles(
-      file_filter=file_filter, include_deletes=False):
-    file_path = affected_file.LocalPath()
-    full_path = root_path / file_path
+  for affected_file in presubmit.affected_python_files():
+    file_path: str = affected_file.LocalPath()
+    full_path: pathlib.Path = root_path / file_path
     try:
       content = input_api.ReadFile(str(full_path), "r")
     except (OSError, UnicodeDecodeError) as e:
@@ -73,9 +76,7 @@ def CheckNoBannedBuiltins(input_api: Any, output_api: Any) -> list[Any]:
     if not visitor.violations:
       continue
 
-    changed_line_numbers = {
-        lineno for lineno, _ in affected_file.ChangedContents()
-    }
+    changed_line_numbers = presubmit.changed_lines(affected_file)
     lines = content.splitlines()
     for lineno, col, func_name in visitor.violations:
       if lineno in changed_line_numbers:
@@ -93,14 +94,13 @@ def CheckNoBannedBuiltins(input_api: Any, output_api: Any) -> list[Any]:
   if not violations:
     return results
 
-  description: str = input_api.change.FullDescriptionText()
   detected_functions = {v.func_name for v in violations}
   missing_bypasses: list[str] = []
   valid_bypasses: list[tuple[str, str]] = []
 
   for func_name in sorted(detected_functions):
     bypass_key = f"ALLOW_{func_name.upper()}"
-    reason = GetBypassReason(description, bypass_key)
+    reason = presubmit.bypass_reason(bypass_key)
     if reason:
       valid_bypasses.append((bypass_key, reason))
     else:

@@ -7,10 +7,15 @@ from __future__ import annotations
 import pathlib
 import platform
 import subprocess
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+  from collections.abc import Sequence
+
+  from presubmit_support import InputApi, OutputApi
 
 
-def GetNodeExecutable(input_api: Any) -> str:
+def GetNodeExecutable(input_api: InputApi) -> str:
   node_base: pathlib.Path = pathlib.Path(
       input_api.change.RepositoryRoot()) / "third_party" / "node"
 
@@ -34,7 +39,7 @@ def GetNodeExecutable(input_api: Any) -> str:
   return node_bin
 
 
-def FormatHjsonFile(input_api: Any, hjson_file: pathlib.Path) -> str:
+def FormatHjsonFile(input_api: InputApi, hjson_file: pathlib.Path) -> str:
   node_bin = GetNodeExecutable(input_api)
 
   hjson_js_bin = str(
@@ -61,11 +66,11 @@ def FormatHjsonFile(input_api: Any, hjson_file: pathlib.Path) -> str:
 
 
 def FormatHjsonFiles(
-    input_api: Any,
-    output_api: Any,
-    modified_hjson_files: list[str],
-) -> list[Any]:
-  results: list[Any] = []
+    input_api: InputApi,
+    output_api: OutputApi,
+    modified_hjson_files: Sequence[str],
+) -> list[object]:
+  results: list[object] = []
   for hjson_file in modified_hjson_files:
     full_hjson_path = pathlib.Path(
         input_api.change.RepositoryRoot()) / hjson_file

@@ -5,12 +5,11 @@
 from __future__ import annotations
 
 import ast
-import pathlib
-from typing import Any, Final
+from typing import TYPE_CHECKING
 
 from tools.presubmit.banned_builtins import BANNED_BUILTIN_FUNCTIONS, \
     BannedBuiltinViolation
-from tools.presubmit.common import GetBypassReason, GlobalSkipChecks
+from tools.presubmit.common import PresubmitCheck
 from tools.presubmit.constant_final import _EXCLUDED_CONSTANTS, \
     _UPPER_SNAKE_CASE_RE
 from tools.presubmit.constant_final import \
@@ -18,14 +17,19 @@ from tools.presubmit.constant_final import \
 from tools.presubmit.constant_final import ConstantFinalViolation, \
     _IsFinalAnnotation, _IsTypeConstruct
 
+if TYPE_CHECKING:
+  import pathlib
+
+  from presubmit_support import InputApi, OutputApi
+
 
 class CombinedAstVisitor(ast.NodeVisitor):
   """Single-pass visitor collecting all AST check violations."""
 
   def __init__(self) -> None:
     super().__init__()
-    self.banned_builtin_violations: Final[list[tuple[int, int, str]]] = []
-    self.constant_final_violations: Final[list[tuple[int, int, str]]] = []
+    self.banned_builtin_violations: list[tuple[int, int, str]] = []
+    self.constant_final_violations: list[tuple[int, int, str]] = []
 
   def visit_Module(self, node: ast.Module) -> None:
     # Check top-level statements for constants marked Final
@@ -69,10 +73,10 @@ class CombinedAstVisitor(ast.NodeVisitor):
 
 
 def _ReportBannedBuiltins(
-    input_api: Any,
-    output_api: Any,
+    input_api: InputApi,
+    output_api: OutputApi,
     violations: list[BannedBuiltinViolation],
-) -> list[Any]:
+) -> list[object]:
   if not violations:
     return []
 
@@ -83,7 +87,7 @@ def _ReportBannedBuiltins(
 
   for func_name in sorted(detected_functions):
     bypass_key = f"ALLOW_{func_name.upper()}"
-    reason = GetBypassReason(description, bypass_key)
+    reason = PresubmitCheck.parse_bypass_reason(description, bypass_key)
     if reason:
       valid_bypasses.append((bypass_key, reason))
     else:
@@ -122,15 +126,16 @@ def _ReportBannedBuiltins(
 
 
 def _ReportConstantFinal(
-    input_api: Any,
-    output_api: Any,
+    input_api: InputApi,
+    output_api: OutputApi,
     violations: list[ConstantFinalViolation],
-) -> list[Any]:
+) -> list[object]:
   if not violations:
     return []
 
   description: str = input_api.change.FullDescriptionText()
-  bypass_reason = GetBypassReason(description, CONSTANT_FINAL_BYPASS_KEY)
+  bypass_reason = PresubmitCheck.parse_bypass_reason(description,
+                                                     CONSTANT_FINAL_BYPASS_KEY)
   if bypass_reason:
     return [
         output_api.PresubmitNotifyResult(
@@ -159,21 +164,17 @@ def _ReportConstantFinal(
   ]
 
 
-def CheckAst(input_api: Any, output_api: Any) -> list[Any]:
+def CheckAst(input_api: InputApi, output_api: OutputApi) -> list[object]:
   """Performs a single-pass AST analysis across modified files."""
-  results: list[Any] = []
+  presubmit = PresubmitCheck(input_api, output_api)
+  results: list[object] = []
   banned_builtin_violations: list[BannedBuiltinViolation] = []
   constant_final_violations: list[ConstantFinalViolation] = []
-  root_path = pathlib.Path(input_api.PresubmitLocalPath())
+  root_path: pathlib.Path = presubmit.root_path
 
-  def file_filter(f: Any) -> bool:
-    return f.LocalPath().endswith(".py") and not GlobalSkipChecks(
-        input_api, f.LocalPath())
-
-  for affected_file in input_api.AffectedFiles(
-      file_filter=file_filter, include_deletes=False):
-    file_path = affected_file.LocalPath()
-    full_path = root_path / file_path
+  for affected_file in presubmit.affected_python_files():
+    file_path: str = affected_file.LocalPath()
+    full_path: pathlib.Path = root_path / file_path
     try:
       content = input_api.ReadFile(str(full_path), "r")
     except (OSError, UnicodeDecodeError) as e:
@@ -194,9 +195,7 @@ def CheckAst(input_api: Any, output_api: Any) -> list[Any]:
         not visitor.constant_final_violations):
       continue
 
-    changed_line_numbers = {
-        lineno for lineno, _ in affected_file.ChangedContents()
-    }
+    changed_line_numbers = presubmit.changed_lines(affected_file)
     lines = content.splitlines()
 
     for lineno, col, func_name in visitor.banned_builtin_violations:

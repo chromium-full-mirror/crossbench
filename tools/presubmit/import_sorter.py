@@ -6,21 +6,23 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
-from typing import Any
+from typing import TYPE_CHECKING
 
-from tools.presubmit.common import GlobalSkipChecks
+if TYPE_CHECKING:
+  from collections.abc import Sequence
+
+  from presubmit_support import InputApi, OutputApi
 
 
 def SortImports(
-    input_api: Any,
-    output_api: Any,
-    modified_py_files: list[str],
-) -> list[Any]:
-  results: list[Any] = []
+    input_api: InputApi,
+    output_api: OutputApi,
+    modified_py_files: Sequence[str],
+) -> list[object]:
+  results: list[object] = []
   files_to_sort = [
       str(pathlib.Path(input_api.change.RepositoryRoot()) / f)
       for f in modified_py_files
-      if not GlobalSkipChecks(input_api, f)
   ]
   if not files_to_sort:
     return results

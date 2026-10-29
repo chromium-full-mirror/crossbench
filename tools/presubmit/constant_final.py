@@ -5,11 +5,15 @@
 from __future__ import annotations
 
 import ast
-import pathlib
 import re
-from typing import Any, Final, NamedTuple
+from typing import TYPE_CHECKING, Final, NamedTuple
 
-from tools.presubmit.common import GetBypassReason, GlobalSkipChecks
+from tools.presubmit.common import PresubmitCheck
+
+if TYPE_CHECKING:
+  import pathlib
+
+  from presubmit_support import InputApi, OutputApi
 
 _UPPER_SNAKE_CASE_RE: Final[re.Pattern[str]] = re.compile(
     r"^_?[A-Z][A-Z0-9_]*$")
@@ -65,7 +69,7 @@ class ConstantFinalVisitor(ast.NodeVisitor):
 
   def __init__(self) -> None:
     super().__init__()
-    self.violations: Final[list[tuple[int, int, str]]] = []
+    self.violations: list[tuple[int, int, str]] = []
 
   def visit_Module(self, node: ast.Module) -> None:
     for stmt in node.body:
@@ -91,19 +95,18 @@ class ConstantFinalVisitor(ast.NodeVisitor):
     self.generic_visit(node)
 
 
-def CheckConstantsMarkedFinal(input_api: Any, output_api: Any) -> list[Any]:
-  results: list[Any] = []
+def CheckConstantsMarkedFinal(
+    input_api: InputApi,
+    output_api: OutputApi,
+) -> list[object]:
+  presubmit = PresubmitCheck(input_api, output_api)
+  results: list[object] = []
   violations: list[ConstantFinalViolation] = []
-  root_path = pathlib.Path(input_api.PresubmitLocalPath())
+  root_path: pathlib.Path = presubmit.root_path
 
-  def file_filter(f: Any) -> bool:
-    return f.LocalPath().endswith(".py") and not GlobalSkipChecks(
-        input_api, f.LocalPath())
-
-  for affected_file in input_api.AffectedFiles(
-      file_filter=file_filter, include_deletes=False):
-    file_path = affected_file.LocalPath()
-    full_path = root_path / file_path
+  for affected_file in presubmit.affected_python_files():
+    file_path: str = affected_file.LocalPath()
+    full_path: pathlib.Path = root_path / file_path
     try:
       content = input_api.ReadFile(str(full_path), "r")
     except (OSError, UnicodeDecodeError) as e:
@@ -122,9 +125,7 @@ def CheckConstantsMarkedFinal(input_api: Any, output_api: Any) -> list[Any]:
     if not visitor.violations:
       continue
 
-    changed_line_numbers = {
-        lineno for lineno, _ in affected_file.ChangedContents()
-    }
+    changed_line_numbers = presubmit.changed_lines(affected_file)
     lines = content.splitlines()
     for lineno, col, target_name in visitor.violations:
       if lineno in changed_line_numbers:
@@ -142,8 +143,7 @@ def CheckConstantsMarkedFinal(input_api: Any, output_api: Any) -> list[Any]:
   if not violations:
     return results
 
-  description: str = input_api.change.FullDescriptionText()
-  bypass_reason = GetBypassReason(description, BYPASS_KEY)
+  bypass_reason = presubmit.bypass_reason(BYPASS_KEY)
   if bypass_reason:
     results.append(
         output_api.PresubmitNotifyResult(

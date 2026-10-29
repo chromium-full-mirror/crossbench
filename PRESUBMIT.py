@@ -8,26 +8,32 @@ from __future__ import annotations
 import functools
 import pathlib
 import platform
-import re
 import shutil
 import sys
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
+  from collections.abc import Sequence
+
+  from presubmit_support import InputApi, OutputApi
   from presubmit_thread_pool import CommandData
 
-USE_PYTHON3 = True
+USE_PYTHON3: Final[bool] = True
 
 SOURCE_SKIP_RE: Final[tuple[str, ...]] = (r"^third_party/.*",)
 
 
-def CheckChange(input_api: Any, output_api: Any, on_commit: bool) -> Any:
+def CheckChange(
+    input_api: InputApi,
+    output_api: OutputApi,
+    on_commit: bool,
+) -> list[object]:
   local_path = input_api.PresubmitLocalPath()
   if local_path not in sys.path:
     sys.path.insert(0, local_path)
 
-  tests = []
-  results = []
+  tests: list[object] = []
+  results: list[object] = []
   testing_env = dict(input_api.environ)
   root_path = pathlib.Path(local_path)
   crossbench_test_path = root_path / "tests" / "crossbench"
@@ -157,8 +163,8 @@ def CheckChange(input_api: Any, output_api: Any, on_commit: bool) -> Any:
   # ---------------------------------------------------------------------------
   # Top-level files:
   # ---------------------------------------------------------------------------
-  from tools.presubmit.toplevel_files import check_no_new_toplevel_files
-  results += check_no_new_toplevel_files(input_api, output_api)
+  from tools.presubmit.toplevel_files import CheckNoNewToplevelFiles
+  results += CheckNoNewToplevelFiles(input_api, output_api)
 
   # ---------------------------------------------------------------------------
   # Skills:
@@ -183,29 +189,27 @@ def CheckChange(input_api: Any, output_api: Any, on_commit: bool) -> Any:
 
 
 def ModifiedFiles(
-    input_api: Any,
+    input_api: InputApi,
     on_commit: bool,
     filename_pattern: str = "*.py",
 ) -> list[str]:
   if on_commit:
     return []
-  from tools.presubmit.common import GlobalSkipChecks
-  files = [file.AbsoluteLocalPath() for file in input_api.AffectedFiles()]
-  files_to_check = []
-  for file_path in files:
+  from tools.presubmit.common import PresubmitCheck
+  files_to_check: list[str] = []
+  for file in input_api.AffectedFiles(include_deletes=False):
+    file_path: str = file.LocalPath()
     if not input_api.fnmatch.fnmatch(file_path, filename_pattern):
       continue
-    if GlobalSkipChecks(input_api, file_path):
+    if PresubmitCheck.is_skipped_path(input_api, file_path):
       continue
-    if not input_api.os_path.exists(file_path):
+    if not input_api.os_path.exists(file.AbsoluteLocalPath()):
       continue
-    file_path = input_api.os_path.relpath(file_path,
-                                          input_api.PresubmitLocalPath())
     files_to_check.append(file_path)
   return files_to_check
 
 
-def GetUntrackedFiles(input_api: Any) -> list[str]:
+def GetUntrackedFiles(input_api: InputApi) -> list[str]:
   try:
     return input_api.subprocess.check_output(
         ["git", "ls-files", "--others", "--exclude-standard"],
@@ -214,25 +218,12 @@ def GetUntrackedFiles(input_api: Any) -> list[str]:
     return []
 
 
-def LinterFilePatterns(
-    on_commit: bool,
-    modified_py_files: list[str],
-) -> list[str]:
-  if on_commit:
-    # Test all files on commit
-    return [r"^[^\.]+\.py$"]
-  # By default, the pylint canned check lints all Python files together to
-  # check for potential problems between dependencies. This is slow to run
-  # across all of crossbench (>2 min), so only lint affected files.
-  return [re.escape(file) for file in modified_py_files]
-
-
 def TyperPaths(
-    input_api: Any,
+    input_api: InputApi,
     on_commit: bool,
-    modified_py_files: list[str],
+    modified_py_files: Sequence[str],
 ) -> list[str]:
-  from tools.presubmit.common import GlobalSkipChecks
+  from tools.presubmit.common import PresubmitCheck
   root_path = pathlib.Path(input_api.PresubmitLocalPath())
   typer_files_to_check = {"PRESUBMIT.py"}
   crossbench_path = root_path / "crossbench"
@@ -242,11 +233,11 @@ def TyperPaths(
   else:
     typer_files_to_check.update(modified_py_files)
   # TODO: enable type checking on all tests
-  result = []
+  result: list[str] = []
   for file in typer_files_to_check:
     if file.startswith("tests/"):
       continue
-    if GlobalSkipChecks(input_api, file):
+    if PresubmitCheck.is_skipped_path(input_api, file):
       continue
     result.append(file)
   return result
@@ -268,8 +259,8 @@ def TestFilePatternsToCheck(
 
 
 def GetPytestCommand(
-    input_api: Any,
-    output_api: Any,
+    input_api: InputApi,
+    output_api: OutputApi,
     on_commit: bool,
     crossbench_test_path: pathlib.Path,
     testing_env: dict[str, str],
@@ -301,9 +292,11 @@ def GetPytestCommand(
   )
 
 
-def CheckChangeOnUpload(input_api: Any, output_api: Any) -> Any:
+def CheckChangeOnUpload(input_api: InputApi,
+                        output_api: OutputApi) -> list[object]:
   return CheckChange(input_api, output_api, on_commit=False)
 
 
-def CheckChangeOnCommit(input_api: Any, output_api: Any) -> Any:
+def CheckChangeOnCommit(input_api: InputApi,
+                        output_api: OutputApi) -> list[object]:
   return CheckChange(input_api, output_api, on_commit=True)

@@ -6,9 +6,12 @@ from __future__ import annotations
 
 import enum
 import pathlib
-from typing import Any, Final
+from typing import TYPE_CHECKING, Final
 
-from tools.presubmit.common import GetBypassReason
+from tools.presubmit.common import PresubmitCheck
+
+if TYPE_CHECKING:
+  from presubmit_support import InputApi, OutputApi
 
 BYPASS_KEY: Final[str] = "ALLOW_TOPLEVEL_FILE"
 
@@ -47,24 +50,23 @@ def _is_toplevel_path(file_path: str) -> bool:
   return pathlib.Path(file_path).parent in PROTECTED_TOPLEVEL_DIRS
 
 
-def _find_new_toplevel_files(input_api: Any) -> list[str]:
-  new_files: list[str] = []
-  for affected_file in input_api.AffectedFiles(include_deletes=False):
-    if affected_file.Action() != FileAction.ADD:
-      continue
-    file_path = affected_file.LocalPath()
-    if _is_toplevel_path(file_path):
-      new_files.append(file_path)
-  return sorted(new_files)
+def _find_new_toplevel_files(input_api: InputApi) -> list[str]:
+  return sorted(
+      f.LocalPath()
+      for f in input_api.AffectedFiles(include_deletes=False)
+      if f.Action() == FileAction.ADD and _is_toplevel_path(f.LocalPath()))
 
 
-def check_no_new_toplevel_files(input_api: Any, output_api: Any) -> list[Any]:
+def CheckNoNewToplevelFiles(
+    input_api: InputApi,
+    output_api: OutputApi,
+) -> list[object]:
   new_toplevel_files = _find_new_toplevel_files(input_api)
   if not new_toplevel_files:
     return []
 
-  description: str = input_api.change.FullDescriptionText()
-  if reason := GetBypassReason(description, BYPASS_KEY):
+  presubmit = PresubmitCheck(input_api, output_api)
+  if reason := presubmit.bypass_reason(BYPASS_KEY):
     return [
         output_api.PresubmitNotifyResult(
             f"Bypassing top-level file check ({', '.join(new_toplevel_files)}) "
