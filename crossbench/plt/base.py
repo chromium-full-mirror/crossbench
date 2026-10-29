@@ -1081,8 +1081,7 @@ class Platform(abc.ABC):
               path: pth.AnyPathLike) -> Generator[pth.AnyPath, None, None]:
     return self.local_path(path).iterdir()
 
-  def glob(self, path: pth.AnyPathLike,
-           pattern: str) -> Generator[pth.AnyPath, None, None]:
+  def glob(self, path: pth.AnyPathLike, pattern: str) -> Iterator[pth.AnyPath]:
     # TODO: support remotely
     return self.local_path(path).glob(pattern)
 

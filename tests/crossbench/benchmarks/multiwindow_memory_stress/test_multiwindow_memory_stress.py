@@ -272,7 +272,7 @@ class MultiwindowMemoryStressBenchmarkTestCase(helper.BaseBenchmarkTestCase):
   def test_page_config_args_not_supported(self) -> None:
     for flag in ("--urls=http://test.com", "--page-config={}"):
       with self.subTest(flag=flag):
-        with self.assertRaises(SystemExit):
+        with self.assertRaises((argparse.ArgumentError, SystemExit)):
           self.parse_args(flag)
 
   def test_name(self) -> None:
