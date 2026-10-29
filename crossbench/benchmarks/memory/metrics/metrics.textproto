@@ -18,6 +18,7 @@ metric_spec: {
   id: "memory-pressure.page_load_duration_ms"
   dimensions: "it_id"
   value: "page_load_duration_ms"
+  polarity: LOWER_IS_BETTER
   query {
     inner_query_id: "tab_timing_query"
   }
@@ -27,6 +28,7 @@ metric_spec: {
   id: "memory-pressure.allocation_duration_ms"
   dimensions: "it_id"
   value: "allocation_duration_ms"
+  polarity: LOWER_IS_BETTER
   query {
     inner_query_id: "tab_timing_query"
   }
@@ -37,6 +39,7 @@ metric_spec: {
   dimensions: "it_id"
   dimensions: "tab_index"
   value: "page_load_duration_ms"
+  polarity: LOWER_IS_BETTER
   query {
     inner_query_id: "tab_timing_query"
   }
@@ -47,6 +50,7 @@ metric_spec: {
   dimensions: "it_id"
   dimensions: "tab_index"
   value: "allocation_duration_ms"
+  polarity: LOWER_IS_BETTER
   query {
     inner_query_id: "tab_timing_query"
   }
@@ -59,6 +63,7 @@ metric_spec: {
   dimensions: "pid"
   dimensions: "process_name"
   value: "alive_tabs"
+  polarity: HIGHER_IS_BETTER
   query {
     table {
       table_name: "alive_tabs_by_tab_index"
@@ -87,6 +92,7 @@ metric_spec: {
   id: "memory-pressure.average_alive_tabs_after_first_kill"
   dimensions: "it_id"
   value: "average_alive_tabs_after_first_kill"
+  polarity: HIGHER_IS_BETTER
   query {
     inner_query_id: "average_alive_tabs_after_first_kill"
   }
@@ -96,6 +102,7 @@ metric_spec: {
   id: "memory-pressure.tab_index_at_first_kill"
   dimensions: "it_id"
   value: "tab_index_at_first_kill"
+  polarity: HIGHER_IS_BETTER
   query {
     inner_query_id: "average_alive_tabs_after_first_kill"
   }
