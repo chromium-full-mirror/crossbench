@@ -37,10 +37,16 @@ class RunTestCase(BaseRunGroupTestCase):
   def _run_actions_and_get_new_marks(self, **kwargs) -> list[str]:
     run = self._create_run()
     initial_marks = list(run.browser.performance_marks)
+    initial_trace_marks = list(self.platform.trace_marks)
     with run.actions("Some_Custom_Action", **kwargs):
       pass
     new_marks = run.browser.performance_marks
+    new_trace_marks = self.platform.trace_marks
     self.assertSequenceEqual(new_marks[:len(initial_marks)], initial_marks)
+    self.assertSequenceEqual(new_trace_marks[:len(initial_trace_marks)],
+                             initial_trace_marks)
+    self.assertSequenceEqual(new_marks[len(initial_marks):],
+                             new_trace_marks[len(initial_trace_marks):])
     return new_marks[len(initial_marks):]
 
   def test_find_probe_context(self):

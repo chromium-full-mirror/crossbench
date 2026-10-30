@@ -89,7 +89,7 @@ class Actions(TimeScope):
       # Print message that doesn't overlap with helper.Spinner
       sys.stdout.write(f"   {self._message.ljust(30)}\r")
     if self._performance_mark:
-      self._browser.performance_mark(f"{self._performance_mark}-start")
+      self._run.performance_mark(f"{self._performance_mark}-start")
     return self
 
   def __exit__(self, exc_type: type[BaseException] | None,
@@ -97,7 +97,7 @@ class Actions(TimeScope):
                traceback: TracebackType | None) -> None:
     self._is_active = False
     if self._performance_mark:
-      self._browser.performance_mark(f"{self._performance_mark}-stop")
+      self._run.performance_mark(f"{self._performance_mark}-stop")
     self._exception_annotation.__exit__(exc_type, exc_value, traceback)
     super().__exit__(exc_type, exc_value, traceback)
     logging.debug("Action end: %s", self._message)

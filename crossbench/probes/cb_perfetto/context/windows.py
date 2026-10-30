@@ -48,11 +48,11 @@ class WindowsPerfettoProbeContext(PerfettoProbeContext):
 
   @override
   def start(self) -> None:
-    self.browser.performance_mark("probe-perfetto-start")
+    self.run.performance_mark("probe-perfetto-start")
 
   @override
   def stop(self) -> None:
-    self.browser.performance_mark("probe-perfetto-stop")
+    self.run.performance_mark("probe-perfetto-stop")
 
   @override
   def _setup_validate_bin(self) -> None:

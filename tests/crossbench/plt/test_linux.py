@@ -23,7 +23,7 @@ from crossbench.plt.display_info import DisplayResolution
 from crossbench.plt.linux import CPUFREQ_POLICY0_PATH, \
     PERF_EVENT_PARANOID_PATH, PROC_CPUINFO_PATH, SCRIPTS_DIR, LinuxPlatform, \
     parse_display_xrandr
-from crossbench.plt.posix import PosixVersion
+from crossbench.plt.posix import TRACE_MARKER_PATH, PosixPlatform, PosixVersion
 from crossbench.plt.process_meminfo import ProcessMeminfo
 from tests import test_helper
 from tests.crossbench.mock_helper import LinuxMockPlatform, MockPlatform, \
@@ -326,6 +326,17 @@ class LocalLinuxMockPlatformTestCase(BaseLocalMockPlatformTestMixin,
     self.assertEqual(details["max_frequency"], "3200.00MHz")
     self.assertEqual(details["current_frequency"], "1800.00MHz")
 
+  def test_trace_mark(self) -> None:
+    # Should not write when /sys/kernel/tracing/trace_marker does not exist.
+    PosixPlatform.trace_mark(self.platform, "missing-marker")
+    self.assertFalse(self.platform.file_contents)
+    self.fs.create_file(TRACE_MARKER_PATH)
+    PosixPlatform.trace_mark(self.platform, "test-mark")
+    self.assertEqual(
+        self.platform.file_contents[self.platform.path(TRACE_MARKER_PATH)],
+        ["I|0|crossbench-test-mark\n"])
+
+
 
 class RemoteLinuxMockPlatformTestCase(_LinuxMockPlatformTestCase):
 
@@ -479,6 +490,11 @@ class RemoteLinuxMockPlatformTestCase(_LinuxMockPlatformTestCase):
   def test_gpu_vram_used_none(self):
     vram = self.platform.gpu_vram_used()
     self.assertEqual(vram, {})
+
+  def test_trace_mark(self) -> None:
+    self.expect_sh("tee", TRACE_MARKER_PATH)
+    PosixPlatform.trace_mark(self.platform, "remote-mark")
+
 
 
 class LinuxPlatformClipboardTestCase(PlatformClipboardTestCase):

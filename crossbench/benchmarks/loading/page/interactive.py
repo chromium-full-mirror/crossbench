@@ -25,7 +25,6 @@ if TYPE_CHECKING:
   from crossbench.action_runner.action_runner import ActionRunner
   from crossbench.benchmarks.loading.config.blocks import ActionBlock
   from crossbench.benchmarks.loading.config.login.custom import LoginBlock
-  from crossbench.browsers.browser import Browser
   from crossbench.cli.config.secrets import Secrets
   from crossbench.runner.run import Run
   from crossbench.types import JsonDict
@@ -128,10 +127,9 @@ class InteractivePage(Page):
 
   @contextlib.contextmanager
   def _performance_mark_scope(self, run: Run, name: str) -> Iterator[None]:
-    browser: Browser = run.browser
-    browser.performance_mark(f"{name}-start", self._name)
+    run.performance_mark(f"{name}-start", self._name)
     yield
-    browser.performance_mark(f"{name}-end", self._name)
+    run.performance_mark(f"{name}-end", self._name)
 
   @override
   def setup(self, run: Run) -> None:

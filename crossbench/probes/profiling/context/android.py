@@ -61,7 +61,7 @@ class AndroidProfilingContext(PosixProfilingContext):
           error_msg = stdout.read().decode("utf-8")
           logging.error(error_msg)
       raise ValueError(f"Unable to start simpleperf. {error_msg}")
-    self.browser.performance_mark("probe-profiling-start")
+    self.run.performance_mark("probe-profiling-start")
 
   def _get_simpleperf_pids(self) -> list[int]:
     simpleperf_pids = []
@@ -129,7 +129,7 @@ class AndroidProfilingContext(PosixProfilingContext):
           timeout=30,
           signal=self.browser_platform.signals.SIGINT)
       self._profiling_process = None
-      self.browser.performance_mark("probe-profiling-stop")
+      self.run.performance_mark("probe-profiling-stop")
 
   def teardown(self) -> ProbeResult:
     result = self.browser_result(perfetto=[self.result_path])

@@ -1441,3 +1441,7 @@ class Platform(abc.ABC):
   def user_id(self) -> int:
     self.assert_is_local()
     return os.getuid()
+
+  def trace_mark(self, name: str, prefix: str = "crossbench-") -> None:
+    full_name = prefix + name
+    logging.debug("%s: skipping trace_mark: %s", self, full_name)

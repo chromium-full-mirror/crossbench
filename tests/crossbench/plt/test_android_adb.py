@@ -186,6 +186,11 @@ class BaseAndroidAdbMockPlatformTestCase(BasePosixMockPlatformTestCase):
   def test_is_android(self):
     self.assertTrue(self.platform.is_android)
 
+  def test_trace_mark(self) -> None:
+    self.expect_sh("tee /sys/kernel/tracing/trace_marker")
+    self.platform.trace_mark("android-mark")
+
+
   def test_clear_memory_page_cache(self):
     self.expect_sh("getprop ro.build.version.sdk", result="37")
     self.expect_sh("sync")

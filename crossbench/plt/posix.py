@@ -32,6 +32,8 @@ if TYPE_CHECKING:
   from crossbench.plt.types import CmdArg, ListCmdArgs, ProcessInfo, \
       ProcessIo, ProcessLike
 
+TRACE_MARKER_PATH: Final = pth.AnyPosixPath("/sys/kernel/tracing/trace_marker")
+
 
 class PosixVersion(PlatformVersion):
   pass
@@ -537,6 +539,35 @@ class PosixPlatform(Platform, metaclass=abc.ABCMeta):
   def clear_memory_page_cache(self) -> None:
     self.sh("sync")
     self.sh("tee", "/proc/sys/vm/drop_caches", input=b"3\n")
+
+  @override
+  def trace_mark(self, name: str, prefix: str = "crossbench-") -> None:
+    full_name = prefix + name
+    # Perfetto / Systrace trace_marker format: "<type>|<tgid>|<name>".
+    # "I" emits a point-in-time instant event (as opposed to "B"/"E" slices),
+    # and tgid "0" places it on a global track rather than tying it to the
+    # transient shell/tee process PID.
+    marker = f"I|0|{full_name}\n"
+    if self.is_local:
+      with contextlib.suppress(OSError):
+        if self.is_file(TRACE_MARKER_PATH):
+          self.write_text(TRACE_MARKER_PATH, marker)
+          return
+    else:
+      # On remote platforms, write_text uses file push (e.g. adb push) which
+      # fails on tracefs pseudo-files, and a separate is_file check would add
+      # an extra remote shell round-trip on every performance mark.
+      proc = self.sh(
+          "tee",
+          TRACE_MARKER_PATH,
+          input=marker.encode("utf-8"),
+          capture_output=True,
+          quiet=True,
+          check=False)
+      if proc.returncode == 0:
+        return
+    super().trace_mark(name, prefix=prefix)
+
 
 
 class RemotePosixEnviron(Environ):

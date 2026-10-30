@@ -436,12 +436,18 @@ class PerfettoProbeContextTestCase(CrossbenchConfigTestMixin,
         str(run.out_dir / "perfetto.trace.pb"),
         result="123")
     context.start()
-    run.browser.performance_mark.assert_called_with("probe-perfetto-start")
+    run.browser.performance_mark.assert_called_with(
+        "probe-perfetto-start", detail=None, prefix="crossbench-")
+    self.assertEqual(platform.trace_marks, ["crossbench-probe-perfetto-start"])
     self.assertEqual(tracebox_proc.state, MockPopenState.RUNNING)
 
     context.stop()
     self.assertEqual(tracebox_proc.state, MockPopenState.RUNNING)
-    run.browser.performance_mark.assert_called_with("probe-perfetto-stop")
+    run.browser.performance_mark.assert_called_with(
+        "probe-perfetto-stop", detail=None, prefix="crossbench-")
+    self.assertEqual(
+        platform.trace_marks,
+        ["crossbench-probe-perfetto-start", "crossbench-probe-perfetto-stop"])
 
     # teardown
     trace_file = run.browser_platform.local_path(context.result_path)

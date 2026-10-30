@@ -120,7 +120,7 @@ class MeminfoProbeContext(ProbeContext[MeminfoProbe]):
 
     # TODO: remove once mypy is replaced by pyrefly
     # https://peps.python.org/pep-0728
-    self.browser.performance_mark("meminfo", detail=cast("Json", meminfo_json))
+    self.run.performance_mark("meminfo", detail=cast("Json", meminfo_json))
     with self._dump_file(title, info_stack).open("x", encoding="utf-8") as f:
       json.dump(meminfo_json, f)
 

@@ -24,6 +24,7 @@ if TYPE_CHECKING:
   from crossbench.helper.durations import Durations
   from crossbench.probes.probe import Probe
   from crossbench.runner.runner import Runner
+  from crossbench.types import Json
 
 
 class ResultOrigin(DecoratorTargetProtocol, ProbeResultOrigin, abc.ABC):
@@ -88,6 +89,14 @@ class ResultOrigin(DecoratorTargetProtocol, ProbeResultOrigin, abc.ABC):
   def measure(self, label: str) -> Iterator[None]:
     with self.exceptions.info(label), self.durations.measure(label):
       yield
+
+  def performance_mark(self,
+                       name: str,
+                       detail: Json = None,
+                       prefix: str = "crossbench-") -> None:
+    self.browser_platform.trace_mark(name, prefix=prefix)
+    self.browser.performance_mark(name, detail=detail, prefix=prefix)
+
 
   def exception_info(self, *stack_entries: str) -> ExceptionAnnotationScope:
     return self.exceptions.info(*stack_entries)

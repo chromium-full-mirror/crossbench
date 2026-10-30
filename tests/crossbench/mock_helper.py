@@ -170,9 +170,14 @@ class MockPlatformMixin:
     # Backs device_config() and set_device_config_value().
     self.device_config_data: dict[str, Any] = {}
     self.device_config_writes: list[tuple[DeviceConfigKeyPath, str | None]] = []
+    self.trace_marks: list[str] = []
     self.fake_fs = fake_fs
     self.use_fs = bool(fake_fs)
     super().__init__(*args, **kwargs)
+
+  def trace_mark(self, name: str, prefix: str = "crossbench-") -> None:
+    self.trace_marks.append(prefix + name)
+
 
   @property
   def has_clipboard(self) -> bool:
