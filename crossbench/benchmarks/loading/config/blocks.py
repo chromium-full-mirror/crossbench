@@ -131,6 +131,10 @@ class ActionBlock(ConfigObject):
                 "'start_browser' in between.")
           is_browser_running = False
           num_stops += 1
+        case ActionType.CLOSE_ALL_APPS:
+          if is_browser_running is not False:
+            num_stops += 1
+          is_browser_running = False
     if num_starts > num_stops + 1:
       raise ConfigError(
           f"Number of 'start_browser' actions ({num_starts}) cannot exceed "

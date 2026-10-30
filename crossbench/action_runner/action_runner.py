@@ -1027,6 +1027,17 @@ class ActionRunner:
     with self.actions(f"LaunchApp {action.component}", measure=False):
       self.browser_platform.launch_app(action.component)
 
+  def close_app(self, action: i_action.CloseAppAction) -> None:
+    with self.actions(f"CloseApp {action.package}", measure=False):
+      self.browser_platform.close_app(action.package)
+
+  def close_all_apps(self, action: i_action.CloseAllAppsAction) -> None:
+    del action
+    with self.actions("CloseAllAppsAction", measure=False):
+      if self.browser.is_running:
+        self.run.browser_session.stop_browser()
+      self.browser_platform.close_all_apps()
+
   def close_all_tabs(self, action: i_action.CloseAllTabsAction) -> None:
     del action
     with self.actions("CloseAllTabsAction", measure=False):

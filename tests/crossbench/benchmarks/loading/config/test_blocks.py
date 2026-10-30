@@ -7,6 +7,7 @@ from __future__ import annotations
 import datetime as dt
 import unittest
 
+from crossbench.action_runner.action.close_all_apps import CloseAllAppsAction
 from crossbench.action_runner.action.get import GetAction
 from crossbench.action_runner.action.js import JsAction
 from crossbench.action_runner.action.start_browser import StartBrowserAction
@@ -142,6 +143,16 @@ class ActionBlockTestCase(unittest.TestCase):
     block_stop_1 = ActionBlock(label="b1", index=1, actions=(stop,))
     with self.assertRaisesRegex(ConfigError, "two 'stop_browser' actions"):
       ActionBlockListConfig(blocks=(block_stop_0, block_stop_1))
+
+  def test_close_all_apps_stops_browser_for_validation(self) -> None:
+    start = StartBrowserAction()
+    stop = StopBrowserAction()
+    close_all = CloseAllAppsAction()
+    block = ActionBlock(actions=(start, close_all, start))
+    self.assertEqual(len(block), 3)
+
+    with self.assertRaisesRegex(ConfigError, "two 'stop_browser' actions"):
+      ActionBlock(actions=(close_all, stop))
 
 
 class LoginBlockTestCase(unittest.TestCase):

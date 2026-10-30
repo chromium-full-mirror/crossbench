@@ -52,3 +52,5 @@ class ActionType(ConfigEnum):
   START_BROWSER = ("start_browser", "Start the browser")
   STOP_BROWSER = ("stop_browser", "Stop the browser")
   LAUNCH_APP = ("launch_app", "Launch a native application or activity")
+  CLOSE_APP = ("close_app", "Close a native application")
+  CLOSE_ALL_APPS = ("close_all_apps", "Close all native applications")

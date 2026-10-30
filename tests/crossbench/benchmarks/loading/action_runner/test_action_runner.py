@@ -13,6 +13,8 @@ from unittest import mock
 from unittest.mock import MagicMock, call
 
 from crossbench.action_runner.action.click import ClickAction
+from crossbench.action_runner.action.close_all_apps import CloseAllAppsAction
+from crossbench.action_runner.action.close_app import CloseAppAction
 from crossbench.action_runner.action.enums import ButtonClick, ScrollMode
 from crossbench.action_runner.action.launch_app import LaunchAppAction
 from crossbench.action_runner.action.mouse_move import MouseMoveAction
@@ -1130,6 +1132,61 @@ class ActionRunnerInputTestCase(ActionRunnerTestCase):
     with self.assertRaisesRegex(NotImplementedError,
                                 "'launch_app' is not supported"):
       self.run_action(launch_action)
+
+  def test_close_app(self) -> None:
+    close_action = CloseAppAction(package="com.android.settings")
+    with mock.patch.object(self.action_runner.browser_platform,
+                           "close_app") as mock_close_app:
+      self.run_action(close_action)
+    mock_close_app.assert_called_once_with("com.android.settings")
+
+  def test_close_app_not_implemented_raises(self) -> None:
+    close_action = CloseAppAction(package="com.android.settings")
+    with self.assertRaisesRegex(NotImplementedError,
+                                "'close_app' is not supported"):
+      self.run_action(close_action)
+
+  def test_close_all_apps_stops_running_browser(self) -> None:
+    action = CloseAllAppsAction()
+    self.action_runner.browser._is_running = True
+    with (
+        mock.patch.object(
+            self.action_runner.run.browser_session,
+            "stop_browser",
+        ) as mock_stop_browser,
+        mock.patch.object(
+            self.action_runner.browser_platform,
+            "close_all_apps",
+        ) as mock_close_all_apps,
+    ):
+      self.run_action(action)
+    mock_stop_browser.assert_called_once_with()
+    mock_close_all_apps.assert_called_once_with()
+
+  def test_close_all_apps_when_browser_not_running(self) -> None:
+    action = CloseAllAppsAction()
+    self.action_runner.browser._is_running = False
+    with (
+        mock.patch.object(
+            self.action_runner.run.browser_session,
+            "stop_browser",
+        ) as mock_stop_browser,
+        mock.patch.object(
+            self.action_runner.browser_platform,
+            "close_all_apps",
+        ) as mock_close_all_apps,
+    ):
+      self.run_action(action)
+    mock_stop_browser.assert_not_called()
+    mock_close_all_apps.assert_called_once_with()
+
+  def test_close_all_apps_not_implemented_raises(self) -> None:
+    action = CloseAllAppsAction()
+    self.action_runner.browser._is_running = False
+    with self.assertRaisesRegex(NotImplementedError,
+                                "'close_all_apps' is not supported"):
+      self.run_action(action)
+
 
 
 class ScriptsDirTestCase(unittest.TestCase):

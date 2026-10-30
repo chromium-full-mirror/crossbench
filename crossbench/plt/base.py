@@ -1438,6 +1438,14 @@ class Platform(abc.ABC):
   def launch_app(self, component: str) -> None:
     raise NotImplementedError(f"'launch_app' is not supported on {self.name}")
 
+  def close_app(self, package: str) -> None:
+    raise NotImplementedError(f"'close_app' is not supported on {self.name}")
+
+  def close_all_apps(self) -> None:
+    raise NotImplementedError(
+        f"'close_all_apps' is not supported on {self.name}")
+
+
   def user_id(self) -> int:
     self.assert_is_local()
     return os.getuid()

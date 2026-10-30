@@ -53,6 +53,7 @@ from tests import test_helper
 from tests.crossbench.mock_helper import ShResult, ShResultType, \
     WinMockPlatform
 from tests.crossbench.plt.helper import BasePosixMockPlatformTestCase
+from third_party.protoc import activitymanagerservice_pb2
 
 ADB_DEVICE_SAMPLE_OUTPUT = (
     "List of devices attached\n"
@@ -1322,6 +1323,41 @@ class AndroidAdbMockPlatformTest(BaseAndroidAdbMockPlatformTestCase):
   def test_launch_app(self) -> None:
     self.expect_sh("am start -W -n com.android.settings/.Settings")
     self.platform.launch_app("com.android.settings/.Settings")
+
+  def _create_activities_proto(self, *tasks: tuple[int, int, str]) -> bytes:
+    dump = (
+        activitymanagerservice_pb2.ActivityManagerServiceDumpActivitiesProto())
+    wc = dump.root_window_container.window_container
+    for task_id, activity_type, real_activity in tasks:
+      task = wc.children.add().task
+      task.id = task_id
+      task.activity_type = activity_type
+      task.real_activity = real_activity
+    return dump.SerializeToString()
+
+  def test_close_app(self) -> None:
+    proto_out = self._create_activities_proto(
+        (101, 1, "com.android.settings/.Settings"),
+        (102, 1, "com.google.android.keep/.Browse"),
+        (1000001, 2, "com.google.android.apps.nexuslauncher/.Launcher"),
+    )
+    self.expect_sh("dumpsys activity --proto activities", result=proto_out)
+    self.expect_sh("am stack remove 101")
+    self.platform.close_app("com.android.settings")
+
+  def test_close_all_apps(self) -> None:
+    proto_out = self._create_activities_proto(
+        (101, 1, "com.android.chrome/com.google.android.apps.chrome.Main"),
+        (102, 1, "com.android.settings/com.android.settings.Settings"),
+        (103, 1, "com.google.android.keep/.Browse"),
+        (1000001, 2, "com.google.android.apps.nexuslauncher/.Launcher"),
+    )
+    self.expect_sh("dumpsys activity --proto activities", result=proto_out)
+    self.expect_sh("am stack remove 101")
+    self.expect_sh("am stack remove 102")
+    self.expect_sh("am stack remove 103")
+    self.platform.close_all_apps()
+
 
   def test_users(self):
     self.expect_sh(

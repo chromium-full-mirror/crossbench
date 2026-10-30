@@ -218,6 +218,17 @@
         "component": "com.android.settings/.Settings"
       }
     ]
+    "close_app": [
+      {
+        "action": "close_app"
+        "package": "com.android.settings"
+      }
+    ]
+    "close_all_apps": [
+      {
+        "action": "close_all_apps"
+      }
+    ]
     "close_tab": [
       {
         "action": "close_tab"

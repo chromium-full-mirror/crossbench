@@ -7,7 +7,9 @@ from __future__ import annotations
 from crossbench.action_runner.action.action import ACTIONS, Action
 from crossbench.action_runner.action.clear_cache import ClearCacheAction
 from crossbench.action_runner.action.click import ClickAction
+from crossbench.action_runner.action.close_all_apps import CloseAllAppsAction
 from crossbench.action_runner.action.close_all_tabs import CloseAllTabsAction
+from crossbench.action_runner.action.close_app import CloseAppAction
 from crossbench.action_runner.action.close_tab import CloseTabAction
 from crossbench.action_runner.action.dump_html import DumpHtmlAction
 from crossbench.action_runner.action.get import GetAction
@@ -45,6 +47,8 @@ from crossbench.action_runner.action.wait_for_url_matches import \
 ACTIONS_TUPLE: tuple[type[Action], ...] = (
     ClearCacheAction,
     ClickAction,
+    CloseAllAppsAction,
+    CloseAppAction,
     CloseTabAction,
     CloseAllTabsAction,
     DumpHtmlAction,

@@ -16,7 +16,9 @@ from crossbench.action_runner.action.action import ACTION_TIMEOUT, ACTIONS, \
 from crossbench.action_runner.action.action_type import ActionType
 from crossbench.action_runner.action.all import ACTIONS_TUPLE
 from crossbench.action_runner.action.click import ClickAction
+from crossbench.action_runner.action.close_all_apps import CloseAllAppsAction
 from crossbench.action_runner.action.close_all_tabs import CloseAllTabsAction
+from crossbench.action_runner.action.close_app import CloseAppAction
 from crossbench.action_runner.action.close_tab import CloseTabAction
 from crossbench.action_runner.action.dump_html import DumpHtmlAction
 from crossbench.action_runner.action.enums import ButtonClick, ReadyState, \
@@ -1539,6 +1541,45 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
           }],
           "duration": "500ms",
       })
+
+  def test_parse_close_app(self) -> None:
+    config_dict = {
+        "action": "close_app",
+        "package": "com.android.settings",
+    }
+    action = CloseAppAction.parse_dict(config_dict)
+    self.assertEqual(action.TYPE, ActionType.CLOSE_APP)
+    self.assertEqual(action.package, "com.android.settings")
+    action.validate()
+
+    action_2 = CloseAppAction.parse_dict(action.to_json())
+    self.assertEqual(action, action_2)
+    action_2.validate()
+
+  def test_parse_close_app_aliases(self) -> None:
+    for alias in ("app", "package_name"):
+      with self.subTest(alias=alias):
+        action = CloseAppAction.parse_dict({
+            "action": "close_app",
+            alias: "com.android.settings",
+        })
+        self.assertEqual(action.package, "com.android.settings")
+
+  def test_parse_close_app_invalid(self) -> None:
+    with self.assertRaises(ValueError):
+      CloseAppAction.parse_dict({"action": "close_app"})
+    with self.assertRaises(ValueError):
+      CloseAppAction.parse_dict({"action": "close_app", "package": ""})
+
+  def test_parse_close_all_apps(self) -> None:
+    config_dict = {"action": "close_all_apps"}
+    action = CloseAllAppsAction.parse(config_dict)
+    self.assertEqual(action.TYPE, ActionType.CLOSE_ALL_APPS)
+    action.validate()
+
+    action_2 = CloseAllAppsAction.parse_dict(action.to_json())
+    self.assertEqual(action, action_2)
+    action_2.validate()
   def test_parse_close_tab_all_args(self):
     config_dict = {
         "action": "close_tab",

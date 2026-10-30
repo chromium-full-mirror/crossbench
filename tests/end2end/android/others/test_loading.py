@@ -10,7 +10,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from crossbench import plt
 from crossbench.benchmarks.loading.input_source import InputSource
+from crossbench.plt.android_adb import Adb
 from tests import test_helper
 from tests.end2end.desktop.test_loading import CLICK_TEST_PAGE, \
     TestDesktopLoading
@@ -246,6 +248,81 @@ class TestAndroidLoading(TestDesktopLoading):
     }
 
     self.run_loading_test(browser_config, page_config, test_env)
+
+  def test_close_app(self, browser_config: str, device_id: str, adb_path: str,
+                     test_env: TestEnv) -> None:
+    test_page = urllib.parse.quote(
+        "<!doctype html><html><head><title>Close App Test</title></head></html>",
+    )
+    page_config = {
+        "pages": {
+            "CloseAppTest": {
+                "actions": [{
+                    "action": "get",
+                    "url": f"data:text/html;charset=utf-8,{test_page}",
+                    "ready_state": "complete",
+                }, {
+                    "action": "launch_app",
+                    "component": "com.android.settings/.Settings",
+                }, {
+                    "action": "wait",
+                    "duration": "1s",
+                }, {
+                    "action": "close_app",
+                    "package": "com.android.settings",
+                }, {
+                    "action": "js",
+                    "script": "return document.title;",
+                }],
+            },
+        },
+    }
+
+    self.run_loading_test(browser_config, page_config, test_env)
+    self.assert_run_succeeded(test_env)
+
+    adb = Adb(plt.PLATFORM, device_id, adb_path)
+    stack_list = adb.shell_stdout("am", "stack", "list")
+    assert "com.android.settings/" not in stack_list
+
+  def test_close_all_apps(self, browser_config: str, device_id: str,
+                          adb_path: str, test_env: TestEnv) -> None:
+    test_page_1 = urllib.parse.quote(
+        "<!doctype html><html><head><title>Page 1</title></head></html>")
+    test_page_2 = urllib.parse.quote(
+        "<!doctype html><html><head><title>Page 2</title></head></html>")
+    page_config = {
+        "pages": {
+            "CloseAllAppsTest": {
+                "actions": [{
+                    "action": "get",
+                    "url": f"data:text/html;charset=utf-8,{test_page_1}",
+                    "ready_state": "complete",
+                }, {
+                    "action": "launch_app",
+                    "component": "com.android.settings/.Settings",
+                }, {
+                    "action": "wait",
+                    "duration": "1s",
+                }, {
+                    "action": "close_all_apps",
+                }, {
+                    "action": "start_browser",
+                }, {
+                    "action": "get",
+                    "url": f"data:text/html;charset=utf-8,{test_page_2}",
+                    "ready_state": "complete",
+                }],
+            },
+        },
+    }
+
+    self.run_loading_test(browser_config, page_config, test_env)
+    self.assert_run_succeeded(test_env)
+
+    adb = Adb(plt.PLATFORM, device_id, adb_path)
+    stack_list = adb.shell_stdout("am", "stack", "list")
+    assert "com.android.settings/" not in stack_list
 
 
 del TestDesktopLoading

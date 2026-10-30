@@ -1632,11 +1632,65 @@ class AndroidAdbPlatform(EvemuPlatformMixin, RemotePosixPlatform):
     # Unlock the device
     self.adb.shell("input", "keyevent", "KEYCODE_MENU")
 
+  _ACTIVITY_TYPE_STANDARD: Final[int] = 1
+
+  def _iter_tasks(
+      self,
+      wc: windowmanagerservice_pb2.WindowContainerProto,
+  ) -> Iterator[windowmanagerservice_pb2.TaskProto]:
+    for child in wc.children:
+      if child.HasField("display_content"):
+        yield from self._iter_tasks(
+            child.display_content.root_display_area.window_container)
+        yield from self._iter_tasks(child.display_content.window_container)
+      elif child.HasField("display_area"):
+        yield from self._iter_tasks(child.display_area.window_container)
+      elif child.HasField("task"):
+        yield child.task
+        yield from self._iter_tasks(child.task.task_fragment.window_container)
+        yield from self._iter_tasks(child.task.window_container)
+      elif child.HasField("task_fragment"):
+        yield from self._iter_tasks(child.task_fragment.window_container)
+      elif child.HasField("window_container"):
+        yield from self._iter_tasks(child.window_container)
+
+  def _list_standard_tasks(self) -> list[tuple[str, str]]:
+    """Lists (task_id, package) for all running standard app tasks."""
+    raw = self.adb.dumpsys_bytes("activity", "--proto", "activities")
+    dump = (
+        activitymanagerservice_pb2.ActivityManagerServiceDumpActivitiesProto())
+    dump.ParseFromString(raw)
+    tasks: list[tuple[str, str]] = []
+    for task in self._iter_tasks(dump.root_window_container.window_container):
+      activity_type = task.activity_type or task.task_fragment.activity_type
+      if activity_type != self._ACTIVITY_TYPE_STANDARD:
+        continue
+      if not task.real_activity:
+        continue
+      package, _, _ = task.real_activity.partition("/")
+      if task.id and package:
+        tasks.append((str(task.id), package))
+    return tasks
+
   @override
   def launch_app(self, component: str) -> None:
     # -W: wait for the activity launch to complete before returning.
     # -n: specify the explicit component name (e.g. "<package>/<activity>").
     self.sh("am", "start", "-W", "-n", component)
+
+  @override
+  def close_app(self, package: str) -> None:
+    # 'am stack remove <task_id>' invokes ActivityTaskManager.removeTask(),
+    # which finishes the task's activities and removes its window/recents entry
+    # just like swiping an app away in Recents or closing its desktop window.
+    for task_id, task_package in self._list_standard_tasks():
+      if task_package == package:
+        self.sh("am", "stack", "remove", task_id, check=False)
+
+  @override
+  def close_all_apps(self) -> None:
+    for task_id, _ in self._list_standard_tasks():
+      self.sh("am", "stack", "remove", task_id, check=False)
 
   @override
   def gpu_vram_used(self) -> dict[str, float]:
