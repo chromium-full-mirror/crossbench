@@ -18,9 +18,12 @@ import os
 import select
 import sys
 import threading
-from typing import Any, Callable, Final
+from typing import TYPE_CHECKING, Any, Callable, Final
 
 from typing_extensions import override
+
+if TYPE_CHECKING:
+  from collections.abc import Iterator
 
 try:
   import termios
@@ -38,6 +41,13 @@ _DEFAULT_TIMEOUT: Final[dt.timedelta] = dt.timedelta(seconds=10)
 def shared() -> StdinCoordinator:
   """Returns the process-wide coordinator that owns `sys.stdin`."""
   return _SHARED
+
+
+@contextlib.contextmanager
+def suspend() -> Iterator[None]:
+  """Suspends the key listener and restores canonical terminal mode."""
+  with _SHARED.suspend():
+    yield
 
 
 def prompt(message: str) -> str:
@@ -58,6 +68,11 @@ class StdinCoordinator:
 
   def __init__(self) -> None:
     self._reader: Final[_StdinReader] = _StdinReader()
+
+  @contextlib.contextmanager
+  def suspend(self) -> Iterator[None]:
+    """Suspends the key listener and restores canonical terminal mode."""
+    yield
 
   def prompt(self, message: str) -> str:
     return input(message)
@@ -92,16 +107,27 @@ class PosixStdinCoordinator(StdinCoordinator):
     self._terminal: Final[_TerminalModeController] = _TerminalModeController()
     self._stop_event: Final[threading.Event] = threading.Event()
     self._thread: threading.Thread | None = None
+    self._suspend_count: int = 0
     atexit.register(self._stop)
+
+  @contextlib.contextmanager
+  @override
+  def suspend(self) -> Iterator[None]:
+    self._suspend_count += 1
+    if self._suspend_count == 1:
+      self._stop_listener()
+    try:
+      yield
+    finally:
+      self._suspend_count -= 1
+      if self._suspend_count == 0:
+        self._start_listener()
 
   @override
   def prompt(self, message: str) -> str:
     """Suspends the key listener, prints `message`, and reads a line."""
-    self._stop_listener()
-    try:
+    with self.suspend():
       return super().prompt(message)
-    finally:
-      self._start_listener()
 
   @override
   def input_with_timeout(
@@ -113,11 +139,8 @@ class PosixStdinCoordinator(StdinCoordinator):
     Returns None on timeout or EOF (Ctrl-D).
     """
     timeout_s = max(0.0, timeout.total_seconds())
-    self._stop_listener()
-    try:
+    with self.suspend():
       return self._reader.read_line(timeout_s)
-    finally:
-      self._start_listener()
 
   @override
   def register_key(self, key: str, handler: KeyHandler) -> None:
@@ -143,7 +166,7 @@ class PosixStdinCoordinator(StdinCoordinator):
     self._stop_listener()
 
   def _start_listener(self) -> None:
-    if not self._handlers or self._thread:
+    if not self._handlers or self._thread or self._suspend_count > 0:
       return
     if (fd := self._terminal.enable_cbreak()) is None:
       return

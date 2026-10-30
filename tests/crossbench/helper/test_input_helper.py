@@ -7,6 +7,7 @@ from __future__ import annotations
 import contextlib
 import datetime as dt
 import os
+import sys
 import threading
 import unittest
 from unittest import mock
@@ -53,6 +54,10 @@ class InputHelperTestCase(unittest.TestCase):
       mock_prompt.assert_called_once_with("msg:")
       self.assertEqual(input_helper.input_with_timeout(timeout), "timed")
       mock_timed.assert_called_once_with(timeout)
+    with mock.patch.object(input_helper.shared(), "suspend") as mock_suspend:
+      with input_helper.suspend():
+        pass
+      mock_suspend.assert_called_once_with()
 
   def test_register_and_stop_without_cbreak(self) -> None:
     with mock.patch("sys.stdin") as mock_stdin, \
@@ -123,6 +128,31 @@ class InputHelperTestCase(unittest.TestCase):
     with self.assertRaises(ValueError):
       with mock.patch("builtins.input", side_effect=ValueError("boom")):
         coordinator.prompt("question:")
+    os.write(stdin_w, b"\x10")
+    self.assertTrue(key_event.wait(timeout=2.0))
+    self.assertEqual(received, ["\x10"])
+
+  def test_suspend_stops_listener_from_consuming_stdin_and_nests(self) -> None:
+    coordinator, stdin_w = self._make_tty_coordinator()
+    received: list[str] = []
+    key_event = threading.Event()
+
+    def on_ctrl_p() -> None:
+      received.append("\x10")
+      key_event.set()
+
+    coordinator.register_key("\x10", on_ctrl_p)
+    self._mock_setcbreak.assert_called_once()
+    with coordinator.suspend():
+      self._mock_tcsetattr.assert_called_once()
+      with coordinator.suspend():
+        os.write(stdin_w, b"secret_password\n")
+        # Inner suspend exit must not restart the listener yet.
+      self.assertEqual(self._mock_setcbreak.call_count, 1)
+      # Another process (e.g. sudo) can read the full password intact.
+      self.assertEqual(os.read(sys.stdin.fileno(), 16), b"secret_password\n")
+    # Exiting the outer suspend restarts the listener.
+    self.assertEqual(self._mock_setcbreak.call_count, 2)
     os.write(stdin_w, b"\x10")
     self.assertTrue(key_event.wait(timeout=2.0))
     self.assertEqual(received, ["\x10"])

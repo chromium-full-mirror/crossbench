@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, ClassVar, Final, Iterable, TextIO
 from typing_extensions import override
 
 from crossbench import path as pth
-from crossbench.helper import url_helper
+from crossbench.helper import input_helper, url_helper
 from crossbench.helper.cwd import change_cwd
 from crossbench.helper.path_finder import WprGoFinder
 from crossbench.parse import NumberParser, PathParser
@@ -193,9 +193,10 @@ class WprBase(abc.ABC):
 
   def start(self) -> None:
     try:
-      self._start_wpr()
-      logging.info("WPR: waiting for startup...")
-      self._wait_for_startup()
+      with input_helper.suspend():
+        self._start_wpr()
+        logging.info("WPR: waiting for startup...")
+        self._wait_for_startup()
       logging.info(("WPR: Started webpagereplay %s: "
                     "DONE (platform=%s, http_port=%s, http_port=%s)"),
                    self.NAME, self._platform, self.http_port, self.https_port)
@@ -326,9 +327,10 @@ class WprBase(abc.ABC):
       if self._log_file:
         self._log_file.close()
         self._log_file = None
-      if force_shutdown:
+      if force_shutdown and self._process.poll() is None:
         if self._run_as_root:
-          self._platform.sh("sudo", "kill", str(self._process.pid))
+          with input_helper.suspend():
+            self._platform.sh("sudo", "kill", str(self._process.pid))
         else:
           self._platform.terminate_gracefully(self._process, timeout=1)
     finally:
