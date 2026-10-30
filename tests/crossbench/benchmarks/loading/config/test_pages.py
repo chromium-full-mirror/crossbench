@@ -15,6 +15,7 @@ import hjson
 
 from crossbench.action_runner.action.action_type import ActionType
 from crossbench.action_runner.action.click import ClickAction
+from crossbench.action_runner.action.get import GetAction
 from crossbench.benchmarks.loading.config.login.google import GoogleLogin
 from crossbench.benchmarks.loading.config.page import PageConfig
 from crossbench.benchmarks.loading.config.pages import \
@@ -233,7 +234,9 @@ class PagesConfigTestCase(CrossbenchFakeFsTestCase):
     config = PagesConfig.parse(config_data)
     self.assert_single_google_story(config.pages)
     login = config.pages[0].login
+    self.assertIsNotNone(login)
     self.assertEqual(len(login.actions), 1)
+    self.assertIsInstance(login.actions[0], GetAction)
     self.assertEqual(login.actions[0].url, "https://www.google.com/login")
 
   def test_example_with_login_preset(self):
@@ -301,7 +304,7 @@ class PagesConfigTestCase(CrossbenchFakeFsTestCase):
   def test_scenario_invalid_actions(self):
     invalid_actions: list[Any] = [None, "", [], {}, "invalid string", 12]
     for invalid_action in invalid_actions:
-      config_dict = {"pages": {"name": invalid_action}}
+      config_dict: dict[str, object] = {"pages": {"name": invalid_action}}
       with self.subTest(invalid_action=invalid_action):
         with self.assertRaises(argparse.ArgumentTypeError):
           PagesConfig.parse_dict(config_dict)
@@ -320,7 +323,7 @@ class PagesConfigTestCase(CrossbenchFakeFsTestCase):
   def test_invalid_action(self):
     invalid_actions: list[Any] = [None, "", [], {}, "unknown action name", 12]
     for invalid_action in invalid_actions:
-      config_dict = {
+      config_dict: dict[str, object] = {
           "pages": {
               "TEST": [{
                   "action": invalid_action,
@@ -536,6 +539,8 @@ class DevToolsRecorderPageConfigTestCase(CrossbenchFakeFsTestCase):
         "target": "main",
         "selectors": [["aria/Search Google"]],
     }
+    # DevToolsRecorderStep marks url as Required and omits target.
+    # pyrefly: ignore[bad-argument-type]
     actions = DevToolsRecorderPagesConfig.parse_step(config)
     self.assertEqual(len(actions), 1)
     action = actions[0]
@@ -549,6 +554,8 @@ class DevToolsRecorderPageConfigTestCase(CrossbenchFakeFsTestCase):
                            ['xpath///*[@id="rso"]'],
                            ["pierce/#rso > div:nth-of-type(3) h3"],
                            ["text/SIMPLE"]]
+    # DevToolsRecorderStep marks url as Required and omits target.
+    # pyrefly: ignore[bad-argument-type]
     action = DevToolsRecorderPagesConfig.parse_step(config)[0]
     assert isinstance(action, ClickAction)
     self.assertIsNotNone(action.position.selector)
@@ -558,6 +565,8 @@ class DevToolsRecorderPageConfigTestCase(CrossbenchFakeFsTestCase):
         ["aria/SIMPLE"],
         ["css/#rso > div:nth-of-type(3) h3"],
     ]
+    # DevToolsRecorderStep marks url as Required and omits target.
+    # pyrefly: ignore[bad-argument-type]
     action = DevToolsRecorderPagesConfig.parse_step(config)[0]
     assert isinstance(action, ClickAction)
     self.assertIsNotNone(action.position.selector)
@@ -567,6 +576,8 @@ class DevToolsRecorderPageConfigTestCase(CrossbenchFakeFsTestCase):
     config["selectors"] = [
         ["#rso > div:nth-of-type(3) h3"],
     ]
+    # DevToolsRecorderStep marks url as Required and omits target.
+    # pyrefly: ignore[bad-argument-type]
     action = DevToolsRecorderPagesConfig.parse_step(config)[0]
     assert isinstance(action, ClickAction)
     self.assertIsNotNone(action.position.selector)
@@ -577,6 +588,8 @@ class DevToolsRecorderPageConfigTestCase(CrossbenchFakeFsTestCase):
         ["aria/SIMPLE", "area/OTHER"],
         ["#rso > div:nth-of-type(3) h3"],
     ]
+    # DevToolsRecorderStep marks url as Required and omits target.
+    # pyrefly: ignore[bad-argument-type]
     action = DevToolsRecorderPagesConfig.parse_step(config)[0]
     assert isinstance(action, ClickAction)
     self.assertIsNotNone(action.position.selector)
@@ -586,6 +599,8 @@ class DevToolsRecorderPageConfigTestCase(CrossbenchFakeFsTestCase):
     config["selectors"] = [
         ["text/Content"],
     ]
+    # DevToolsRecorderStep marks url as Required and omits target.
+    # pyrefly: ignore[bad-argument-type]
     action = DevToolsRecorderPagesConfig.parse_step(config)[0]
     assert isinstance(action, ClickAction)
     self.assertIsNotNone(action.position.selector)

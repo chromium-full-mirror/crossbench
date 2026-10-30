@@ -9,7 +9,7 @@ import copy
 import csv
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Mapping, Sequence
 from unittest import mock
 
 from typing_extensions import override
@@ -23,6 +23,7 @@ if TYPE_CHECKING:
   from crossbench.benchmarks.jetstream.jetstream_2 import \
       JetStream2Benchmark, JetStream2Probe, JetStream2ProbeContext, \
       JetStream2Story
+  from crossbench.benchmarks.jetstream.jetstream_3 import JetStream3Story
 
 
 class JetStream2BaseTestCase(
@@ -221,8 +222,14 @@ class JetStream3BaseTestCase(JetStream2BaseTestCase, metaclass=abc.ABCMeta):
     browser.expect_js(result=json.dumps(jetstream_probe_results))
 
   @property
-  def story_data(self) -> dict[str, list[str]]:
+  def story_data(self) -> Mapping[str, tuple[str, ...]]:
     return self.story_cls.STORY_DATA
+
+  @property
+  @abc.abstractmethod
+  @override
+  def story_cls(self) -> type[JetStream3Story]:
+    pass
 
   @override
   def test_run_default(self):

@@ -32,17 +32,16 @@ _POINTING_DEVICE_CLASSES: Final[tuple[type[PointingVirtualDeviceConfig],
 class VirtualDeviceConfigTestCase(unittest.TestCase):
 
   def test_parse_keyboard(self) -> None:
-    config_dict = {
+    config_dict: dict[str, object] = {
         "type": "keyboard",
         "name": "default_keyboard",
     }
     device = VirtualDeviceConfig.parse_dict(config_dict)
     self.assertIsInstance(device, KeyboardVirtualDeviceConfig)
-    assert isinstance(device, KeyboardVirtualDeviceConfig)
     self.assertEqual(device.name, "default_keyboard")
     self.assertEqual(device.device_type, VirtualDeviceType.KEYBOARD)
 
-    device_2 = VirtualDeviceConfig.parse_dict(device.to_json())
+    device_2 = VirtualDeviceConfig.parse_dict(dict(device.to_json()))
     self.assertEqual(device, device_2)
 
   def test_all_virtual_devices(self) -> None:
@@ -54,24 +53,23 @@ class VirtualDeviceConfigTestCase(unittest.TestCase):
         len(VIRTUAL_DEVICES_TUPLE), len(set(VIRTUAL_DEVICES_TUPLE)))
 
   def test_parse_touchscreen_defaults(self) -> None:
-    config_dict = {
+    config_dict: dict[str, object] = {
         "type": "touchscreen",
         "name": "default_touchscreen",
     }
     device = VirtualDeviceConfig.parse_dict(config_dict)
     self.assertIsInstance(device, TouchscreenVirtualDeviceConfig)
-    assert isinstance(device, TouchscreenVirtualDeviceConfig)
     self.assertEqual(device.name, "default_touchscreen")
     self.assertEqual(device.device_type, VirtualDeviceType.TOUCHSCREEN)
     self.assertIsNone(device.width)
     self.assertIsNone(device.height)
     self.assertEqual(device.polling_rate_hz, DEFAULT_TOUCH_POLLING_RATE_HZ)
 
-    device_2 = VirtualDeviceConfig.parse_dict(device.to_json())
+    device_2 = VirtualDeviceConfig.parse_dict(dict(device.to_json()))
     self.assertEqual(device, device_2)
 
   def test_parse_touchscreen_explicit(self) -> None:
-    config_dict = {
+    config_dict: dict[str, object] = {
         "type": "touchscreen",
         "name": "custom_touchscreen",
         "width": 1080,
@@ -80,35 +78,33 @@ class VirtualDeviceConfigTestCase(unittest.TestCase):
     }
     device = VirtualDeviceConfig.parse_dict(config_dict)
     self.assertIsInstance(device, TouchscreenVirtualDeviceConfig)
-    assert isinstance(device, TouchscreenVirtualDeviceConfig)
     self.assertEqual(device.name, "custom_touchscreen")
     self.assertEqual(device.device_type, VirtualDeviceType.TOUCHSCREEN)
     self.assertEqual(device.width, 1080)
     self.assertEqual(device.height, 2400)
     self.assertEqual(device.polling_rate_hz, 240)
 
-    device_2 = VirtualDeviceConfig.parse_dict(device.to_json())
+    device_2 = VirtualDeviceConfig.parse_dict(dict(device.to_json()))
     self.assertEqual(device, device_2)
 
   def test_parse_mouse_defaults(self) -> None:
-    config_dict = {
+    config_dict: dict[str, object] = {
         "type": "mouse",
         "name": "default_mouse",
     }
     device = VirtualDeviceConfig.parse_dict(config_dict)
     self.assertIsInstance(device, MouseVirtualDeviceConfig)
-    assert isinstance(device, MouseVirtualDeviceConfig)
     self.assertEqual(device.name, "default_mouse")
     self.assertEqual(device.device_type, VirtualDeviceType.MOUSE)
     self.assertIsNone(device.width)
     self.assertIsNone(device.height)
     self.assertEqual(device.polling_rate_hz, DEFAULT_MOUSE_POLLING_RATE_HZ)
 
-    device_2 = VirtualDeviceConfig.parse_dict(device.to_json())
+    device_2 = VirtualDeviceConfig.parse_dict(dict(device.to_json()))
     self.assertEqual(device, device_2)
 
   def test_parse_mouse_explicit(self) -> None:
-    config_dict = {
+    config_dict: dict[str, object] = {
         "type": "mouse",
         "name": "custom_mouse",
         "width": 1920,
@@ -117,21 +113,20 @@ class VirtualDeviceConfigTestCase(unittest.TestCase):
     }
     device = VirtualDeviceConfig.parse_dict(config_dict)
     self.assertIsInstance(device, MouseVirtualDeviceConfig)
-    assert isinstance(device, MouseVirtualDeviceConfig)
     self.assertEqual(device.name, "custom_mouse")
     self.assertEqual(device.device_type, VirtualDeviceType.MOUSE)
     self.assertEqual(device.width, 1920)
     self.assertEqual(device.height, 1080)
     self.assertEqual(device.polling_rate_hz, 500)
 
-    device_2 = VirtualDeviceConfig.parse_dict(device.to_json())
+    device_2 = VirtualDeviceConfig.parse_dict(dict(device.to_json()))
     self.assertEqual(device, device_2)
 
   def test_parse_pointing_device_type_alias(self) -> None:
     for device_cls in _POINTING_DEVICE_CLASSES:
       device_type = str(device_cls.TYPE)
       with self.subTest(device_type=device_type):
-        config_dict = {
+        config_dict: dict[str, object] = {
             "device_type": device_type,
             "name": "dev1",
             "width": 100,
@@ -187,7 +182,7 @@ class VirtualDeviceConfigTestCase(unittest.TestCase):
       device_type = str(device_cls.TYPE)
       for field_name in ("polling_rate", "rate", "frequency"):
         with self.subTest(device_type=device_type, field_name=field_name):
-          config_dict = {
+          config_dict: dict[str, object] = {
               "type": device_type,
               "name": "dev",
               field_name: 250,

@@ -94,6 +94,7 @@ class ChromeOSLoginTestCase(ActionRunnerTestCase):
     self.expect_successful_google_login()
 
     self.mock_run.story_secrets = page[0].secrets
+    self.assertIsNotNone(config.pages[0].login)
     config.pages[0].login.run_with(self.action_runner)
 
   def test_logged_in_google_account(self):
@@ -103,6 +104,7 @@ class ChromeOSLoginTestCase(ActionRunnerTestCase):
     self.browser.expect_is_logged_in(GoogleUsernamePassword("test", "s3cr3t"))
 
     self.mock_run.story_secrets = page[0].secrets
+    self.assertIsNotNone(config.pages[0].login)
     config.pages[0].login.run_with(self.action_runner)
 
   def test_logged_in_non_google_account(self):
@@ -114,6 +116,7 @@ class ChromeOSLoginTestCase(ActionRunnerTestCase):
     self.expect_successful_google_login()
 
     self.mock_run.story_secrets = page[0].secrets
+    self.assertIsNotNone(config.pages[0].login)
     config.pages[0].login.run_with(self.action_runner)
 
   def test_full_account_maintenance_flow(self):
@@ -188,6 +191,7 @@ class ChromeOSLoginTestCase(ActionRunnerTestCase):
     self.browser.expect_js(result={"count": 1})
 
     self.mock_run.story_secrets = page[0].secrets
+    self.assertIsNotNone(config.pages[0].login)
     config.pages[0].login.run_with(self.action_runner)
 
 

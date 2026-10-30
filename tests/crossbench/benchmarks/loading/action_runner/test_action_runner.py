@@ -64,7 +64,7 @@ class MockActionRunner(ActionRunner):
 
   def __init__(self, run: Run) -> None:
     super().__init__(run)
-    self.click_js = MagicMock(name="Mock click_js")
+    self.click_js: MagicMock = MagicMock(name="Mock click_js")
 
 
 class BaseActionRunnerTestCase(unittest.TestCase):

@@ -9,7 +9,7 @@ import contextlib
 import copy
 import dataclasses
 import datetime as dt
-from typing import TYPE_CHECKING, Any, Iterator, cast
+from typing import TYPE_CHECKING, Any, Iterator, Sequence, cast
 
 from typing_extensions import override
 
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 class JsInvocation:
   result: Any
   script: str | re.Pattern | None = None
-  arguments: list[Any] | None = None
+  arguments: Sequence[Any] | None = None
   timeout: dt.timedelta | None = None
 
 

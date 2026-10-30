@@ -10,18 +10,20 @@ import json
 import pathlib
 import re
 import unittest
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 from unittest import mock
 
 from typing_extensions import override
 
 from crossbench.action_runner.action.action_type import ActionType
+from crossbench.action_runner.action.get import GetAction
 from crossbench.action_runner.action_runner import SCRIPTS_DIR
 from crossbench.benchmarks.loading.config.blocks import ActionBlock, \
     ActionBlockListConfig
 from crossbench.benchmarks.loading.config.login.google import GOOGLE_LOGIN_URL
 from crossbench.benchmarks.loading.loading_benchmark import LoadingBenchmark, \
     LoadingPageFilter
+from crossbench.benchmarks.loading.page.base import Page
 from crossbench.benchmarks.loading.page.combined import CombinedPage
 from crossbench.benchmarks.loading.page.interactive import InteractivePage
 from crossbench.benchmarks.loading.page.live import PAGE_LIST, \
@@ -38,8 +40,11 @@ from tests.crossbench.base import BaseCliTestCase, BaseCrossbenchTestCase
 from tests.crossbench.benchmarks.helper import SubStoryTestCase
 from tests.crossbench.mock_browser import JsInvocation
 
+if TYPE_CHECKING:
+  from crossbench.cli.parser import CBNamespace
 
-class LoadingBenchmarkCliTestCaseMixin:
+
+class LoadingBenchmarkCliTestCaseMixin(SubStoryTestCase):
 
   def test_parser_defaults(self):
     args = self.parse_args()
@@ -59,6 +64,7 @@ class LoadingBenchmarkCliTestCaseMixin:
     benchmark = self.benchmark_cls.from_cli_args(args)
     self.assertGreaterEqual(len(benchmark.stories), 1)
     for story in benchmark.stories:
+      self.assertIsInstance(story, Page)
       self.assertEqual(story.tabs, TabController.single())
 
   def test_multiple_tab_flag(self):
@@ -67,6 +73,7 @@ class LoadingBenchmarkCliTestCaseMixin:
     benchmark = self.benchmark_cls.from_cli_args(args)
     self.assertGreaterEqual(len(benchmark.stories), 1)
     for story in benchmark.stories:
+      self.assertIsInstance(story, Page)
       self.assertEqual(story.tabs, TabController.multiple())
 
   def test_multiple_tab_count_flag(self):
@@ -75,6 +82,7 @@ class LoadingBenchmarkCliTestCaseMixin:
     benchmark = self.benchmark_cls.from_cli_args(args)
     self.assertGreaterEqual(len(benchmark.stories), 1)
     for story in benchmark.stories:
+      self.assertIsInstance(story, Page)
       self.assertEqual(story.tabs, TabController.repeat(5))
 
   def test_infinite_tab_flag(self):
@@ -83,6 +91,7 @@ class LoadingBenchmarkCliTestCaseMixin:
     benchmark = self.benchmark_cls.from_cli_args(args)
     self.assertGreaterEqual(len(benchmark.stories), 1)
     for story in benchmark.stories:
+      self.assertIsInstance(story, Page)
       self.assertEqual(story.tabs, TabController.forever())
 
   def test_playback_flag(self):
@@ -91,6 +100,7 @@ class LoadingBenchmarkCliTestCaseMixin:
     benchmark = self.benchmark_cls.from_cli_args(args)
     self.assertGreaterEqual(len(benchmark.stories), 1)
     for story in benchmark.stories:
+      self.assertIsInstance(story, Page)
       self.assertEqual(story.playback, PlaybackController.repeat(5))
 
   def test_forever_flag(self):
@@ -99,6 +109,7 @@ class LoadingBenchmarkCliTestCaseMixin:
     benchmark = self.benchmark_cls.from_cli_args(args)
     self.assertGreaterEqual(len(benchmark.stories), 1)
     for story in benchmark.stories:
+      self.assertIsInstance(story, Page)
       self.assertEqual(story.playback, PlaybackController.forever())
 
   def test_about_blank_duration_flag(self):
@@ -174,12 +185,14 @@ class TestPageLoadBenchmark(LoadingBenchmarkCliTestCaseMixin, SubStoryTestCase):
     return LoadingBenchmark
 
   @override
-  def mock_args(self) -> argparse.Namespace:
-    args = super().mock_args()
+  def mock_args(self, **kwargs) -> CBNamespace:
+    args = super().mock_args(**kwargs)
     args.pages_config = None
     return args
 
   @override
+  # Narrows SubStoryTestCase.story_filter with loading-specific parameters.
+  # pyrefly: ignore[bad-override]
   def story_filter(self,
                    patterns: Sequence[str],
                    separate: bool = True,
@@ -243,8 +256,13 @@ class TestPageLoadBenchmark(LoadingBenchmarkCliTestCaseMixin, SubStoryTestCase):
 
   def test_filter_by_name(self):
     for preset_page in PAGE_LIST:
+      self.assertIsInstance(preset_page, LivePage)
       stories = self.story_filter([preset_page.name]).stories
-      self.assertSequenceEqual([p.url for p in stories], [preset_page.url])
+      urls = []
+      for p in stories:
+        self.assertIsInstance(p, LivePage)
+        urls.append(p.url)
+      self.assertSequenceEqual(urls, [preset_page.url])
     with self.assertRaisesRegex(argparse.ArgumentTypeError,
                                 r"(?i)non-empty string"):
       self.story_filter([])
@@ -253,8 +271,13 @@ class TestPageLoadBenchmark(LoadingBenchmarkCliTestCaseMixin, SubStoryTestCase):
     pages = PAGE_LIST
     filtered_pages = self.story_filter([pages[0].name, pages[1].name,
                                         "1001"]).stories
-    self.assertSequenceEqual([p.url for p in filtered_pages],
-                             [pages[0].url, pages[1].url])
+    self.assertIsInstance(pages[0], LivePage)
+    self.assertIsInstance(pages[1], LivePage)
+    urls = []
+    for p in filtered_pages:
+      self.assertIsInstance(p, LivePage)
+      urls.append(p.url)
+    self.assertSequenceEqual(urls, [pages[0].url, pages[1].url])
     self.assertEqual(filtered_pages[0].duration, pages[0].duration)
     self.assertEqual(filtered_pages[1].duration, dt.timedelta(seconds=1001))
 
@@ -285,7 +308,11 @@ class TestPageLoadBenchmark(LoadingBenchmarkCliTestCaseMixin, SubStoryTestCase):
   def test_run_combined(self):
     stories = [CombinedPage(PAGE_LIST)]
     self._test_run(stories)
-    self._assert_urls_loaded([story.url for story in PAGE_LIST])
+    urls = []
+    for story in PAGE_LIST:
+      self.assertIsInstance(story, LivePage)
+      urls.append(story.url)
+    self._assert_urls_loaded(urls)
 
   def test_substories_single(self):
     page = LivePage("test", "https://test.com", dt.timedelta(seconds=5))
@@ -1136,6 +1163,7 @@ class ActionBlockListConfigTestCase(unittest.TestCase):
       self.assertEqual(block.label, f"block {index}")
       self.assertEqual(len(block.actions), 1)
       self.assertEqual(block.actions[0].TYPE, ActionType.GET)
+      self.assertIsInstance(block.actions[0], GetAction)
       self.assertEqual(block.actions[0].url, f"http://test.com/{index}")
       self.assertEqual(block.duration, dt.timedelta(seconds=10 + index))
 
@@ -1192,6 +1220,7 @@ class ActionBlockListConfigTestCase(unittest.TestCase):
     self.assertEqual(len(block.actions), 2)
     for index, action in enumerate(block.actions):
       self.assertEqual(action.TYPE, ActionType.GET)
+      self.assertIsInstance(action, GetAction)
       self.assertEqual(action.url, f"http://test.com/{index}")
 
   def test_parse_single_block_empty_action_dict(self):
@@ -1230,6 +1259,7 @@ class ActionBlockListConfigTestCase(unittest.TestCase):
       self.assertEqual(block.label, f"block {index}")
       self.assertEqual(len(block.actions), 1)
       self.assertEqual(block.actions[0].TYPE, ActionType.GET)
+      self.assertIsInstance(block.actions[0], GetAction)
       self.assertEqual(block.actions[0].url, f"http://test.com/{index}")
 
   def test_parse_multi_block_actions_list(self):
@@ -1248,6 +1278,7 @@ class ActionBlockListConfigTestCase(unittest.TestCase):
       self.assertEqual(block.label, f"block {index}")
       self.assertEqual(len(block.actions), 1)
       self.assertEqual(block.actions[0].TYPE, ActionType.GET)
+      self.assertIsInstance(block.actions[0], GetAction)
       self.assertEqual(block.actions[0].url, f"http://test.com/{index}")
 
   def test_parse_dict_label_conflict(self):

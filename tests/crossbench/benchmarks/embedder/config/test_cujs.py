@@ -81,7 +81,7 @@ class CUJsConfigTestCase(CrossbenchFakeFsTestCase):
   def test_scenario_invalid_actions(self):
     invalid_actions: list[Any] = [None, "", [], {}, "invalid string", 12]
     for invalid_action in invalid_actions:
-      config_dict: dict[str, dict] = {"cujs": {"name": invalid_action}}
+      config_dict: dict[str, object] = {"cujs": {"name": invalid_action}}
       with self.subTest(invalid_action=invalid_action):
         with self.assertRaises(argparse.ArgumentTypeError):
           CUJsConfig.parse_dict(config_dict)
@@ -100,7 +100,7 @@ class CUJsConfigTestCase(CrossbenchFakeFsTestCase):
   def test_invalid_action(self):
     invalid_actions: list[Any] = [None, "", [], {}, "unknown action name", 12]
     for invalid_action in invalid_actions:
-      config_dict = {
+      config_dict: dict[str, object] = {
           "cujs": {
               "TEST": [{
                   "action": invalid_action,

@@ -5,14 +5,22 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+from typing import TYPE_CHECKING
 from unittest import mock
 
 from crossbench.action_runner.action_runner import SCRIPTS_DIR
 from tests.crossbench.base import CrossbenchFakeFsTestCase, \
     CrossbenchMockArgsMixin
 
+if TYPE_CHECKING:
+  from crossbench.cli.parser import CBNamespace
+  from tests.crossbench.mock_browser import MockBrowser
+  from tests.crossbench.mock_helper import MockPlatformMixin
+
 
 class ActionRunnerTestCase(CrossbenchMockArgsMixin, CrossbenchFakeFsTestCase):
+  platform: MockPlatformMixin
+  browser: MockBrowser
 
   def setUp(self) -> None:
     super().setUp()
@@ -31,8 +39,8 @@ class ActionRunnerTestCase(CrossbenchMockArgsMixin, CrossbenchFakeFsTestCase):
 
     self.sleep_mock.side_effect = sleep_side_effect
 
-  def mock_args(self):
-    args = super().mock_args()
+  def mock_args(self, **kwargs) -> CBNamespace:
+    args = super().mock_args(**kwargs)
     args.stories = None
     args.story_tags = None
     args.separate = False

@@ -58,6 +58,7 @@ class TestBrowserStartupBenchmark(BaseCrossbenchTestCase):
             "google_startup": "https://www.google.com/",
         })
     probes_default = desc.get("probes_default") or desc.get("probes-default")
+    self.assertIsInstance(probes_default, dict)
     self.assertIn("browser_startup", probes_default)
 
   def test_all_story_names(self) -> None:

@@ -42,7 +42,8 @@ from crossbench.probes.cb_perfetto.perfetto import TraceConfig
 from crossbench.runner.groups.session import BrowserSessionRunGroup
 from crossbench.runner.runner import Runner
 from tests.crossbench import mock_browser
-from tests.crossbench.mock_helper import MockCLI, MockPlatform
+from tests.crossbench.mock_helper import MockCLI, MockPlatform, \
+    MockPlatformMixin
 from tests.crossbench.runner.mocks import MockRun, MockRunner
 
 if TYPE_CHECKING:
@@ -165,7 +166,7 @@ class CrossbenchConfigTestMixin:
 
 class CrossbenchPlatformMockMixin:
   if TYPE_CHECKING:
-    platform: plt.Platform
+    platform: MockPlatformMixin
     addCleanup: Callable[..., None]  # noqa: N815
 
   def setup_platform_mock(self) -> None:

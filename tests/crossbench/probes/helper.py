@@ -14,7 +14,7 @@ from typing_extensions import override
 from crossbench.benchmarks.loading.loading_benchmark import LoadingBenchmark
 from crossbench.benchmarks.loading.page.combined import CombinedPage
 from crossbench.env.runner_env import EnvConfig, ValidationMode
-from crossbench.runner.runner import Runner
+from crossbench.runner.runner import CacheTemperature, Runner
 from tests.crossbench.base import BaseCrossbenchTestCase, \
     CrossbenchFakeFsTestCase, CrossbenchPlatformMockMixin
 from tests.crossbench.mock_helper import MockPlatform
@@ -54,7 +54,8 @@ class GenericProbeTestCase(BaseCrossbenchTestCase):
                     separate: bool = False,
                     repetitions: int = 3,
                     warmup_repetitions: int = 0,
-                    cache_temperatures: Iterable[str] = ("default",),
+                    cache_temperatures: Iterable[CacheTemperature] = (
+                        CacheTemperature.DEFAULT,),
                     throw: bool = True) -> Runner:
     self.assertTrue(stories)
     if not separate and len(stories) > 1:

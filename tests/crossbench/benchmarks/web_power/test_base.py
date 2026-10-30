@@ -32,7 +32,7 @@ from crossbench.device_config import DeviceConfigMap, DeviceConfigValueError, \
 from crossbench.env.runner_env import ValidationMode
 from crossbench.network.replay.wpr import WprReplayNetwork
 from crossbench.parse import ObjectParser
-from crossbench.probes.bits import BitsProbe
+from crossbench.probes.bits import BitsProbe, BitsProbeContext
 from crossbench.probes.cb_perfetto.perfetto import PerfettoProbe, TraceConfig
 from crossbench.probes.junction_temperature import JunctionTemperatureProbe
 from crossbench.probes.probe import Probe, ProbeIncompatibleBrowser
@@ -528,6 +528,7 @@ class WebPowerBenchmarkBaseTestCase(BaseWebPowerBenchmarkTestCase):
     with mock.patch("crossbench.probes.bits.dt.datetime") as mock_datetime:
       mock_datetime.now.return_value = now
       context = bits_probe.create_context(run)
+      self.assertIsInstance(context, BitsProbeContext)
       self.assertEqual(context.bits_out_id, "20260702_170055")
 
   def test_kwargs_from_cli_bits_only_out_fails(self) -> None:
@@ -645,7 +646,6 @@ class WebPowerBenchmarkBaseTestCase(BaseWebPowerBenchmarkTestCase):
     self.assertEqual(len(extra_probes), 1)
     tp_probe = extra_probes[0]
     self.assertIsInstance(tp_probe, TraceProcessorProbe)
-    assert isinstance(tp_probe, TraceProcessorProbe)
     return tp_probe
 
   def test_setup_trace_processor_probe(self) -> None:
@@ -991,7 +991,6 @@ class WebPowerBenchmarkSetupSessionTestCase(BaseCrossbenchTestCase):
       self.assertIsNotNone(network._response_transformations_file)
       rules_file = network._response_transformations_file
       self.assertIsNotNone(rules_file)
-      assert rules_file is not None
       self.assertTrue(pathlib.Path(rules_file).exists())
 
   def test_setup_session_network_twice(self) -> None:

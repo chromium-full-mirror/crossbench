@@ -18,16 +18,22 @@ from typing_extensions import override
 from crossbench.benchmarks.loading.playback_controller import \
     PlaybackController
 from crossbench.benchmarks.loading.tab_controller import TabController
-from crossbench.benchmarks.loadline.loadline import LoadLinePageFilter
+from crossbench.benchmarks.loadline.loadline import LoadLineBenchmark, \
+    LoadLinePageFilter
 from tests.crossbench.base import SysExitTestException
 from tests.crossbench.benchmarks.helper import SubStoryTestCase
 
 if TYPE_CHECKING:
-  from crossbench.benchmarks.base import Benchmark
   from crossbench.benchmarks.loading.page.interactive import InteractivePage
 
 
 class BaseLoadLineTestCase(SubStoryTestCase, metaclass=abc.ABCMeta):
+
+  @property
+  @abc.abstractmethod
+  @override
+  def benchmark_cls(self) -> type[LoadLineBenchmark]:
+    pass
 
   @override
   def setUp(self) -> None:
@@ -39,6 +45,8 @@ class BaseLoadLineTestCase(SubStoryTestCase, metaclass=abc.ABCMeta):
     pass
 
   @override
+  # Narrows SubStoryTestCase.story_filter with LoadLine-specific parameters.
+  # pyrefly: ignore[bad-override-param-name]
   def story_filter(
       self,
       patterns: Sequence[str],
@@ -129,8 +137,13 @@ class BaseLoadLineBenchmarkTestCase(
         run_setup=True,
     )
 
-  tablet_benchmark_cls: type[Benchmark] | None = None
-  phone_benchmark_cls: type[Benchmark] | None = None
+  @property
+  def tablet_benchmark_cls(self) -> type[LoadLineBenchmark] | None:
+    return None
+
+  @property
+  def phone_benchmark_cls(self) -> type[LoadLineBenchmark] | None:
+    return None
 
   def test_get_pages_config_variants(self):
     if self.tablet_benchmark_cls and self.phone_benchmark_cls:

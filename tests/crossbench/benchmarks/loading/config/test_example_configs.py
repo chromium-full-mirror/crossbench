@@ -7,6 +7,9 @@ from __future__ import annotations
 import datetime as dt
 
 from crossbench import hjson as cb_hjson
+from crossbench.action_runner.action.click import ClickAction
+from crossbench.action_runner.action.get import GetAction
+from crossbench.action_runner.action.scroll import ScrollAction
 from crossbench.benchmarks.loading.config.pages import PagesConfig
 from crossbench.helper.cwd import change_cwd
 from tests import test_helper
@@ -53,14 +56,17 @@ class TestExamplePageConfig(CrossbenchFakeFsTestCase):
     self.assertEqual(len(block.actions), 3)
 
     get_action = block.actions[0]
+    self.assertIsInstance(get_action, GetAction)
     self.assertEqual(get_action.url, "https://www.google.com")
 
     cookie_banner_action = block.actions[1]
+    self.assertIsInstance(cookie_banner_action, ClickAction)
     self.assertIsNotNone(cookie_banner_action.position.selector)
     self.assertEqual(cookie_banner_action.position.selector.selector,
                      "xpath///button/div[contains(text(),'akzeptieren')]")
 
     scroll_action = block.actions[2]
+    self.assertIsInstance(scroll_action, ScrollAction)
     self.assertEqual(scroll_action.distance, 500)
     self.assertEqual(scroll_action.duration, dt.timedelta(seconds=10))
 

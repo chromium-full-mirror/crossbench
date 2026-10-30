@@ -16,10 +16,10 @@ from crossbench.browsers.settings import Settings
 from crossbench.runner.runner import Runner
 from tests.crossbench.base import BaseCrossbenchTestCase
 from tests.crossbench.mock_browser import MockChromeDev, MockFirefox
-from tests.crossbench.mock_helper import MockBenchmark, MockStory
+from tests.crossbench.mock_helper import MockBenchmark, MockPlatformMixin, \
+    MockStory
 
 if TYPE_CHECKING:
-  from crossbench import plt
   from crossbench.benchmarks.base import Benchmark
   from crossbench.browsers.browser import Browser
   from crossbench.probes.probe import Probe
@@ -42,7 +42,7 @@ __all__ = [
 
 class CrossbenchMagicMockMixin:
   if TYPE_CHECKING:
-    platform: plt.Platform
+    platform: MockPlatformMixin
     magic_mock_session: mock.MagicMock
 
   @property
@@ -75,6 +75,9 @@ class CrossbenchMagicMockMixin:
     return run
 
 
+# CrossbenchMagicMockMixin.mock_run and BaseCrossbenchTestCase.mock_run have
+# different method signatures.
+# pyrefly: ignore[inconsistent-inheritance]
 class BaseRunnerTestCase(
     CrossbenchMagicMockMixin, BaseCrossbenchTestCase, metaclass=abc.ABCMeta):
 

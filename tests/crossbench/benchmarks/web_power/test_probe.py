@@ -1011,8 +1011,10 @@ class WebPowerProbeMappingTestCase(CrossbenchFakeFsTestCase):
     internal_sql = self._create_sql_file(Mapping.INTERNAL, "internal_query.sql")
 
     (tp_probe,) = self.probe.get_extra_probes(self.runner)
+    self.assertIsInstance(tp_probe, TraceProcessorProbe)
     self.assertEqual(len(tp_probe.queries), 2)
     device_query, cpu_query = tp_probe.queries
+    self.assertIsInstance(device_query, DeviceSpecificTraceProcessorQuery)
     self.assertEqual(cpu_query.name, "web_power_cpu_time")
 
     self.assertDictEqual(
@@ -1084,11 +1086,9 @@ class WebPowerProbeQueryValidationTestCase(unittest.TestCase):
     self.assertEqual(len(extra_probes), 1)
     default_tp_probe = extra_probes[0]
     self.assertIsInstance(default_tp_probe, TraceProcessorProbe)
-    assert isinstance(default_tp_probe, TraceProcessorProbe)
     self.assertEqual(len(default_tp_probe.queries), 2)
     raw_query, self.cpu_query = default_tp_probe.queries
     self.assertIsInstance(raw_query, DeviceSpecificTraceProcessorQuery)
-    assert isinstance(raw_query, DeviceSpecificTraceProcessorQuery)
     # Validate the cpu_query config independently
     self.assertIsInstance(self.cpu_query, TraceProcessorQueryConfig)
     self.assertEqual(self.cpu_query.name, "web_power_cpu_time")
@@ -1241,7 +1241,6 @@ class WebPowerProbeQueryValidationTestCase(unittest.TestCase):
           """)
           resolved = self.query.resolve_for_platform(browser.platform)
           self.assertIsNotNone(resolved)
-          assert resolved is not None
           df = tp.query(resolved.sql).as_pandas_dataframe()
           self.assertListEqual(
               list(df.columns), ["power_rail_name", "avg_power_mw"])

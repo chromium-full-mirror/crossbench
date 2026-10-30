@@ -216,6 +216,7 @@ class PageConfigTestsCase(unittest.TestCase):
     self.assertEqual(len(config.blocks), 1)
     self.assertEqual(len(tuple(config.actions())), 1)
     self.assertEqual(len(login), 2)
+    self.assertIsInstance(login.actions[0], GetAction)
     self.assertEqual(login.actions[0].url, "http://test.com/login")
 
   def test_parse_setup_block(self):
@@ -231,6 +232,8 @@ class PageConfigTestsCase(unittest.TestCase):
         "actions": ["http://test.com/charts"],
     }
     config = PageConfig.parse(config_data)
+    self.assertIsNotNone(config.login)
+    self.assertIsNotNone(config.setup)
     self.assertEqual(len(config.login), 1)
     self.assertEqual(len(config.setup), 2)
     self.assertIsNone(config.teardown)
@@ -268,6 +271,7 @@ class PageConfigTestsCase(unittest.TestCase):
     self.assertIsNone(config.setup)
     self.assertEqual(len(config.blocks), 1)
     self.assertEqual(config.blocks[0].first_url, "http://test.com/charts")
+    self.assertIsNotNone(config.teardown)
     self.assertEqual(len(config.teardown), 2)
     self.assertEqual(config.teardown.first_url, "http://test.com/teardown")
 

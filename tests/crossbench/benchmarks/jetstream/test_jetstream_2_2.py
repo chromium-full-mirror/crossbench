@@ -37,7 +37,6 @@ class JetStream22TestCase(jetstream_helper.JetStream2BaseTestCase):
     return JetStream22ProbeContext
 
   @property
-  @override
   def name(self):
     return "jetstream_2.2"
 

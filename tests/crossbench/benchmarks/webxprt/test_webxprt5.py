@@ -273,9 +273,12 @@ class WebXPRT5TestCase(helper.PressBaseBenchmarkTestCase):
     }
     with mock.patch.object(context, "_get_expected_iters", return_value=2):
       flattened = context.flatten_json_data(raw_data)
+    self.assertIsInstance(flattened, dict)
     self.assertEqual(flattened["Score"], 60.0)
     self.assertEqual(flattened["Geomean"], 1438.88)
     self.assertEqual(flattened["Variance"], 1.25)
+    self.assertIsInstance(flattened["Video_Effects"], float)
+    self.assertIsInstance(flattened["Detect_Faces"], float)
     self.assertAlmostEqual(flattened["Video_Effects"], (3343.7 + 3280.3) / 2)
     self.assertAlmostEqual(flattened["Detect_Faces"], (700.0 + 800.0) / 2)
     self.assertNotIn("Video background blur with AI", flattened)
@@ -305,6 +308,7 @@ class WebXPRT5TestCase(helper.PressBaseBenchmarkTestCase):
     }
     with mock.patch.object(context, "_get_expected_iters", return_value=1):
       flattened = context.flatten_json_data(raw_data)
+    self.assertIsInstance(flattened, dict)
     self.assertNotIn("Score", flattened)
     self.assertNotIn("Geomean", flattened)
     self.assertNotIn("Variance", flattened)
@@ -371,9 +375,11 @@ class WebXPRT5TestCase(helper.PressBaseBenchmarkTestCase):
         "_extract_workload_metrics",
         side_effect=mock_extract_workload_metrics):
       flattened = context.flatten_json_data(raw_data)
+    self.assertIsInstance(flattened, dict)
     self.assertEqual(flattened["Score"], 65.0)
     self.assertEqual(flattened["Geomean"], 1326.12)
     self.assertEqual(flattened["Variance"], 4.0)
+    self.assertIsInstance(flattened["Video_Effects"], float)
     self.assertAlmostEqual(flattened["Video_Effects"], (2924.1 + 3043.0) / 2)
     self.assertEqual(flattened["Detect_Faces"], 755.5)
     self.assertEqual(flattened["Photo_Effects"], 624.8)
@@ -419,9 +425,11 @@ class WebXPRT5TestCase(helper.PressBaseBenchmarkTestCase):
     }
     with mock.patch.object(context, "_get_expected_iters", return_value=2):
       flattened = context.flatten_json_data(raw_data)
+    self.assertIsInstance(flattened, dict)
     self.assertNotIn("Score", flattened)
     self.assertNotIn("Geomean", flattened)
     self.assertNotIn("Variance", flattened)
+    self.assertIsInstance(flattened["Photo_Effects"], float)
     self.assertAlmostEqual(flattened["Photo_Effects"], (616.0 + 592.8) / 2)
 
   def test_flatten_json_data_mismatched_iters_raises_error(self):

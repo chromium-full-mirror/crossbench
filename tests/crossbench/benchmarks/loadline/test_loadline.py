@@ -39,10 +39,12 @@ class BaseLoadLine1BenchmarkTestCase(
     return TabController.default()
 
   @property
+  @override
   def tablet_benchmark_cls(self):
     return LoadLine1TabletBenchmark
 
   @property
+  @override
   def phone_benchmark_cls(self):
     return LoadLine1PhoneBenchmark
 

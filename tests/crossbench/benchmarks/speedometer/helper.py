@@ -16,7 +16,8 @@ from unittest import mock
 
 from typing_extensions import override
 
-from crossbench.benchmarks.speedometer.speedometer_3 import MeasurementMethod
+from crossbench.benchmarks.speedometer.speedometer_3 import \
+    MeasurementMethod, Speedometer3Benchmark, Speedometer3Story
 from crossbench.browsers.viewport import Viewport
 from crossbench.env.runner_env import EnvConfig, ValidationMode
 from crossbench.runner.runner import Runner
@@ -80,9 +81,13 @@ class SpeedometerBaseTestCase(
     args = self.Namespace()
     self.benchmark_cls.from_cli_args(args)
     with self.assertRaisesRegex(argparse.ArgumentTypeError, "iteration"):
+      # Intentionally assigning str to int field to test CLI validation.
+      # pyrefly: ignore[bad-assignment]
       args.iterations = "-10"
       self.benchmark_cls.from_cli_args(args)
     with self.assertRaisesRegex(argparse.ArgumentTypeError, "iteration"):
+      # Intentionally assigning str to int field to test CLI validation.
+      # pyrefly: ignore[bad-assignment]
       args.iterations = "1234"
       benchmark = self.benchmark_cls.from_cli_args(args)
     args.iterations = 1234
@@ -487,6 +492,18 @@ class Speedometer2BaseTestCase(SpeedometerBaseTestCase, metaclass=abc.ABCMeta):
 
 
 class Speedometer3BaseTestCase(SpeedometerBaseTestCase):
+
+  @property
+  @abc.abstractmethod
+  @override
+  def benchmark_cls(self) -> type[Speedometer3Benchmark]:
+    pass
+
+  @property
+  @abc.abstractmethod
+  @override
+  def story_cls(self) -> type[Speedometer3Story]:
+    pass
 
   @property
   @override

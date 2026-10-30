@@ -19,8 +19,7 @@ from crossbench.flags.base import Flags
 
 if TYPE_CHECKING:
   from crossbench import path as pth
-  from crossbench.plt.types import CmdArg, ListCmdArgs, SequenceCmdArgs, \
-      TupleCmdArgs
+  from crossbench.plt.types import CmdArg, ListCmdArgs, SequenceCmdArgs
 
 root_dir = config.root_dir
 config_dir = config.config_dir
@@ -42,7 +41,7 @@ class TestEnv:
   output_dir: pathlib.Path
   test_name: str
   is_cq: bool = field(init=False)
-  cq_flags: TupleCmdArgs = field(init=False)
+  cq_flags: tuple[str, ...] = field(init=False)
   archive_dir: pathlib.Path = field(init=False)
   results_dir: pathlib.Path = field(init=False)
   root_dir: pathlib.Path = field(init=False)
@@ -129,10 +128,10 @@ def run_pytest(
   pass_through_args: list[str] = sys.argv[1:]
   extra_args.extend(pass_through_args)
   # Run tests single-threaded by default when running the test file directly.
-  if not any(arg == "-n" or arg.startswith(("-n=", "--numprocesses="))
+  if not any(arg == "-n" or str(arg).startswith(("-n=", "--numprocesses="))
              for arg in extra_args):
     extra_args.append("-n=0")
-  if not any(arg == "-r" or arg.startswith("-r") for arg in extra_args):
+  if not any(arg == "-r" or str(arg).startswith("-r") for arg in extra_args):
     extra_args.append("-rs")
 
   pytest_args: list[str] = [str(path), *map(str, extra_args)]

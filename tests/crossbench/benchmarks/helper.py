@@ -11,6 +11,7 @@ from typing_extensions import override
 
 from crossbench.benchmarks import base as benchmark_module
 from crossbench.cli.parser import CBArgumentParser
+from crossbench.stories.press_benchmark import PressBenchmarkStory
 from tests.crossbench.base import BaseCrossbenchTestCase
 
 
@@ -53,6 +54,13 @@ class BaseBenchmarkTestCase(BaseCrossbenchTestCase, metaclass=abc.ABCMeta):
 
 
 class SubStoryTestCase(BaseBenchmarkTestCase, metaclass=abc.ABCMeta):
+
+  @property
+  @abc.abstractmethod
+  @override
+  def benchmark_cls(self) -> type[benchmark_module.SubStoryBenchmark]:
+    pass
+
   @property
   def story_filter_cls(self) -> type[benchmark_module.StoryFilter]:
     return self.benchmark_cls.STORY_FILTER_CLS
@@ -73,8 +81,14 @@ class SubStoryTestCase(BaseBenchmarkTestCase, metaclass=abc.ABCMeta):
     with self.assertRaises(AssertionError):
       self.benchmark_cls(stories=[])
     with self.assertRaises(AssertionError):
+      # Intentionally passing a str instead of Sequence[Story] to test runtime
+      # assertion.
+      # pyrefly: ignore[bad-argument-type]
       self.benchmark_cls(stories="")
     with self.assertRaises(AssertionError):
+      # Intentionally passing Sequence[str] instead of Sequence[Story] to test
+      # runtime assertion.
+      # pyrefly: ignore[bad-argument-type]
       self.benchmark_cls(stories=["", ""])
 
   def test_stories_creation(self):
@@ -96,6 +110,7 @@ class SubStoryTestCase(BaseBenchmarkTestCase, metaclass=abc.ABCMeta):
     self.benchmark_cls([any_story])
     with self.assertRaises(AssertionError):
       # Accidentally nested array.
+      # pyrefly: ignore[bad-argument-type]
       self.benchmark_cls([[any_story]])
 
   def test_instantiate_all_stories(self):
@@ -104,6 +119,18 @@ class SubStoryTestCase(BaseBenchmarkTestCase, metaclass=abc.ABCMeta):
 
 
 class PressBaseBenchmarkTestCase(SubStoryTestCase, metaclass=abc.ABCMeta):
+
+  @property
+  @abc.abstractmethod
+  @override
+  def benchmark_cls(self) -> type[benchmark_module.PressBenchmark]:
+    pass
+
+  @property
+  @override
+  def story_cls(self) -> type[PressBenchmarkStory]:
+    return self.benchmark_cls.DEFAULT_STORY_CLS
+
   def test_invalid_story_names(self):
     # Only StoryFilter can filter stories by regexp
     with self.assertRaises(ValueError):
@@ -195,6 +222,7 @@ class PressBaseBenchmarkTestCase(SubStoryTestCase, metaclass=abc.ABCMeta):
     benchmark_instance = self.benchmark_cls.from_cli_args(args)
     self.assertEqual(benchmark_instance.custom_url, self.story_cls.URL)
     for story in benchmark_instance.stories:
+      self.assertIsInstance(story, PressBenchmarkStory)
       self.assertEqual(story.url, self.story_cls.URL)
 
   def test_cli_flag_official(self):
@@ -203,6 +231,7 @@ class PressBaseBenchmarkTestCase(SubStoryTestCase, metaclass=abc.ABCMeta):
     benchmark_instance = self.benchmark_cls.from_cli_args(args)
     self.assertEqual(benchmark_instance.custom_url, self.story_cls.URL_OFFICIAL)
     for story in benchmark_instance.stories:
+      self.assertIsInstance(story, PressBenchmarkStory)
       self.assertEqual(story.url, self.story_cls.URL_OFFICIAL)
 
   def test_cli_flag_local(self):
@@ -211,6 +240,7 @@ class PressBaseBenchmarkTestCase(SubStoryTestCase, metaclass=abc.ABCMeta):
     benchmark_instance = self.benchmark_cls.from_cli_args(args)
     self.assertEqual(benchmark_instance.custom_url, self.story_cls.URL_LOCAL)
     for story in benchmark_instance.stories:
+      self.assertIsInstance(story, PressBenchmarkStory)
       self.assertEqual(story.url, self.story_cls.URL_LOCAL)
 
   def test_cli_flag_custom_benchmark_url(self):
@@ -220,6 +250,7 @@ class PressBaseBenchmarkTestCase(SubStoryTestCase, metaclass=abc.ABCMeta):
     benchmark_instance = self.benchmark_cls.from_cli_args(args)
     self.assertEqual(benchmark_instance.custom_url, custom_url)
     for story in benchmark_instance.stories:
+      self.assertIsInstance(story, PressBenchmarkStory)
       self.assertEqual(story.url, custom_url)
 
   def test_cli_flag_aliases(self):

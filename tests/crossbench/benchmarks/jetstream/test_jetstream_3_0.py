@@ -37,7 +37,6 @@ class JetStream30TestCase(jetstream_helper.JetStream3BaseTestCase):
     return JetStream30ProbeContext
 
   @property
-  @override
   def name(self):
     return "jetstream_3.0"
 

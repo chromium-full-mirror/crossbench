@@ -22,16 +22,19 @@ from crossbench.probes.probe_context import ProbeContext
 from crossbench.probes.results import LocalProbeResult, ProbeResult
 from crossbench.runner.actions import Actions
 from crossbench.runner.pause_controller import ResumeMode
-from crossbench.runner.result_origin import ResultOrigin
+from crossbench.runner.run import Run
 from crossbench.runner.timing import Timing
 from tests.crossbench.mock_helper import MockBenchmark, MockStory
 
 if TYPE_CHECKING:
+  from unittest import mock
+
+  from crossbench.benchmarks.base import Benchmark
   from crossbench.browsers.browser import Browser
   from crossbench.probes.probe import ProbeT
-  from crossbench.runner.run import Run
   from crossbench.runner.runner import Runner
   from crossbench.runner.timing import AnyTimeUnit
+  from crossbench.stories.story import Story
 
 
 class MockBrowser:
@@ -45,7 +48,49 @@ class MockBrowser:
     return self.unique_name
 
 
-class MockRun(ResultOrigin):
+class MockRun(Run):
+  if TYPE_CHECKING:
+    # MockRun redefines Run's Final fields as mutable attributes so tests can
+    # assign to them directly.
+    # pyrefly: ignore[bad-override]
+    _runner: Runner
+    # MockRun._browser_session is often a MagicMock in tests.
+    # pyrefly: ignore[bad-override]
+    _browser_session: mock.MagicMock
+    # Redefines Run._browser (Final) as a mutable attribute.
+    # pyrefly: ignore[bad-override]
+    _browser: Browser
+    # Redefines Run._exceptions (Final) as a mutable attribute.
+    # pyrefly: ignore[bad-override]
+    _exceptions: Annotator
+    # Redefines Run._durations (Final) as a mutable attribute.
+    # pyrefly: ignore[bad-override]
+    _durations: Durations
+    _browser_tmp_dir: pth.AnyPath
+    # Redefines Run._repetition (Final) as a mutable attribute.
+    # pyrefly: ignore[bad-override]
+    _repetition: int
+    # Redefines Run._is_warmup (Final) as a mutable attribute.
+    # pyrefly: ignore[bad-override]
+    _is_warmup: bool
+    # Redefines Run._temperature (Final) as a mutable attribute.
+    # pyrefly: ignore[bad-override]
+    _temperature: str
+    # Redefines Run._name (Final) as a mutable non-None attribute.
+    # pyrefly: ignore[bad-override]
+    _name: str
+    # Redefines Run._index (Final) as a mutable attribute.
+    # pyrefly: ignore[bad-override]
+    _index: int
+    # Redefines Run._story (Final) as a mutable attribute accepting str.
+    # pyrefly: ignore[bad-override]
+    _story: Story | str
+    # Redefines Run._action_runner (Final) as a mutable attribute.
+    # pyrefly: ignore[bad-override]
+    _action_runner: ActionRunner
+    # Redefines Run._out_dir (Final) as a mutable attribute.
+    # pyrefly: ignore[bad-override]
+    _out_dir: pth.LocalPath
 
   def __init__(self,
                runner,
@@ -60,38 +105,39 @@ class MockRun(ResultOrigin):
                probe=None,
                probe_context=None) -> None:
     self._runner = runner
-    self.browser_session = browser_session
+    self._browser_session = browser_session
     self._browser = browser_session.browser
     self._exceptions = Annotator(False)
     self._durations = Durations()
     self._browser_tmp_dir = pth.AnyPath("/browser_tmp")
-    self.repetition = repetition
-    self.is_warmup = is_warmup
-    self.temperature = temperature
-    self.name = name
+    self._repetition = repetition
+    self._is_warmup = is_warmup
+    self._temperature = temperature
+    self._name = name
+    # Tests inspect `run.probes` assuming `[None]` when `probe` is omitted.
+    # pyrefly: ignore[bad-assignment]
     self._probes: list[Probe] = [probe]
     self.probe_context: ProbeContext | None = probe_context
-    self.timing = Timing()
-    self.is_success = True
-    self.index = index
-    self.story = story
-    self.action_runner: ActionRunner = action_runner or ActionRunner(self)
+    self._timing = Timing()
+    self._is_success = True
+    self._index = index
+    self._story = story
+    self._action_runner = action_runner or ActionRunner(self)
 
     self.story_secrets = Secrets()
     self._out_dir = (
         browser_session.root_dir /
         pth.safe_filename(self._browser.unique_name) / "stories" / name /
-        f"repetition={self.repetition}" / self.temperature)
-    self.group_dir = self._out_dir.parent
+        f"repetition={self._repetition}" / self._temperature)
     self.did_setup = False
     self.did_run = False
     self.did_teardown = False
     self.did_teardown_browser = False
-    self.is_skipped = False
+    self._is_skipped = False
     self.is_dry_run: bool | None = None
 
   @property
-  def benchmark(self) -> Any:
+  def benchmark(self) -> Benchmark:
     return self._runner.benchmark
 
   def validate_env(self, env: RunnerEnv):
@@ -163,8 +209,45 @@ class MockRun(ResultOrigin):
     return self._browser_tmp_dir
 
   @property
+  @override
+  # MockRun.browser_session is often a MagicMock in tests.
+  # pyrefly: ignore[bad-override]
+  def browser_session(self) -> mock.MagicMock:
+    return self._browser_session
+
+  @property
+  @override
+  def action_runner(self) -> ActionRunner:
+    return self._action_runner
+
+  @action_runner.setter
+  def action_runner(self, value: ActionRunner) -> None:
+    self._action_runner = value
+
+  @property
+  @override
+  def timing(self) -> Timing:
+    return self._timing
+
+  @property
+  @override
+  def is_success(self) -> bool:
+    return self._is_success
+
+  @is_success.setter
+  def is_success(self, value: bool) -> None:
+    self._is_success = value
+
+  @property
   def secrets(self) -> Secrets:
     return self.story_secrets.merge(fallback=self.browser.secrets)
+
+  @property
+  @override
+  def browser_platform(self) -> mock.MagicMock:
+    # MockRun._browser.platform is a MagicMock in tests.
+    # pyrefly: ignore[bad-return]
+    return self._browser.platform
 
   @property
   def is_remote(self) -> bool:
@@ -174,7 +257,7 @@ class MockRun(ResultOrigin):
     return dt.datetime.max
 
   def mark_skipped(self) -> None:
-    self.is_skipped = True
+    self._is_skipped = True
 
   def run(self, is_dry_run: bool) -> None:
     assert self.is_dry_run is is_dry_run
@@ -255,6 +338,8 @@ class MockRunner:
     self.browsers: list[Browser] = []
     self.out_dir = pth.LocalPath("results/out")
     self.timing = Timing()
+    # MockPlatform does not inherit from Platform.
+    # pyrefly: ignore[bad-argument-type]
     self.env = RunnerEnv(self.platform, self.out_dir, self.browsers,
                          self.probes, self.repetitions)
     self.mock_waits: list[MockWait] = []

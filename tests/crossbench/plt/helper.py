@@ -17,7 +17,7 @@ import crossbench.path as pth
 from crossbench import plt
 from crossbench.plt.posix import PosixPlatform
 from tests.crossbench.base import CrossbenchFakeFsTestCase
-from tests.crossbench.mock_helper import MockPlatform
+from tests.crossbench.mock_helper import MockPlatform, MockPlatformMixin
 
 GCS_URL: Final[str] = (
     "gs://chrome-partner-loadline/archive_phone_20260331.wprgo")
@@ -59,7 +59,7 @@ class BaseMockPlatformTestCase(CrossbenchFakeFsTestCase, metaclass=abc.ABCMeta):
   def setup_host_platform(self) -> MockPlatform:
     return MockPlatform()
 
-  def setup_platform(self) -> MockPlatform:
+  def setup_platform(self) -> plt.Platform:
     return self.host_platform
 
   def mock_platform_str(self, platform, name) -> None:
@@ -78,6 +78,7 @@ class BaseMockPlatformTestCase(CrossbenchFakeFsTestCase, metaclass=abc.ABCMeta):
     super().tearDown()
 
   def expect_sh(self, *args, result="", returncode: int = 0):
+    self.assertIsInstance(self.platform, MockPlatformMixin)
     self.platform.expect_sh(*args, result=result, returncode=returncode)
 
   def test_is_android(self):
@@ -206,7 +207,7 @@ class BaseMockPlatformTestCase(CrossbenchFakeFsTestCase, metaclass=abc.ABCMeta):
         self._assert_gcs_nothing_cached(dest)
 
 
-class BaseLocalMockPlatformTestMixin:
+class BaseLocalMockPlatformTestMixin(BaseMockPlatformTestCase):
 
   def test_local_port_forward_invalid(self):
     with self.platform.ports.nested() as ports:

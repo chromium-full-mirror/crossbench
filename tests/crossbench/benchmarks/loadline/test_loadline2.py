@@ -150,10 +150,12 @@ class BaseLoadLine2BenchmarkTestCase(
     return None
 
   @property
+  @override
   def tablet_benchmark_cls(self):
     return LoadLine2TabletBenchmark
 
   @property
+  @override
   def phone_benchmark_cls(self):
     return LoadLine2PhoneBenchmark
 

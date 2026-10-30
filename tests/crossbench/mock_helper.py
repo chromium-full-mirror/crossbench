@@ -27,10 +27,12 @@ from crossbench.action_runner.virtual_device.virtual_device_type import \
     VirtualDeviceType
 from crossbench.benchmarks.base import SubStoryBenchmark
 from crossbench.cli.cli import CrossBenchCLI
+from crossbench.cli.subcommand.benchmark import BenchmarkSubcommand
 from crossbench.plt.android_adb import Adb, AndroidAdbPlatform
 from crossbench.plt.base import MachineArch, Platform, SubprocessError
 from crossbench.plt.chromeos_ssh import ChromeOsSshPlatform
-from crossbench.plt.evemu_platform_mixin import VirtualDeviceState
+from crossbench.plt.evemu_platform_mixin import EvemuPlatformMixin, \
+    VirtualDeviceState
 from crossbench.plt.ios import IOSPlatform
 from crossbench.plt.linux import LinuxPlatform, RemoteLinuxPlatform
 from crossbench.plt.linux_ssh import LinuxSshPlatform
@@ -86,7 +88,7 @@ class ShResult:
     return self._returncode
 
 
-class TrackingPortManagerMixin:
+class TrackingPortManagerMixin(PortManager):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -94,6 +96,9 @@ class TrackingPortManagerMixin:
     self.reverse_forwarded_ports: dict[int, int] = {}
 
   def forward(self, local_port: int, remote_port: int) -> int:
+    # PortManager.forward is abstract; concrete subclasses in the method
+    # resolution order provide the implementation.
+    # pyrefly: ignore[missing-attribute]
     local_port = super().forward(local_port, remote_port)
     self.forwarded_ports[local_port] = remote_port
     return local_port
@@ -103,6 +108,9 @@ class TrackingPortManagerMixin:
       del self.forwarded_ports[local_port]
 
   def reverse_forward(self, remote_port: int, local_port: int) -> int:
+    # PortManager.reverse_forward is abstract; concrete subclasses in the
+    # method resolution order provide the implementation.
+    # pyrefly: ignore[missing-attribute]
     remote_port = super().reverse_forward(remote_port, local_port)
     self.reverse_forwarded_ports[remote_port] = local_port
     return remote_port
@@ -112,7 +120,7 @@ class TrackingPortManagerMixin:
       del self.reverse_forwarded_ports[remote_port]
 
 
-class MockRemoterPortManagerMixin:
+class MockRemoterPortManagerMixin(PortManager):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -147,7 +155,7 @@ class MockRemotePortManager(TrackingPortManagerMixin,
 ShResultType: TypeAlias = str | bytes | ShResult
 
 
-class MockPlatformMixin:
+class MockPlatformMixin(Platform):
 
   def __init__(self, *args, is_battery_powered=False, fake_fs=None, **kwargs):
     self._is_battery_powered = is_battery_powered
@@ -158,7 +166,7 @@ class MockPlatformMixin:
     self._download_results: list[DownloadMockData] = []
     self.file_contents: MutableMapping[pth.AnyPath, list[str]] = (
         collections.defaultdict(list))
-    self.sleeps: list[dt.timedelta] = []
+    self.sleeps: list[float | dt.timedelta] = []
     self.use_mock_machine = True
     self.use_mock_name = True
     self.mock_version_str: str | None = "1.2.3.4.5"
@@ -310,7 +318,13 @@ class MockPlatformMixin:
   @property
   def os_name(self) -> str:
     if self.use_mock_name:
+      # Platform.os_name is abstract; concrete subclasses in the method
+      # resolution order provide the implementation.
+      # pyrefly: ignore[missing-attribute]
       return f"mock.{super().os_name}"
+    # Platform.os_name is abstract; concrete subclasses in the method
+    # resolution order provide the implementation.
+    # pyrefly: ignore[missing-attribute]
     return super().os_name
 
   @property
@@ -329,6 +343,9 @@ class MockPlatformMixin:
   def version_str(self) -> str:
     if self.mock_version_str:
       return self.mock_version_str
+    # Platform.version_str is abstract; concrete subclasses in the method
+    # resolution order provide the implementation.
+    # pyrefly: ignore[missing-attribute]
     return super().version_str
 
   @property
@@ -395,8 +412,8 @@ class MockPlatformMixin:
     else:
       node[key] = value
 
-  def sleep(self, duration):
-    self.sleeps.append(duration)
+  def sleep(self, seconds: float | dt.timedelta) -> None:
+    self.sleeps.append(seconds)
 
   def processes(self, attrs=()):
     del attrs
@@ -430,6 +447,9 @@ class MockPlatformMixin:
       path = self.path(f"/usr/bin/{app_or_bin}")
     if self.use_fs and self.is_file(path):
       return path
+    # Platform.search_binary is abstract; concrete subclasses in the method
+    # resolution order provide the implementation.
+    # pyrefly: ignore[missing-attribute]
     return super().search_binary(app_or_bin)
 
   def sh_stdout_bytes(self,
@@ -489,6 +509,8 @@ class MockPlatformMixin:
 
     return process
 
+  # MockPlatformMixin._popen returns MockPopen instead of subprocess.Popen.
+  # pyrefly: ignore[bad-override]
   def _popen(self,
              *args: CmdArg,
              bufsize=-1,
@@ -635,6 +657,7 @@ class PosixMockPlatformMixin(MockPlatformMixin):
 
   def _init_mock_virtual_device(self, device_name: str,
                                 device_type: VirtualDeviceType) -> None:
+    assert isinstance(self, EvemuPlatformMixin)
     if self._is_device_running(device_name):
       return
     mock_proc = mock.MagicMock(spec=subprocess.Popen)
@@ -731,6 +754,8 @@ class AndroidAdbMockPlatform(PosixMockPlatformMixin, AndroidAdbPlatform):
   pass
 
 
+# MockPlatformMixin overrides Platform methods with mock-specific signatures.
+# pyrefly: ignore[inconsistent-inheritance]
 class GenericMockPlatform(MockPlatformMixin, Platform):
   pass
 
@@ -768,3 +793,10 @@ class MockCLI(CrossBenchCLI):
   def __init__(self, platform: Platform, enable_logging: bool = True) -> None:
     self.platform = platform
     super().__init__(enable_logging=enable_logging)
+
+  @property
+  @override
+  def last_subcommand(self) -> BenchmarkSubcommand:
+    subcommand = super().last_subcommand
+    assert isinstance(subcommand, BenchmarkSubcommand)
+    return subcommand
