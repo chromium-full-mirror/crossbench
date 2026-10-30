@@ -24,6 +24,8 @@ from crossbench.action_runner.action.probe import ProbeAction
 from crossbench.action_runner.action.raw_input import RawInputAction
 from crossbench.action_runner.action.screenshot import ScreenshotAction
 from crossbench.action_runner.action.scroll import ScrollAction
+from crossbench.action_runner.action.start_browser import StartBrowserAction
+from crossbench.action_runner.action.stop_browser import StopBrowserAction
 from crossbench.action_runner.action.swipe import SwipeAction
 from crossbench.action_runner.action.switch_frame import SwitchFrameAction
 from crossbench.action_runner.action.switch_tab import SwitchTabAction
@@ -59,6 +61,8 @@ ACTIONS_TUPLE: tuple[type[Action], ...] = (
     OpenDevToolsAction,
     ScreenshotAction,
     ScrollAction,
+    StartBrowserAction,
+    StopBrowserAction,
     SwipeAction,
     SwitchTabAction,
     SwitchFrameAction,

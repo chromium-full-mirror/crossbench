@@ -133,6 +133,65 @@ class RunTestCase(BaseRunGroupTestCase):
     run.mark_skipped()
     self.assertTrue(run.is_skipped)
 
+  def test_run_without_starting_browser(self) -> None:
+
+    class NoBrowserStory(MockStory):
+
+      @override
+      def run(self, run: Run) -> None:
+        run.performance_mark("no-browser-mark")
+
+    session = self.default_session()
+    session.browser.settings._start_browser = False
+    run = Run(self.runner, session, NoBrowserStory("no_browser"), 1, False,
+              "1_default", 1, "test run", dt.timedelta(minutes=1), True)
+    session.set_ready()
+    with mock.patch.object(run, "teardown_write_results_db"), session.open():
+      run.run(is_dry_run=False)
+      self.assertTrue(run.is_success)
+      self.assertFalse(run.browser.is_running)
+      self.assertFalse(run.browser.did_run)
+      self.assertEqual(run.browser.url_list, [])
+      self.assertEqual(run.browser.performance_marks,
+                       ["crossbench-no-browser-mark"])
+      self.assertIn("crossbench-no-browser-mark", self.platform.trace_marks)
+
+  def test_run_starts_and_stops_browser_explicitly(self) -> None:
+
+    class ExplicitBrowserStory(MockStory):
+
+      @override
+      def run(self, run: Run) -> None:
+        assert not run.browser.is_running
+        run.browser_session.start_browser()
+        assert run.browser.is_running
+        with run.actions("Navigate") as actions:
+          actions.show_url("https://example.com")
+        run.browser_session.stop_browser()
+        assert not run.browser.is_running
+        run.browser_session.start_browser()
+        assert run.browser.is_running
+        with run.actions("Reopen") as actions:
+          actions.show_url("https://example.org")
+
+    session = self.default_session()
+    session.browser.settings._start_browser = False
+    run = Run(self.runner, session, ExplicitBrowserStory("explicit_browser"), 1,
+              False, "1_default", 1, "test run", dt.timedelta(minutes=1), True)
+    session.set_ready()
+    with (
+        mock.patch.object(run, "teardown_write_results_db"),
+        mock.patch.object(
+            run, "_run_splashscreen", wraps=run._run_splashscreen) as
+        mock_splashscreen,
+    ):
+      with session.open():
+        run.run(is_dry_run=False)
+      self.assertTrue(run.is_success)
+      mock_splashscreen.assert_not_called()
+      self.assertIn("https://example.com", run.browser.url_list)
+      self.assertIn("https://example.org", run.browser.url_list)
+
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)

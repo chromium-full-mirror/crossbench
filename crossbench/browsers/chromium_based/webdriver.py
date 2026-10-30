@@ -188,7 +188,11 @@ class ChromiumBasedWebDriver(
         " stdout_log_file should have been unset, but got "
         f"{self._stdout_log_file}")
     # On desktop platforms service logs contain browser stdout, hence the name.
-    self._stdout_log_file = self.log_file.with_stem("browser.stdout").open("w+")
+    stdout_log_path = self.log_file.with_stem("browser.stdout")
+    if stdout_log_path.exists():
+      self._stdout_log_file = stdout_log_path.open("a+")
+    else:
+      self._stdout_log_file = stdout_log_path.open("w+")
     service = self.WEB_DRIVER_SERVICE(
         executable_path=os.fspath(driver_path),
         service_args=service_args,
@@ -380,10 +384,10 @@ class ChromiumBasedWebDriver(
 
     if tab_to_close != original_handle:
       driver.switch_to.window(original_handle)
-    else:
+    elif handles := driver.window_handles:
       # When a tab closes itself, arbitrarily default
       # to switching to the first tab.
-      driver.switch_to.window(driver.window_handles[0])
+      driver.switch_to.window(handles[0])
 
   @override
   def close_all_tabs(self) -> None:
@@ -458,6 +462,7 @@ class ChromiumBasedWebDriver(
 
   @override
   def force_quit(self) -> None:
+    self._script_id_kwargs_by_window_id.clear()
     try:
       super().force_quit()
     finally:

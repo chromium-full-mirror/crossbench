@@ -1,0 +1,27 @@
+# Copyright 2026 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+from __future__ import annotations
+
+import dataclasses
+from typing import TYPE_CHECKING, ClassVar
+
+from typing_extensions import override
+
+from crossbench.action_runner.action.action import Action
+from crossbench.action_runner.action.action_type import ActionType
+
+if TYPE_CHECKING:
+  from crossbench.action_runner.action_runner import ActionRunner
+
+
+@dataclasses.dataclass(frozen=True, eq=False)
+class StopBrowserAction(Action):
+  """Stops the session browser if it is currently running."""
+
+  TYPE: ClassVar[ActionType] = ActionType.STOP_BROWSER
+
+  @override
+  def run_with(self, action_runner: ActionRunner) -> None:
+    action_runner.stop_browser(self)

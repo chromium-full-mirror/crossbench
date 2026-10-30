@@ -428,7 +428,7 @@ class Run(ResultOrigin):
 
   def _run(self, is_dry_run: bool) -> None:
     self._state.transition(State.READY, to=State.RUN)
-    if not is_dry_run:
+    if not is_dry_run and self.browser.is_running:
       self._run_splashscreen()
     with self._probe_context_manager.open(is_dry_run):
       logging.info("RUNNING STORY")
@@ -481,6 +481,8 @@ class Run(ResultOrigin):
       self._story.teardown(self)
 
   def _run_success_validation(self) -> None:
+    if not self.browser.is_running:
+      return
     try:
       self.environment.check_browser_focused(self.browser)
     except ValidationError as e:

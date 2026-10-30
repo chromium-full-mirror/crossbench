@@ -278,5 +278,15 @@
         "action": "clear_cache"
       }
     ]
+    "start_browser": [
+      {
+        "action": "start_browser"
+      }
+    ]
+    "stop_browser": [
+      {
+        "action": "stop_browser"
+      }
+    ]
   }
 }

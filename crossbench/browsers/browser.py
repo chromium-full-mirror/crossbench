@@ -448,7 +448,6 @@ class Browser(abc.ABC):
       self.force_quit()
     finally:
       self._pid = None
-      self._teardown_cache_dir()
 
   def force_quit(self) -> None:
     if not self._is_running:
@@ -582,6 +581,11 @@ class Browser(abc.ABC):
                        detail: Json = None,
                        prefix: str = "crossbench-") -> None:
     full_name = prefix + name
+    if not self._is_running:
+      logging.warning(
+          "%s: cannot set performance_mark %r because the browser is not "
+          "running.", self, full_name)
+      return
     if detail is None:
       self.js("performance.mark(arguments[0]);", arguments=[full_name])
     else:

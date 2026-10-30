@@ -66,6 +66,7 @@ class CdpAndroidBrowser(ChromiumBased):
     self.flags.update(self.CHROMEDRIVER_FLAGS)
     self._previous_command_line_contents: str | None = None
     self._needs_restore_chrome_flags: bool = False
+    self._has_started_in_session: bool = False
 
   @classmethod
   @override
@@ -182,12 +183,14 @@ class CdpAndroidBrowser(ChromiumBased):
   def start(self, session: BrowserSessionRunGroup) -> None:
     super().start(session)
     self.adb_force_stop()
-    if (session and
-        session.browser.wipe_system_user_data) or self.clear_cache_dir:
-      self.adb_force_clear()
-      self._setup_binary_permissions()
-    self._set_debug_app()
+    if not self._has_started_in_session:
+      if (session and
+          session.browser.wipe_system_user_data) or self.clear_cache_dir:
+        self.adb_force_clear()
+        self._setup_binary_permissions()
+      self._has_started_in_session = True
     self._backup_chrome_flags()
+    self._set_debug_app()
     flags = tuple(
         sorted(
             self._get_browser_flags_for_session(session) if session else tuple(
@@ -220,6 +223,14 @@ class CdpAndroidBrowser(ChromiumBased):
     finally:
       self._restore_chrome_flags()
       self._is_running = False
+
+  @override
+  def teardown(self) -> None:
+    self._has_started_in_session = False
+    try:
+      self._restore_chrome_flags()
+    finally:
+      super().teardown()
 
   def _send_cdp(self, method: str, params: JsonDict | None = None) -> JsonDict:
     return self.platform.send_cdp_command(method, params)

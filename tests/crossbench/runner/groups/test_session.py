@@ -326,6 +326,37 @@ class BrowserSessionRunGroupTestCase(BaseRunGroupTestCase):
       session.browser.setup()
       self.assertEqual(session.browser._cache_dir, cache_dir)
 
+  def test_start_and_stop_browser_in_session(self) -> None:
+    session = self.default_session()
+    session.browser.settings._start_browser = False
+    run = MockRun(self.runner, session, "story 0")
+    session.append(run)
+    session.set_ready()
+    with (
+        mock.patch.object(session.browser, "quit", wraps=session.browser.quit)
+        as mock_quit,
+        session.open() as startup_is_success,
+    ):
+      self.assertTrue(startup_is_success)
+      self.assertFalse(session.browser.is_running)
+      with self.assertRaisesRegex(RuntimeError, "browser is not running"):
+        session.stop_browser()
+      session.start_browser()
+      self.assertTrue(session.browser.is_running)
+      self.assertIn("browser-setup", session.durations.to_json())
+      with self.assertRaisesRegex(RuntimeError, "browser is already running"):
+        session.start_browser()
+      session.stop_browser()
+      self.assertFalse(session.browser.is_running)
+      self.assertEqual(mock_quit.call_count, 1)
+      self.assertIn("browser-stop", session.durations.to_json())
+      session.start_browser()
+      self.assertTrue(session.browser.is_running)
+      self.assertIn("browser-setup-1", session.durations.to_json())
+      session.stop_browser()
+      self.assertFalse(session.browser.is_running)
+      self.assertEqual(mock_quit.call_count, 2)
+      self.assertIn("browser-stop-1", session.durations.to_json())
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)

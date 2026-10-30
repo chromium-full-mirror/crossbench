@@ -34,6 +34,20 @@ class SettingsTestCase(unittest.TestCase):
     self.assertEqual(settings.platform, plt.PLATFORM)
     self.assertEqual(settings.env_config, EnvConfig.default())
     self.assertIsNone(settings.browser_version)
+    self.assertTrue(settings.start_browser)
+
+  def test_start_browser_false_forces_no_splash_screen(self) -> None:
+    settings = Settings(start_browser=False)
+    self.assertFalse(settings.start_browser)
+    self.assertEqual(settings.splash_screen, SplashScreen.NONE)
+
+    settings_none = Settings(
+        start_browser=False, splash_screen=SplashScreen.NONE)
+    self.assertFalse(settings_none.start_browser)
+    self.assertEqual(settings_none.splash_screen, SplashScreen.NONE)
+
+    with self.assertRaisesRegex(ValueError, "SplashScreen"):
+      _ = Settings(start_browser=False, splash_screen=SplashScreen.DETAILED)
 
   def test_custom(self):
     flags = Flags({"--one": "1", "--two": "2"}).freeze()

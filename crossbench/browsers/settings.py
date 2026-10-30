@@ -45,6 +45,7 @@ class Settings:
       extensions: tuple[ExtensionConfig, ...] | None = None,
       apk_config: ApkConfig | None = None,
       browser_version: str | None = None,
+      start_browser: bool = True,
   ) -> None:
     self._flags: Final[Flags] = self._convert_flags(flags, "flags")
     self._js_flags: Final[Flags] = self._extract_js_flags(self._flags, js_flags)
@@ -54,6 +55,11 @@ class Settings:
     self._driver_path: Final[pth.AnyPath | None] = driver_path
     self._network: Final[Network] = network or LiveNetwork()
     self._viewport: Viewport = viewport or Viewport.DEFAULT
+    if not start_browser:
+      if splash_screen and splash_screen is not SplashScreen.NONE:
+        raise ValueError(
+            "SplashScreen cannot be used when start_browser is False.")
+      splash_screen = SplashScreen.NONE
     self._splash_screen: Final[
         SplashScreen] = splash_screen or SplashScreen.DEFAULT
     self._secrets: Final[Secrets] = secrets
@@ -64,6 +70,7 @@ class Settings:
     self._extensions: Final[tuple[ExtensionConfig, ...]] = extensions or ()
     self._apk_config: Final[ApkConfig | None] = apk_config
     self._browser_version: Final[str | None] = browser_version
+    self._start_browser: Final[bool] = start_browser
 
   def _extract_js_flags(self, flags: Flags,
                         js_flags: FlagsData | None) -> Flags:
@@ -149,6 +156,10 @@ class Settings:
   @property
   def browser_version(self) -> str | None:
     return self._browser_version
+
+  @property
+  def start_browser(self) -> bool:
+    return self._start_browser
 
   @property
   def viewport(self) -> Viewport:

@@ -393,6 +393,108 @@ class TestDesktopLoading:
 
     self.run_loading_test(browser_config, page_config, test_env)
 
+  def test_loading_without_open_browser(self, browser_config: str,
+                                        test_env: TestEnv) -> None:
+    page_config = {
+        "pages": {
+            "NoBrowserTest": {
+                "actions": [{
+                    "action": "wait",
+                    "duration": "0.5s",
+                }],
+            },
+        },
+    }
+
+    self.run_loading_test(
+        browser_config,
+        page_config,
+        test_env,
+        extra_args=["--start-browser=false", "--no-splash"])
+    self.assert_run_succeeded(test_env)
+
+  def test_loading_begins_without_open_browser(self, browser_config: str,
+                                               test_env: TestEnv) -> None:
+    test_page = urllib.parse.quote("""
+<!doctype html>
+<html>
+  <head><title>Delayed Start Test</title></head>
+  <body><p>Started mid-story</p></body>
+</html>
+""")
+    page_config = {
+        "pages": {
+            "DelayedStartTest": {
+                "actions": [{
+                    "action": "wait",
+                    "duration": "0.5s",
+                }, {
+                    "action": "start_browser",
+                }, {
+                    "action": "get",
+                    "url": f"data:text/html;charset=utf-8,{test_page}",
+                    "ready_state": "complete",
+                }],
+            },
+        },
+    }
+
+    self.run_loading_test(
+        browser_config,
+        page_config,
+        test_env,
+        extra_args=["--start-browser=false", "--no-splash"])
+    self.assert_run_succeeded(test_env)
+
+  def test_loading_open_and_close_browser_multiple_times(
+      self, browser_config: str, test_env: TestEnv) -> None:
+    test_page_1 = urllib.parse.quote(
+        "<!doctype html><html><head><title>Page 1</title></head></html>")
+    test_page_2 = urllib.parse.quote(
+        "<!doctype html><html><head><title>Page 2</title></head></html>")
+    test_page_3 = urllib.parse.quote(
+        "<!doctype html><html><head><title>Page 3</title></head></html>")
+
+    page_config = {
+        "pages": {
+            "ReopenBrowserTest": {
+                "actions": [{
+                    "action": "get",
+                    "url": f"data:text/html;charset=utf-8,{test_page_1}",
+                    "ready_state": "complete",
+                }, {
+                    "action": "stop_browser",
+                }, {
+                    "action": "wait",
+                    "duration": "0.5s",
+                }, {
+                    "action": "start_browser",
+                }, {
+                    "action": "get",
+                    "url": f"data:text/html;charset=utf-8,{test_page_2}",
+                    "ready_state": "complete",
+                }, {
+                    "action": "stop_browser",
+                }, {
+                    "action": "wait",
+                    "duration": "0.5s",
+                }, {
+                    "action": "start_browser",
+                }, {
+                    "action": "get",
+                    "url": f"data:text/html;charset=utf-8,{test_page_3}",
+                    "ready_state": "complete",
+                }, {
+                    "action": "js",
+                    "script": "return document.title;",
+                }],
+            },
+        },
+    }
+
+    self.run_loading_test(browser_config, page_config, test_env)
+    self.assert_run_succeeded(test_env)
+
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)

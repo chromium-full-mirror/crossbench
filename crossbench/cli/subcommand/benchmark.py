@@ -356,6 +356,22 @@ class BenchmarkSubcommand(CrossbenchSubcommand):
         action="store_const",
         help="Shortcut for --splash-screen=none")
 
+    start_browser_group = browser_group.add_mutually_exclusive_group()
+    start_browser_group.add_argument(
+        "--no-start-browser",
+        dest="start_browser",
+        action="store_false",
+        help="Do not start the browser at the beginning of a session.")
+    start_browser_group.add_argument(
+        "--start-browser",
+        dest="start_browser",
+        nargs="?",
+        const=True,
+        default=None,
+        type=ObjectParser.bool,
+        help=("Whether to start the browser at the beginning of a session. "
+              "Defaults to true."))
+
     viewport_group = browser_group.add_mutually_exclusive_group()
 
     viewport_group.add_argument(

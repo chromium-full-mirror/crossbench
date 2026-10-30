@@ -112,6 +112,7 @@ class CrossbenchMockArgsMixin:
         probe_config=kwargs.pop("probe_config", None),
         viewport=kwargs.pop("viewport", None),
         splash_screen=kwargs.pop("splash_screen", None),
+        start_browser=kwargs.pop("start_browser", True),
         secrets=kwargs.pop("secrets", Secrets()),
         driver_logging=kwargs.pop("driver_logging", False),
         wipe_system_user_data=kwargs.pop("wipe_system_user_data", False),

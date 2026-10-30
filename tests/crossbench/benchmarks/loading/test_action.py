@@ -34,6 +34,8 @@ from crossbench.action_runner.action.probe import ProbeAction
 from crossbench.action_runner.action.raw_input import RawInputAction
 from crossbench.action_runner.action.screenshot import ScreenshotAction
 from crossbench.action_runner.action.scroll import ScrollAction
+from crossbench.action_runner.action.start_browser import StartBrowserAction
+from crossbench.action_runner.action.stop_browser import StopBrowserAction
 from crossbench.action_runner.action.swipe import SwipeAction
 from crossbench.action_runner.action.switch_frame import SwitchFrameAction
 from crossbench.action_runner.action.switch_tab import SwitchTabAction
@@ -1419,6 +1421,16 @@ class ActionTestCase(CrossbenchFakeFsTestCase):
     action = CloseAllTabsAction.parse(config_dict)
 
     self.assertEqual(action.TYPE, ActionType.CLOSE_ALL_TABS)
+
+  def test_parse_start_browser(self) -> None:
+    config_dict = {"action": "start_browser"}
+    action = StartBrowserAction.parse(config_dict)
+    self.assertEqual(action.TYPE, ActionType.START_BROWSER)
+
+  def test_parse_stop_browser(self) -> None:
+    config_dict = {"action": "stop_browser"}
+    action = StopBrowserAction.parse(config_dict)
+    self.assertEqual(action.TYPE, ActionType.STOP_BROWSER)
 
   def test_parse_launch_app(self) -> None:
     config_dict = {

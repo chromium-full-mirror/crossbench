@@ -1031,3 +1031,13 @@ class ActionRunner:
     del action
     with self.actions("CloseAllTabsAction", measure=False):
       self.browser.close_all_tabs()
+
+  def start_browser(self, action: i_action.StartBrowserAction) -> None:
+    del action
+    with self.actions("StartBrowserAction", measure=False):
+      self.run.browser_session.start_browser()
+
+  def stop_browser(self, action: i_action.StopBrowserAction) -> None:
+    del action
+    with self.actions("StopBrowserAction", measure=False):
+      self.run.browser_session.stop_browser()

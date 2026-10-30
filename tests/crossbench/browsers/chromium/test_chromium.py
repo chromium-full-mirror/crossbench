@@ -680,6 +680,55 @@ class ChromiumPathAndroidTest(BaseCrossbenchTestCase):
     browser._private_driver.maximize_window.assert_not_called()
     browser._private_driver.set_window_rect.assert_not_called()
 
+  def test_android_restart_preserves_session_data_and_flags(self) -> None:
+    browser = self._create_android_browser("153.0.7994.0")
+    mock_session = mock.MagicMock()
+    mock_session.browser = browser
+    driver_path = pth.AnyPath("/path/to/chromedriver")
+    mock_driver = mock.MagicMock()
+
+    with (
+        mock.patch.object(self.platform, "rm"),
+        mock.patch.object(browser, "adb_force_stop") as mock_force_stop,
+        mock.patch.object(browser, "adb_force_clear") as mock_force_clear,
+        mock.patch.object(browser, "_read_device_flags", return_value=None),
+        mock.patch.object(
+            browser, "_backup_chrome_flags",
+            wraps=browser._backup_chrome_flags) as mock_backup_flags,
+        mock.patch.object(
+            browser, "_start_chromedriver", return_value=mock_driver) as
+        mock_start_chromedriver,
+        mock.patch.object(browser, "_dismiss_any_os_permission_prompts"),
+        mock.patch.object(
+            browser,
+            "_restore_chrome_flags",
+            wraps=browser._restore_chrome_flags) as mock_restore_flags,
+    ):
+      # First start in session: clears data and backs up flags.
+      browser._start_driver(mock_session, driver_path)
+      browser._is_running = True
+      self.assertEqual(mock_force_stop.call_count, 1)
+      mock_force_clear.assert_called_once_with()
+      mock_backup_flags.assert_called_once_with()
+      self.assertEqual(mock_start_chromedriver.call_count, 1)
+
+      # Mid-session quit restores flags but preserves session state.
+      browser.quit()
+      mock_restore_flags.assert_called_once_with()
+      self.assertTrue(browser._has_started_in_session)
+
+      # Second start in session: does NOT clear data, backs up flags again.
+      browser._start_driver(mock_session, driver_path)
+      self.assertEqual(mock_force_stop.call_count, 3)
+      mock_force_clear.assert_called_once_with()
+      self.assertEqual(mock_backup_flags.call_count, 2)
+      self.assertEqual(mock_start_chromedriver.call_count, 2)
+
+      # Teardown restores flags and resets session state.
+      browser.teardown()
+      self.assertEqual(mock_restore_flags.call_count, 2)
+      self.assertFalse(browser._has_started_in_session)
+
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)

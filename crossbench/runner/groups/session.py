@@ -71,6 +71,8 @@ class BrowserSessionRunGroup(RunGroup, ResultOrigin):
     self._runs: Final[list[Run]] = []
     self._root_dir: Final[pth.LocalPath] = root_dir
     self._browser_tmp_dir: pth.AnyPath | None = None
+    self._browser_start_count: int = 0
+    self._browser_stop_count: int = 0
     self._extra_js_flags: Final[JSFlags] = JSFlags()
     self._extra_flags: Final[Flags] = extra_flags
     # Temporary objects, reset after all runs are ready (see set_ready).
@@ -200,12 +202,12 @@ class BrowserSessionRunGroup(RunGroup, ResultOrigin):
 
   @property
   def extra_js_flags(self) -> JSFlags:
-    self._state.expect_before(State.RUNNING)
+    self._state.expect_before(State.STOPPING)
     return self._extra_js_flags
 
   @property
   def extra_flags(self) -> Flags:
-    self._state.expect_before(State.RUNNING)
+    self._state.expect_before(State.STOPPING)
     return self._extra_flags
 
   def add_flag_details(self, details_json: JsonDict) -> None:
@@ -350,8 +352,20 @@ class BrowserSessionRunGroup(RunGroup, ResultOrigin):
     assert not browser_log_file.exists(), (
         f"Default browser log file {browser_log_file} already exists.")
     self._browser.set_log_file(browser_log_file)
+    if self._browser.settings.start_browser:
+      self.start_browser()
 
-    with self.measure("browser-setup"):
+  def start_browser(self) -> None:
+    self._state.expect(State.STARTING, State.RUNNING)
+    assert self.network.is_running, "Network isn't running yet"
+    assert self._probe_session_context_manager.is_running
+    if self._browser.is_running:
+      raise RuntimeError("Cannot start browser: browser is already running.")
+    measure_name = "browser-setup"
+    if self._browser_start_count > 0:
+      measure_name = f"browser-setup-{self._browser_start_count}"
+    self._browser_start_count += 1
+    with self.measure(measure_name):
       try:
         self._browser.start(self)
         assert self._browser.is_running, "Browser did not start up correctly"
@@ -360,6 +374,17 @@ class BrowserSessionRunGroup(RunGroup, ResultOrigin):
         # Clean up half-setup browser instances
         self._browser.force_quit()
         raise
+
+  def stop_browser(self) -> None:
+    self._state.expect(State.RUNNING)
+    if not self._browser.is_running:
+      raise RuntimeError("Cannot stop browser: browser is not running.")
+    measure_name = "browser-stop"
+    if self._browser_stop_count > 0:
+      measure_name = f"browser-stop-{self._browser_stop_count}"
+    self._browser_stop_count += 1
+    with self.measure(measure_name):
+      self._browser.quit()
 
   def _teardown(self, is_dry_run: bool) -> None:
     self._state.transition(

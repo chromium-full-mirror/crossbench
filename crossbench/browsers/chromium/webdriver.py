@@ -125,6 +125,7 @@ class ChromiumWebDriverAndroid(ChromiumBasedWebDriver):
     self._chrome_command_line_path: pth.AnyPath = FLAGS_CHROME
     self._previous_command_line_contents: str | None = None
     self._needs_restore_chrome_flags: bool = False
+    self._has_started_in_session: bool = False
     super().__init__(label, path, settings)
     self._android_package: Final[str] = self._lookup_android_package(self.path)
     if not self._android_package:
@@ -186,9 +187,11 @@ class ChromiumWebDriverAndroid(ChromiumBasedWebDriver):
   def _start_driver(self, session: BrowserSessionRunGroup,
                     driver_path: pth.AnyPath) -> webdriver.Remote:
     self.adb_force_stop()
-    if session.browser.wipe_system_user_data or self.clear_cache_dir:
-      self.adb_force_clear()
-      self._setup_binary_permissions()
+    if not self._has_started_in_session:
+      if session.browser.wipe_system_user_data or self.clear_cache_dir:
+        self.adb_force_clear()
+        self._setup_binary_permissions()
+      self._has_started_in_session = True
     self._backup_chrome_flags()
     driver = self._start_chromedriver(session, driver_path)
     self._dismiss_any_os_permission_prompts()
@@ -245,10 +248,18 @@ class ChromiumWebDriverAndroid(ChromiumBasedWebDriver):
       finally:
         self.adb_force_stop()
     finally:
+      self._restore_chrome_flags()
+
+  @override
+  def teardown(self) -> None:
+    self._has_started_in_session = False
+    try:
       try:
         self._restore_chrome_flags()
       finally:
         self._uninstall_android_apk()
+    finally:
+      super().teardown()
 
   @override
   def meminfo(self, timeout: dt.timedelta) -> list[ProcessMeminfo]:

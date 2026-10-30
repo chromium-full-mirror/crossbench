@@ -482,6 +482,21 @@ class BenchmarkFlagsParserTestCase(BaseCliTestCase):
     with self.assertRaises(argparse.ArgumentError):
       self.parse_args("--splash-screen=none", "--no-splash")
 
+  def test_start_browser_options(self) -> None:
+    args = self.parse_args()
+    self.assertTrue(args.start_browser)
+
+    for flag in ("--start-browser", "--start-browser=true"):
+      args = self.parse_args(flag)
+      self.assertTrue(args.start_browser)
+
+    for flag in ("--no-start-browser", "--start-browser=false"):
+      args = self.parse_args(flag)
+      self.assertFalse(args.start_browser)
+
+    with self.assertRaises(argparse.ArgumentError):
+      self.parse_args("--start-browser", "--no-start-browser")
+
   def test_viewport_options(self) -> None:
     args = self.parse_args("--viewport=maximized")
     self.assertEqual(args.viewport, Viewport.MAXIMIZED)
@@ -1166,6 +1181,24 @@ class BenchmarkFlagsCliTestCase(BaseCliTestCase):
           "--no-splash",
           "--throw",
       )
+
+  def test_conflicting_start_browser_and_splash_screen(self) -> None:
+    with self._patch_get_browser_cls():
+      with self.assertRaises(
+          (argparse.ArgumentTypeError, SysExitTestException)):
+        self.run_cli(
+            "loading",
+            "--browser=chrome",
+            f"--urls={self.URL}",
+            "--no-start-browser",
+            "--splash-screen=minimal",
+            "--throw",
+        )
+    cli, runner = self._run_loading("--no-start-browser", "--no-splash")
+    self.assertFalse(cli.args.start_browser)
+    self.assertFalse(runner.browsers[0].settings.start_browser)
+    self.assertEqual(runner.browsers[0].settings.splash_screen,
+                     SplashScreen.NONE)
 
   def test_viewport_options(self) -> None:
     cli, _ = self._run_loading("--viewport=maximized")
