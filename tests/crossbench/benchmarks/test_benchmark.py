@@ -13,7 +13,8 @@ from typing_extensions import override
 from crossbench.benchmarks.base import PressBenchmarkStoryFilter, \
     RangePatternError, RegexFilter, TagsFilter
 from crossbench.cli.parser import CBArgumentParser
-from crossbench.stories.press_benchmark import PressBenchmarkStory
+from crossbench.stories.press_benchmark import MAX_STORY_NAME_LEN, \
+    PressBenchmarkStory
 from tests import test_helper
 
 if TYPE_CHECKING:
@@ -38,6 +39,10 @@ class MockStory(PressBenchmarkStory):
 
   def run(self, run: Run) -> None:
     pass
+
+
+class MockStoryWithLongNames(MockStory):
+  SUBSTORIES = tuple(f"Story-{i}-{'x' * 60}" for i in range(1, 5))
 
 
 class MockStoryWithTags(MockStory):
@@ -97,6 +102,25 @@ class PressBenchmarkStoryFilterTestCase(unittest.TestCase):
     self.assertEqual(len(stories), 1)
     story: MockStory = stories[0]
     self.assertSequenceEqual(story.substories, MockStory.SUBSTORIES)
+
+  def test_long_name_is_shortened(self):
+    stories = PressBenchmarkStoryFilter(
+        MockStoryWithLongNames, ["Story-1.*", "Story-2.*"],
+        args=argparse.Namespace()).stories
+    self.assertEqual(len(stories), 1)
+    story = stories[0]
+    self.assertEqual(len(story.substories), 2)
+    self.assertLessEqual(len(story.name), MAX_STORY_NAME_LEN)
+    self.assertTrue(story.name.startswith("Story-1-"))
+    # The name is stable and distinguishes different selections.
+    other_story = PressBenchmarkStoryFilter(
+        MockStoryWithLongNames, ["Story-1.*", "Story-2.*"],
+        args=argparse.Namespace()).stories[0]
+    self.assertEqual(story.name, other_story.name)
+    third_story = PressBenchmarkStoryFilter(
+        MockStoryWithLongNames, ["Story-1.*", "Story-3.*"],
+        args=argparse.Namespace()).stories[0]
+    self.assertNotEqual(story.name, third_story.name)
 
   def test_match_regexp_all_wrong_case(self):
     stories = self.story_filter(["StOrY.*"]).stories

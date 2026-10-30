@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import abc
 import datetime as dt
+import hashlib
 import logging
 from typing import TYPE_CHECKING, ClassVar, Final, Self, Sequence
 
@@ -16,6 +17,12 @@ from crossbench.stories.story import Story
 
 if TYPE_CHECKING:
   from crossbench.runner.run import Run
+
+
+# Story names end up in output directory paths, which are limited to 260
+# characters in total on Windows by default. Keep combined names short.
+MAX_STORY_NAME_LEN: Final[int] = 64
+_NAME_HASH_LEN: Final[int] = 8
 
 
 class PressBenchmarkStory(Story, metaclass=abc.ABCMeta):
@@ -86,12 +93,15 @@ class PressBenchmarkStory(Story, metaclass=abc.ABCMeta):
     if substories_set == set(self.default_story_names()):
       return self.NAME
     if substories_set == set(self.all_story_names()):
-      name = "all"
-    else:
-      name = "_".join(self._substories)
-    if len(name) > 220:
-      # Crop the name and add some random hash bits
-      name = name[:220] + hex(hash(name))[2:10]
+      return "all"
+    name = "_".join(self._substories)
+    if len(name) > MAX_STORY_NAME_LEN:
+      # Crop the name and append a stable hash of the full name to keep
+      # different substory selections distinguishable.
+      digest = hashlib.sha1(
+          name.encode("utf-8"), usedforsecurity=False).hexdigest()
+      prefix_len = MAX_STORY_NAME_LEN - _NAME_HASH_LEN - 1
+      name = f"{name[:prefix_len]}_{digest[:_NAME_HASH_LEN]}"
     return name
 
   def _get_initial_duration(self) -> dt.timedelta:
