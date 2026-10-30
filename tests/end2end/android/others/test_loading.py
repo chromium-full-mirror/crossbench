@@ -5,57 +5,35 @@
 from __future__ import annotations
 
 import json
-import pathlib
-import tempfile
 import urllib.parse
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pytest
 
-from crossbench.cli.cli import CrossBenchCLI
+from crossbench.benchmarks.loading.input_source import InputSource
 from tests import test_helper
+from tests.end2end.desktop.test_loading import CLICK_TEST_PAGE, \
+    TestDesktopLoading
+
+if TYPE_CHECKING:
+  from tests.test_helper import TestEnv
 
 
-def _run_loading_test(browser_config: str,
-                      page_config: Any,
-                      test_env: Any,
-                      probe_config_file: pathlib.Path | None = None) -> None:
-  with tempfile.NamedTemporaryFile(
-      suffix="page.config.json", mode="w",
-      encoding="utf-8") as page_config_file:
-    json.dump(page_config, page_config_file)
-    page_config_file.flush()
-
-    cli = CrossBenchCLI()
-
-    args = [
-        "loading",
-        f"--browser={browser_config}",
-        f"--page-config={page_config_file.name}",
-        f"--out-dir={test_env.results_dir}",
-        "--env-validation=skip",
-        *list(test_env.cq_flags),
-    ]
-    if probe_config_file:
-      args.append(f"--probe-config={probe_config_file}")
-
-    cli.run(args)
+def _webview_shell_config(device_id: str, adb_path: str) -> str:
+  return json.dumps({
+      "browser": "org.chromium.webview_shell",
+      "driver": {
+          "type": "adb",
+          "device_id": device_id,
+          "adb_bin": adb_path,
+      },
+  })
 
 
-def _run_loading_test_with_probes(browser_config: str, page_config: Any,
-                                  test_env: Any, probe_config: Any) -> None:
-  with tempfile.NamedTemporaryFile(
-      suffix="probe.config.json", mode="w",
-      encoding="utf-8") as probe_config_file:
-    json.dump(probe_config, probe_config_file)
-    probe_config_file.flush()
+class TestAndroidLoading(TestDesktopLoading):
 
-    _run_loading_test(browser_config, page_config, test_env,
-                      pathlib.Path(probe_config_file.name))
-
-
-def test_download(browser_config, test_env):
-  test_page = urllib.parse.quote("""
+  def test_download(self, browser_config: str, test_env: TestEnv) -> None:
+    test_page = urllib.parse.quote("""
 <!doctype html>
 <html>
   <head>
@@ -73,53 +51,42 @@ def test_download(browser_config, test_env):
 </html>
 """)
 
-  page_config = {
-      "pages": {
-          "DownloadTest": {
-              "actions": [{
-                  "action": "get",
-                  "url": f"data:text/html;charset=utf-8,{test_page}",
-                  "ready_state": "complete",
-              }, {
-                  "action": "click",
-                  "position": "#download",
-              }, {
-                  "action": "wait_for_download",
-                  "timeout": "10s",
-                  "pattern": "car.txt",
-              }],
-          },
-      },
-  }
+    page_config = {
+        "pages": {
+            "DownloadTest": {
+                "actions": [{
+                    "action": "get",
+                    "url": f"data:text/html;charset=utf-8,{test_page}",
+                    "ready_state": "complete",
+                }, {
+                    "action": "click",
+                    "position": "#download",
+                }, {
+                    "action": "wait_for_download",
+                    "timeout": "10s",
+                    "pattern": "car.txt",
+                }],
+            },
+        },
+    }
 
-  probe_config = {
-      "probes": {
-          "downloads": {
-              "clear_downloads": True,
-              "save_downloads": True,
-          },
-      },
-  }
+    probe_config = {
+        "probes": {
+            "downloads": {
+                "clear_downloads": True,
+                "save_downloads": True,
+            },
+        },
+    }
 
-  _run_loading_test_with_probes(browser_config, page_config, test_env,
-                                probe_config)
+    self.run_loading_test(
+        browser_config, page_config, test_env, probe_config=probe_config)
 
-
-def _webview_shell_config(device_id, adb_path) -> str:
-  return json.dumps({
-      "browser": "org.chromium.webview_shell",
-      "driver": {
-          "type": "adb",
-          "device_id": device_id,
-          "adb_bin": adb_path,
-      },
-  })
-
-
-@pytest.mark.legacy_android_sdk
-def test_webview(device_id, adb_path, test_env) -> None:
-  browser_config = _webview_shell_config(device_id, adb_path)
-  test_page = urllib.parse.quote("""
+  @pytest.mark.legacy_android_sdk
+  def test_webview(self, device_id: str, adb_path: str,
+                   test_env: TestEnv) -> None:
+    browser_config = _webview_shell_config(device_id, adb_path)
+    test_page = urllib.parse.quote("""
 <!DOCTYPE html>
 <html>
 <head>
@@ -133,20 +100,155 @@ def test_webview(device_id, adb_path, test_env) -> None:
 </html>
 """)
 
-  page_config = {
-      "pages": {
-          "LoadingTest": {
-              "actions": [{
-                  "action": "get",
-                  "url": f"data:text/html;charset=utf-8,{test_page}",
-                  "ready_state": "complete",
-              }],
-          },
-      },
-  }
+    page_config = {
+        "pages": {
+            "LoadingTest": {
+                "actions": [{
+                    "action": "get",
+                    "url": f"data:text/html;charset=utf-8,{test_page}",
+                    "ready_state": "complete",
+                }],
+            },
+        },
+    }
 
-  _run_loading_test(browser_config, page_config, test_env)
+    self.run_loading_test(browser_config, page_config, test_env)
 
+  @pytest.mark.parametrize("input_source",
+                           [InputSource.TOUCH, InputSource.MOUSE])
+  def test_click_ui_selector(self, browser_config: str,
+                             input_source: InputSource,
+                             test_env: TestEnv) -> None:
+    self.check_input_source_supported(browser_config, input_source)
+    page_config = {
+        "pages": {
+            "ClickTest": {
+                "actions": [
+                    {
+                        "action":
+                            "get",
+                        "url":
+                            f"data:text/html;charset=utf-8,{CLICK_TEST_PAGE}",
+                        "ready_state":
+                            "complete",
+                    },
+                    {
+                        "action": "click",
+                        "position": {
+                            "text": "Click me",
+                        },
+                        "verify": "button[id='clicked-button']",
+                        "source": str(input_source),
+                    },
+                ],
+            },
+        },
+    }
+
+    self.run_loading_test(browser_config, page_config, test_env)
+
+  def test_android_keycodes(self, browser_config: str,
+                            test_env: TestEnv) -> None:
+    self.check_input_source_supported(browser_config, InputSource.KEYBOARD)
+    second_page = urllib.parse.quote("""
+<!DOCTYPE html>
+<html>
+<body>
+  <div id="page-2">Page 2</div>
+</body>
+</html>
+""")
+    page_config = {
+        "pages": {
+            "AndroidKeycodesTest": {
+                "actions": [
+                    {
+                        "action":
+                            "get",
+                        "url":
+                            f"data:text/html;charset=utf-8,{CLICK_TEST_PAGE}",
+                        "ready_state":
+                            "complete",
+                    },
+                    {
+                        "action": "click",
+                        "position": {
+                            "selector": "button[id='button']",
+                            "required": True,
+                            "scroll_into_view": True,
+                            "wait": True,
+                        },
+                        "verify": "button[id='clicked-button']",
+                        "source": str(InputSource.TOUCH),
+                    },
+                    {
+                        "action": "get",
+                        "url": f"data:text/html;charset=utf-8,{second_page}",
+                        "ready_state": "complete",
+                    },
+                    {
+                        "action": "wait_for_element",
+                        "selector": "div[id='page-2']",
+                        "timeout": "5s",
+                    },
+                    # Open Android Overview with KEYCODE_APP_SWITCH. The first
+                    # KEYCODE_BACK dismisses Overview and returns to Chrome on
+                    # page-2 (whereas if Overview had not opened, Chrome would
+                    # have navigated back to the first page immediately).
+                    {
+                        "action": "text_input",
+                        "keyevent": "KEYCODE_APP_SWITCH",
+                        "source": str(InputSource.KEYBOARD),
+                    },
+                    {
+                        "action": "wait",
+                        "duration": "1s",
+                    },
+                    {
+                        "action": "text_input",
+                        "keyevent": "KEYCODE_BACK",
+                        "source": str(InputSource.KEYBOARD),
+                    },
+                    {
+                        "action": "wait",
+                        "duration": "1s",
+                    },
+                    {
+                        "action": "wait_for_element",
+                        "selector": "div[id='page-2']",
+                        "timeout": "5s",
+                    },
+                    # Now that Chrome is focused again, the second KEYCODE_BACK
+                    # navigates back to the first page.
+                    {
+                        "action": "text_input",
+                        "keyevent": "KEYCODE_BACK",
+                        "source": str(InputSource.KEYBOARD),
+                    },
+                    {
+                        "action": "wait_for_element",
+                        "selector": "button",
+                        "timeout": "5s",
+                    },
+                    {
+                        "action": "text_input",
+                        "keyevent": "KEYCODE_HOME",
+                        "source": str(InputSource.KEYBOARD),
+                    },
+                    {
+                        "action": "wait_for_condition",
+                        "condition": "return !document.hasFocus();",
+                        "timeout": "5s",
+                    },
+                ],
+            },
+        },
+    }
+
+    self.run_loading_test(browser_config, page_config, test_env)
+
+
+del TestDesktopLoading
 
 if __name__ == "__main__":
   test_helper.run_pytest(__file__)

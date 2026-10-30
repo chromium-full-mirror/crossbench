@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import tempfile
 import urllib.parse
-from typing import TYPE_CHECKING, Final, Mapping
+from typing import TYPE_CHECKING, Any, Final, Mapping, Sequence
 
 import pytest
 
@@ -16,6 +16,7 @@ from crossbench.action_runner.virtual_device.all import DEFAULT_VIRTUAL_DEVICES
 from crossbench.benchmarks.loading.input_source import InputSource
 from crossbench.cli.cli import CrossBenchCLI
 from crossbench.cli.config.browser import BrowserConfig
+from tests import test_helper
 
 if TYPE_CHECKING:
   from crossbench import plt
@@ -39,7 +40,13 @@ CLICK_TEST_PAGE: Final[str] = urllib.parse.quote("""
 """)
 
 
-class BaseInputInjectionTest:
+@pytest.fixture
+def browser_config(test_chrome_name: str) -> str:
+  return test_chrome_name
+
+
+@pytest.mark.xdist_group("end2end-benchmark")
+class TestDesktopLoading:
 
   def get_test_platform(self, browser_config: str) -> plt.Platform:
     return BrowserConfig.parse(browser_config).get_platform()
@@ -61,11 +68,17 @@ class BaseInputInjectionTest:
           f"Native input injection ('{input_source}') requires a display on "
           f"{platform}")
 
-  def run_loading_test(self, browser_config: str, page_config: Mapping[str,
-                                                                       object],
-                       test_env: TestEnv) -> None:
+  def run_loading_test(
+      self,
+      browser_config: str,
+      page_config: Mapping[str, object],
+      test_env: TestEnv,
+      probe_config: Mapping[str, object] | None = None,
+      extra_args: Sequence[str] = (),
+  ) -> None:
     with tempfile.TemporaryDirectory() as tmp_dir:
-      page_config_file = pth.LocalPath(tmp_dir) / "page.config.json"
+      tmp_path = pth.LocalPath(tmp_dir)
+      page_config_file = tmp_path / "page.config.json"
       page_config_file.write_text(json.dumps(page_config), encoding="utf-8")
 
       cli = CrossBenchCLI()
@@ -78,7 +91,12 @@ class BaseInputInjectionTest:
           "--env-validation=skip",
           "--throw",
           *list(test_env.cq_flags),
+          *extra_args,
       ]
+      if probe_config is not None:
+        probe_config_file = tmp_path / "probe.config.json"
+        probe_config_file.write_text(json.dumps(probe_config), encoding="utf-8")
+        args.append(f"--probe-config={probe_config_file}")
       platform = self.get_test_platform(browser_config)
       if platform.is_headless:
         args.append("--headless")
@@ -89,6 +107,15 @@ class BaseInputInjectionTest:
         if "uinput injection is only supported on Android SDK" in str(e):
           pytest.skip(f"Skipping test on unsupported Android SDK: {e}")
         raise
+
+  def assert_run_succeeded(self, test_env: TestEnv) -> dict[str, Any]:
+    result_files = list(test_env.results_dir.glob("cb.results.json"))
+    assert len(result_files) == 1
+    with result_files[0].open(encoding="utf-8") as f:
+      result = json.load(f)
+    assert result["success"], f"Run failed with errors: {result.get('errors')}"
+    assert not result["errors"]
+    return result
 
   @pytest.mark.parametrize("input_source", [
       InputSource.JS,
@@ -305,3 +332,67 @@ class BaseInputInjectionTest:
     }
 
     self.run_loading_test(browser_config, page_config, test_env)
+
+  def test_mouse_move(self, browser_config: str, test_env: TestEnv) -> None:
+    self.check_input_source_supported(browser_config, InputSource.MOUSE)
+    test_page = urllib.parse.quote("""
+<!DOCTYPE html>
+<html>
+<body style="margin: 0; width: 100vw; height: 100vh;">
+  <script>
+    let startPoint = null;
+    window.addEventListener('mousemove', (e) => {
+      if (!startPoint) {
+        startPoint = { x: e.clientX, y: e.clientY };
+        return;
+      }
+      if (e.clientX > startPoint.x + 50 && e.clientY > startPoint.y + 50) {
+        document.body.id = 'mouse-moved';
+      }
+    });
+  </script>
+</body>
+</html>
+""")
+    page_config = {
+        "pages": {
+            "MouseMoveTest": {
+                "actions": [
+                    {
+                        "action": "get",
+                        "url": f"data:text/html;charset=utf-8,{test_page}",
+                        "ready_state": "complete",
+                    },
+                    {
+                        "action": "mouse_move",
+                        "waypoints": [
+                            {
+                                "x": 150,
+                                "y": 400,
+                            },
+                            {
+                                "x": 350,
+                                "y": 400,
+                            },
+                            {
+                                "x": 350,
+                                "y": 600,
+                            },
+                        ],
+                        "duration": "300ms",
+                    },
+                    {
+                        "action": "wait_for_element",
+                        "selector": "body[id='mouse-moved']",
+                        "timeout": "5s",
+                    },
+                ],
+            },
+        },
+    }
+
+    self.run_loading_test(browser_config, page_config, test_env)
+
+
+if __name__ == "__main__":
+  test_helper.run_pytest(__file__)
