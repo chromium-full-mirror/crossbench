@@ -297,7 +297,12 @@ class PerfettoProbeFunctionalTestCase(CrossbenchConfigTestMixin,
   def test_log_results(self):
     probe = PerfettoProbe.parse_str("v8")
     run = mock.Mock()
-    run.results = {probe: mock.Mock(file=self.create_file("perfetto.trace.pb"))}
+    trace_file = self.create_file("perfetto.trace.pb")
+    snapshot_file = self.create_file("perfetto_snapshot_000.trace.pb")
+    run.results = {
+        probe:
+            mock.Mock(file=trace_file, file_list=[snapshot_file, trace_file]),
+    }
 
     with self.assertLogs(level=logging.INFO) as cm:
       probe.log_run_result(run)
@@ -391,8 +396,7 @@ class PerfettoProbeContextTestCase(CrossbenchConfigTestMixin,
     super().setUp()
     self.setup_perfetto_config_presets()
 
-  def test_desktop_context_lifecycle(self):
-    probe = PerfettoProbe.parse_str("v8")
+  def _create_desktop_context(self, probe: PerfettoProbe):
     platform = LinuxMockPlatform(fake_fs=self.fs)
     platform.install_mock_binary("tracebox", "/usr/bin/tracebox")
     platform.install_mock_binary("perfetto", "/usr/bin/perfetto")
@@ -416,6 +420,12 @@ class PerfettoProbeContextTestCase(CrossbenchConfigTestMixin,
                                                   "perfetto")
 
     context = DesktopPerfettoProbeContext(probe, run)
+    return context, platform, tracebox_proc
+
+  def test_desktop_context_lifecycle(self):
+    probe = PerfettoProbe.parse_str("v8")
+    context, platform, tracebox_proc = self._create_desktop_context(probe)
+    run = context.run
 
     # setup
     platform.expect_sh("tracebox", "traced", "traced_probes", result="")
@@ -457,6 +467,63 @@ class PerfettoProbeContextTestCase(CrossbenchConfigTestMixin,
 
     context.teardown()
     self.assertEqual(tracebox_proc.state, MockPopenState.TERMINATED)
+
+  def test_desktop_context_clone_snapshot(self):
+    trace_config = trace_config_pb2.TraceConfig()
+    trace_config.unique_session_name = "test_session"
+    probe = PerfettoProbe(trace_config=trace_config)
+    context, platform, _ = self._create_desktop_context(probe)
+    run = context.run
+
+    platform.expect_sh("tracebox", "traced", "traced_probes", result="")
+    context.setup()
+
+    platform.expect_sh(
+        "tracebox",
+        "perfetto",
+        "--background",
+        "--config",
+        str(run.out_dir / "perfetto_config.textproto"),
+        "--txt",
+        "--out",
+        str(run.out_dir / "perfetto.trace.pb"),
+        result="123")
+    context.start()
+
+    tmp_dir: pth.LocalPath = run.out_dir / "tmp_snapshot"
+    self.fs.create_dir(tmp_dir)
+    tmp_snapshot_file: pth.LocalPath = (
+        tmp_dir / "perfetto_snapshot_000_jank_1.trace.pb")
+    snapshot_file: pth.LocalPath = (
+        run.out_dir / "perfetto_snapshot_000_jank_1.trace.pb")
+    platform.expect_sh(
+        "tracebox",
+        "perfetto",
+        "--clone-by-name",
+        "test_session",
+        "--out",
+        str(tmp_snapshot_file),
+    )
+    self.fs.create_file(tmp_snapshot_file, contents="snapshot_bytes")
+    platform.expect_sh("gzip", str(snapshot_file))
+    self.fs.create_file(snapshot_file.with_suffix(".pb.gz"))
+
+    with mock.patch.object(platform, "mkdtemp", return_value=tmp_dir):
+      context.invoke(("step_1",), label="jank_1")
+    self.assertFalse(self.fs.exists(tmp_dir))
+
+    context.stop()
+    trace_file: pth.LocalPath = run.browser_platform.local_path(
+        context.result_path)
+    self.fs.create_file(trace_file)
+    platform.expect_sh("gzip", str(trace_file))
+    self.fs.create_file(trace_file.with_suffix(".pb.gz"))
+
+    result = context.teardown()
+    self.assertEqual(len(result.file_list), 2)
+    self.assertEqual(len(result.perfetto_list), 1)
+    mock_run = mock.Mock(results={probe: result})
+    probe.log_run_result(mock_run)
 
 
 if __name__ == "__main__":

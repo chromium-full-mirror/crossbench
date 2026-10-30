@@ -416,9 +416,9 @@ class PerfettoProbe(Probe):
     logging.info("-" * 80)
     logging.critical("Perfetto trace results:")
     for run in runs:
-      result_file = run.results[self].file
-      logging.critical("  - %s : %s", result_file,
-                       fs_helper.get_file_size(result_file))
+      for result_file in run.results[self].file_list:
+        logging.critical("  - %s : %s", result_file,
+                         fs_helper.get_file_size(result_file))
 
   @override
   def create_context(self, run: Run) -> PerfettoProbeContext:
