@@ -129,6 +129,20 @@ class PageConfig(ConfigObject):
     blocks = (ActionBlock.from_url(url, duration),)
     return cls(label=label, blocks=blocks)
 
+  @override
+  def validate(self) -> None:
+    super().validate()
+    ActionBlock.validate_browser_start_stop(self._all_actions())
+
+  def _all_actions(self) -> Iterator[Action]:
+    if self.login:
+      yield from self.login
+    if self.setup:
+      yield from self.setup
+    yield from self.actions()
+    if self.teardown:
+      yield from self.teardown
+
   def actions(self) -> Iterator[Action]:
     for block in self.blocks or ():
       yield from block

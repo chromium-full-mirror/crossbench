@@ -9,9 +9,14 @@ import unittest
 
 from crossbench.action_runner.action.get import GetAction
 from crossbench.action_runner.action.js import JsAction
-from crossbench.benchmarks.loading.config.blocks import ActionBlock
+from crossbench.action_runner.action.start_browser import StartBrowserAction
+from crossbench.action_runner.action.stop_browser import StopBrowserAction
+from crossbench.action_runner.action.wait import WaitAction
+from crossbench.benchmarks.loading.config.blocks import ActionBlock, \
+    ActionBlockListConfig
 from crossbench.benchmarks.loading.config.login.custom import LoginBlock
 from crossbench.benchmarks.loading.config.login.google import GoogleLogin
+from crossbench.config import ConfigError
 from tests import test_helper
 
 
@@ -80,6 +85,63 @@ class ActionBlockTestCase(unittest.TestCase):
 
     block = ActionBlock.parse(block.to_json())
     self.assertEqual(block.duration, dt.timedelta(seconds=2))
+
+  def test_start_stop_browser_interleaved_valid(self) -> None:
+    start = StartBrowserAction()
+    stop = StopBrowserAction()
+    wait = WaitAction.create(duration=dt.timedelta(seconds=1))
+    for actions in (
+        (start,),
+        (stop,),
+        (start, wait, stop),
+        (stop, wait, start),
+        (start, wait, stop, wait, start),
+        (stop, wait, start, wait, stop, wait, start),
+    ):
+      with self.subTest(actions=tuple(str(a.TYPE) for a in actions)):
+        block = ActionBlock(actions=actions)
+        self.assertEqual(len(block), len(actions))
+
+  def test_start_browser_twice_in_a_row_invalid(self) -> None:
+    start = StartBrowserAction()
+    stop = StopBrowserAction()
+    wait = WaitAction.create(duration=dt.timedelta(seconds=1))
+    for actions in (
+        (start, start),
+        (start, wait, start),
+        (start, wait, start, stop),
+        (stop, start, wait, start),
+    ):
+      with self.subTest(actions=tuple(str(a.TYPE) for a in actions)):
+        with self.assertRaisesRegex(ConfigError, "two 'start_browser' actions"):
+          ActionBlock(actions=actions)
+
+  def test_stop_browser_twice_in_a_row_invalid(self) -> None:
+    start = StartBrowserAction()
+    stop = StopBrowserAction()
+    wait = WaitAction.create(duration=dt.timedelta(seconds=1))
+    for actions in (
+        (stop, stop),
+        (stop, wait, stop),
+        (stop, wait, stop, start),
+        (start, stop, wait, stop),
+    ):
+      with self.subTest(actions=tuple(str(a.TYPE) for a in actions)):
+        with self.assertRaisesRegex(ConfigError, "two 'stop_browser' actions"):
+          ActionBlock(actions=actions)
+
+  def test_start_stop_browser_across_blocks_invalid(self) -> None:
+    start = StartBrowserAction()
+    stop = StopBrowserAction()
+    block_start_0 = ActionBlock(label="b0", index=0, actions=(start,))
+    block_start_1 = ActionBlock(label="b1", index=1, actions=(start,))
+    with self.assertRaisesRegex(ConfigError, "two 'start_browser' actions"):
+      ActionBlockListConfig(blocks=(block_start_0, block_start_1))
+
+    block_stop_0 = ActionBlock(label="b0", index=0, actions=(stop,))
+    block_stop_1 = ActionBlock(label="b1", index=1, actions=(stop,))
+    with self.assertRaisesRegex(ConfigError, "two 'stop_browser' actions"):
+      ActionBlockListConfig(blocks=(block_stop_0, block_stop_1))
 
 
 class LoginBlockTestCase(unittest.TestCase):

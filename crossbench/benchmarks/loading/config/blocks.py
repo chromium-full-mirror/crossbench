@@ -7,7 +7,8 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import functools
-from typing import TYPE_CHECKING, Final, Iterator, Mapping, Self, Sequence
+from typing import TYPE_CHECKING, Final, Iterable, Iterator, Mapping, Self, \
+    Sequence
 
 from typing_extensions import override
 
@@ -101,12 +102,39 @@ class ActionBlock(ConfigObject):
 
   def validate_actions(self) -> None:
     ObjectParser.sequence(self.actions, "actions")
+    self.validate_browser_start_stop(self.actions)
     # TODO: enable validating action indices
     # for index, action in enumerate(self.actions):
     #   if index != action.index:
     #     raise ValueError(
     #         f"action[{index}].index should be {index}, "
     #         f"but got {action.index}")
+
+  @classmethod
+  def validate_browser_start_stop(cls, actions: Iterable[Action]) -> None:
+    num_starts = 0
+    num_stops = 0
+    is_browser_running: bool | None = None
+    for action in actions:
+      match action.TYPE:
+        case ActionType.START_BROWSER:
+          if is_browser_running is True:
+            raise ConfigError(
+                "Cannot have two 'start_browser' actions in a row without "
+                "'stop_browser' in between.")
+          is_browser_running = True
+          num_starts += 1
+        case ActionType.STOP_BROWSER:
+          if is_browser_running is False:
+            raise ConfigError(
+                "Cannot have two 'stop_browser' actions in a row without "
+                "'start_browser' in between.")
+          is_browser_running = False
+          num_stops += 1
+    if num_starts > num_stops + 1:
+      raise ConfigError(
+          f"Number of 'start_browser' actions ({num_starts}) cannot exceed "
+          f"number of 'stop_browser' actions ({num_stops}) + 1.")
 
   def run_with(self, runner: ActionRunner) -> None:
     runner.run_block(self)
@@ -249,3 +277,5 @@ class ActionBlockListConfig(ConfigObject):
       if index != block.index:
         raise ValueError(
             f"blocks[{index}].index should be {index}, but got {block.index}")
+    ActionBlock.validate_browser_start_stop(
+        action for block in self.blocks for action in block)

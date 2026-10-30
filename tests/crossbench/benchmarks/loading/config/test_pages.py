@@ -422,6 +422,37 @@ class PagesConfigTestCase(CrossbenchFakeFsTestCase):
             },
         })
 
+  def test_start_stop_browser_across_page_blocks_invalid(self) -> None:
+    with self.assertRaisesRegex(argparse.ArgumentTypeError,
+                                "two 'start_browser' actions"):
+      PagesConfig.parse_dict({
+          "pages": {
+              "TEST": {
+                  "setup": [{
+                      "action": "start_browser",
+                  }],
+                  "actions": [{
+                      "action": "start_browser",
+                  }],
+              },
+          },
+      })
+
+    with self.assertRaisesRegex(argparse.ArgumentTypeError,
+                                "two 'stop_browser' actions"):
+      PagesConfig.parse_dict({
+          "pages": {
+              "TEST": {
+                  "actions": [{
+                      "action": "stop_browser",
+                  }],
+                  "teardown": [{
+                      "action": "stop_browser",
+                  }],
+              },
+          },
+      })
+
 
 DEVTOOLS_RECORDER_EXAMPLE = {
     "title":
